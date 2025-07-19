@@ -1,0 +1,17 @@
+
+<svg
+  width="80"
+  height="40"
+  viewBox="0 0 80 40"
+  xmlns="http://www.w3.org/2000/svg"
+>
+  <!-- Body -->
+  <rect x="5" y="10" width="70" height="20" rx="4" fill="none" stroke="#8B6D50" stroke-width="2"/>
+  <!-- End caps -->
+  <rect x="0" y="12" width="5" height="16" fill="#C0C0C0"/>
+  <rect x="75" y="12" width="5" height="16" fill="#C0C0C0"/>
+  <!-- Color bands -->
+  <rect x="20" y="10" width="4" height="20" fill="#000"/>
+  <rect x="32" y="10" width="4" height="20" fill="#A52A2A"/>
+  <rect x="44" y="10" width="4" height="20" fill="#FFD700"/>
+</svg>

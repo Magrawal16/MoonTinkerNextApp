@@ -18,6 +18,8 @@ export default function createElement(
         y: -2,
         parentId: id,
         polarity: "positive",
+        placeholder: 'Positive',
+        fillColor: 'green'
       },
       {
         id: id + "-node-2",
@@ -25,6 +27,8 @@ export default function createElement(
         y: -2,
         parentId: id,
         polarity: "negative",
+        placeholder: 'Negative',
+        fillColor: 'red'
       },
     ],
     properties: {
@@ -47,12 +51,16 @@ export default function createElement(
         x: 10,
         y: 40,
         parentId: id,
+        placeholder: 'Terminal 1',
+        fillColor: 'red'
       },
       {
         id: id + "-node-2",
         x: 30,
         y: 40,
         parentId: id,
+        placeholder: 'Terminal 2',
+        fillColor: 'red'
       },
     ],
     properties: {
@@ -75,12 +83,16 @@ export default function createElement(
         x: 1,
         y: 42,
         parentId: id,
+        placeholder: 'Terminal 1',
+        fillColor: 'red'
       },
       {
         id: id + "-node-2",
         x: 42,
         y: 42,
         parentId: id,
+        placeholder: 'Terminal 1',
+        fillColor: 'red'
       },
     ],
     properties: {
@@ -104,6 +116,8 @@ export default function createElement(
         y: 20,
         parentId: id,
         polarity: "negative",
+        placeholder: 'Negative',
+        fillColor: 'red'
       },
       {
         id: id + "-node-2",
@@ -111,6 +125,8 @@ export default function createElement(
         y: 20,
         parentId: id,
         polarity: "positive",
+        placeholder: 'Positive',
+        fillColor: 'green'
       },
     ],
     properties: {
@@ -134,6 +150,8 @@ export default function createElement(
         y: 23,
         parentId: id,
         name: "A", // optional for clarity
+        placehodler: 'Terminal 1',
+        fillColor: 'red'
       },
       {
         id: id + "-node-W", // Wiper
@@ -141,6 +159,8 @@ export default function createElement(
         y: 23, // position it visually on top if needed
         parentId: id,
         name: "W",
+        placeholder: 'black',
+        fillColor: 'red'
       },
       {
         id: id + "-node-B", // Terminal B
@@ -148,6 +168,8 @@ export default function createElement(
         y: 23,
         parentId: id,
         name: "B",
+        placehodler: 'Terminal 2',
+        fillColor: 'red'
       },
     ],
     properties: {
@@ -171,6 +193,8 @@ export default function createElement(
         y: 40,
         parentId: id,
         polarity: "positive",
+        placeholder: 'Cathode',
+        fillColor: 'red'
       },
       {
         id: id + "-node-2",
@@ -178,6 +202,8 @@ export default function createElement(
         y: 40,
         parentId: id,
         polarity: "negative",
+        placeholder: 'Anode',
+        fillColor: 'red'
       },
     ],
     properties: {
@@ -200,30 +226,40 @@ export default function createElement(
         x: 42.9,
         y: 227,
         parentId: id,
+        placeholder: 'P0',
+        fillColor: 'red'
       },
       {
         id: id + "-node-1",
         x: 74.8,
         y: 227,
         parentId: id,
+        placeholder: 'P1',
+        fillColor: 'red'
       },
       {
         id: id + "-node-2",
         x: 111.4,
         y: 227,
         parentId: id,
+        placeholder: 'P2',
+        fillColor: 'red'
       },
       {
         id: id + "-node-3V",
         x: 148,
         y: 227,
         parentId: id,
+        placeholder: '3.3V',
+        fillColor: 'red'
       },
       {
         id: id + "-node-GND",
         x: 180,
         y: 227,
         parentId: id,
+        placeholder: 'GND',
+        fillColor: 'red'
       },
     ],
     properties: {

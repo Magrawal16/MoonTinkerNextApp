@@ -38,6 +38,8 @@ export type Node = {
   y: number;
   parentId: string;
   polarity?: "positive" | "negative"; // Optional polarity for the node
+  placeholder?: string;
+  fillColor?: string;
 };
 
 export type Size =

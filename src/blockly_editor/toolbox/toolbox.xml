@@ -1,0 +1,47 @@
+<!-- src/app/editor/toolbox/toolbox.xml -->
+<xml>
+  <category name="Micro:bit">
+    <block type="controls_forever" />
+    <block type="basic_show_icon">
+      <field name="ICON">heart</field>
+    </block>
+    <block type="basic_show_string">
+      <field name="TEXT">Hello</field>
+    </block>
+    <block type="basic_clear_screen" />
+    <block type="basic_pause">
+      <value name="MILLIS">
+        <shadow type="math_number">
+          <field name="NUM">1000</field>
+        </shadow>
+      </value>
+    </block>
+  </category>
+  <category name="Logic" categorystyle="logic_category">
+    <block type="controls_if" />
+    <block type="logic_compare" />
+    <block type="logic_operation" />
+    <block type="logic_boolean" />
+  </category>
+  <category name="Loops" categorystyle="loop_category">
+    <block type="controls_repeat_ext">
+      <value name="TIMES">
+        <shadow type="math_number">
+          <field name="NUM">10</field>
+        </shadow>
+      </value>
+    </block>
+    <block type="controls_whileUntil" />
+  </category>
+  <category name="Math" categorystyle="math_category">
+    <block type="math_number" />
+    <block type="math_arithmetic" />
+    <block type="math_random_int" />
+  </category>
+  <category name="Text" categorystyle="text_category">
+    <block type="text" />
+    <block type="text_print" />
+  </category>
+  <category name="Variables" custom="VARIABLE" />
+  <category name="Functions" custom="PROCEDURE" />
+</xml>

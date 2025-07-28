@@ -3,9 +3,12 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 
-const CircuitCanvas = dynamic(() => import('@/components/circuit/core/CircuitCanvas'), {
-  ssr: false,
-});
+const CircuitCanvas = dynamic(
+  () => import("@/circuit_canvas/components/core/CircuitCanvas"),
+  {
+    ssr: false,
+  }
+);
 
 export default function Page() {
   const [showCanvas, setShowCanvas] = useState(false);
@@ -13,9 +16,9 @@ export default function Page() {
   useEffect(() => {
     const timer = setTimeout(() => {
       setShowCanvas(true);
-    }, 1500); 
+    }, 400);
 
-    return () => clearTimeout(timer); 
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -24,7 +27,11 @@ export default function Page() {
         <CircuitCanvas />
       ) : (
         <div className="flex items-center justify-center h-screen">
-          <img src="/common/moonpreneur_logo.svg" alt="Loading..." className="w-100 h-60 animate-bounce" />
+          <img
+            src="/assets/common/moonpreneur_logo.svg"
+            alt="Loading..."
+            className="w-100 h-60 animate-bounce"
+          />
         </div>
       )}
     </>

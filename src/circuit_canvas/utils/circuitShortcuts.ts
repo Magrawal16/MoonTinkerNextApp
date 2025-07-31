@@ -1,5 +1,6 @@
+import { setSelected } from "node_modules/blockly/core/common";
 import type { ShortcutDefinition } from "../hooks/useCircuitShortcuts";
-import type { CircuitElement, Wire } from "../types/circuit"
+import type { CircuitElement, Wire } from "../types/circuit";
 
 type ShortcutMetadata = Omit<ShortcutDefinition, "handler">;
 
@@ -55,7 +56,7 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
     {
       name: "Start/stop simulation",
       description: "Start or stop the circuit simulation",
-      keys: ["space"],
+      keys: ["ctrl", "space"],
     },
   ];
 }
@@ -89,6 +90,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
           handler: () => {
             setCreatingWireStartNode(null);
             setEditingWire(null);
+            setSelectedElement(null);
           },
         };
       case "ctrl+l":
@@ -138,7 +140,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             stopSimulation();
           },
         };
-      case "space":
+      case "ctrl+space":
         return {
           ...meta,
           handler: () => {

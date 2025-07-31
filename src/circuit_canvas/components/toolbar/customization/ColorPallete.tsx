@@ -41,7 +41,7 @@ export function ColorPaletteDropdown({
     <div ref={dropdownRef} className="relative inline-block text-left">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-sm text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center"
+        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
       >
         <div
           className="w-4 h-4 rounded-full border"
@@ -62,9 +62,8 @@ export function ColorPaletteDropdown({
               }}
             >
               <div
-                className={`w-4 h-4 rounded-full border ${
-                  selectedColor === hex ? "border-black" : "border-gray-300"
-                }`}
+                className={`w-4 h-4 rounded-full border ${selectedColor === hex ? "border-black" : "border-gray-300"
+                  }`}
                 style={{ backgroundColor: hex }}
               />
               <span className="text-sm text-black">{name}</span>

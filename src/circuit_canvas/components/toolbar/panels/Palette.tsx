@@ -14,34 +14,39 @@ export default function CircuitSelector() {
   }, [search]);
 
   return (
-    <Panel className="w-full h-full overflow-x-clip p-2">
+    <Panel
+      className={`w-full h-[510px] overflow-x-clip p-4
+      bg-white-500 bg-opacity-20
+      backdrop-blur-2xl
+      border border-red border-opacity-30
+      rounded-xl
+      shadow-lg
+      `}
+    >
       <input
         type="text"
         placeholder="Search..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        className="mb-3 w-full rounded-md border border-gray-300  bg-white px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        className="mb-4 w-full rounded-md border border-gray-300 bg-white/30 px-3 py-2 text-sm placeholder-gray-400 text-black backdrop-blur-sm focus:outline-none shadow-lg focus:ring-2 focus:ring-blue-400 hover:shadow-blue-400 hover:scale-105"
       />
 
       <div className="w-full h-full grid grid-cols-3 gap-2 auto-rows-[100px]">
         {filteredElements.map((el) => (
           <div
             key={el.type}
-            className="aspect-[1/1.2] cursor-grab active:cursor-grabbing flex flex-col justify-center items-center gap-3 p-1 rounded-lg border border-b-blue-950 shadow-2xl hover:shadow-blue-950 hover:scale-110 transition-all duration-200 bg-[#F1F1F3]"
+            className="aspect-[1/1.2] cursor-grab active:cursor-grabbing flex flex-col justify-center items-center gap-3 p-2 rounded-lg border border-blue-200 border-opacity-20 shadow-lg bg-white bg-opacity-20 backdrop-blur-md hover:shadow-blue-400 hover:scale-110 transition-all duration-300 text-black"
             draggable
             onDragStart={(e) => {
-              e.dataTransfer.setData(
-                "application/element-type",
-                JSON.stringify(el)
-              );
+              e.dataTransfer.setData("application/element-type", JSON.stringify(el));
             }}
           >
             <img
               src={el.iconPath}
               alt={el.label}
-              className="w-15 h-15 object-contain"
+              className="w-14 h-13 object-contain filter drop-shadow-md"
             />
-            <span className="text-sm text-gray-800 truncate max-w-[95%] text-center">
+            <span className="text-xs text-center truncate max-w-[100%] text-black">
               {el.label}
             </span>
           </div>

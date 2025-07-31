@@ -59,11 +59,12 @@ export default function Microbit({
             image={imgOffState}
             width={220}
             height={220}
-            shadowColor={props.selected ? "blue" : undefined}
-            shadowBlur={props.selected ? 15 : 0}
-            offset={{ x: 0, y: 10 }}
-            shadowOffset={{ x: 0, y: 0 }}
-            shadowOpacity={props.selected ? 0.6 : 0}
+            x={0}
+            y={-25}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 6 : 0}
+            shadowOffset={{ x: 15, y: -15 }}
+            shadowOpacity={props.selected ? 2 : 0}
           />
         )}
         {imgOnnState && isSimulationOn && (
@@ -71,11 +72,10 @@ export default function Microbit({
             image={imgOnnState}
             width={220}
             height={220}
-            shadowColor={props.selected ? "blue" : undefined}
-            shadowBlur={props.selected ? 15 : 0}
-            offset={{ x: 0, y: -2 }}
-            shadowOffset={{ x: 0, y: 0 }}
-            shadowOpacity={props.selected ? 0.6 : 0}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 10 : 0}
+            shadowOffset={{ x: 15, y: -15 }}
+            shadowOpacity={props.selected ? 2 : 0}
           />
         )}
         {imgMicrobit && (
@@ -83,10 +83,10 @@ export default function Microbit({
             image={imgMicrobit}
             width={220}
             height={220}
-            shadowColor={props.selected ? "blue" : undefined}
-            shadowBlur={props.selected ? 15 : 0}
-            shadowOffset={{ x: 0, y: 0 }}
-            shadowOpacity={props.selected ? 0.6 : 0}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 10 : 0}
+            shadowOffset={{ x: 15, y: -15 }}
+            shadowOpacity={props.selected ? 2 : 0}
           />
         )}
 

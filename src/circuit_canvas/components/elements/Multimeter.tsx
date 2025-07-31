@@ -67,10 +67,10 @@ export default function Multimeter(props: MultimeterProps) {
             image={img}
             width={240}
             height={100}
-            shadowColor={props.selected ? "blue" : undefined}
-            shadowBlur={props.selected ? 15 : 0}
-            shadowOffset={{ x: 0, y: 0 }}
-            shadowOpacity={props.selected ? 0.6 : 0}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 10 : 0}
+            shadowOffset={{ x: 20, y: 20 }}
+            shadowOpacity={props.selected ? 2 : 0}
           />
         )}
         <Line

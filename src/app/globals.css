@@ -40,3 +40,24 @@ body {
 .animate-slide-in-up {
   animation: slide-in-up 0.3s ease-out;
 }
+
+/* for text editor */
+/* Monaco Editor: Transparent glass, dark text with shadow */
+/* Monaco Editor: Transparent glass, LIGHT text with subtle shadow for clarity */
+.monaco-transparent .monaco-editor,
+.monaco-transparent .monaco-editor-background,
+.monaco-transparent .margin,
+.monaco-transparent .inputarea.ime-input {
+  background-color: transparent !important;
+}
+
+.monaco-transparent .monaco-editor .view-line {
+  color: #f7faff !important;
+  /* Light code lines */
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.28), 0 1px 0 rgba(80, 140, 230, 0.08);
+}
+
+.monaco-transparent .monaco-editor .margin .line-numbers {
+  color: #ecf2fd !important;
+  text-shadow: 0 0 4px rgba(30, 60, 230, 0.12);
+}

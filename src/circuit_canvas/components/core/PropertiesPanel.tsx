@@ -192,8 +192,8 @@ export default function PropertiesPanel({
       )}
 
       {showUpdateMessage && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <div className="flex items-center gap-2 bg-white border border-green-400 text-green-700 px-3 py-2 rounded shadow animate-slide-in-up text-xs">
+        <div className="fixed bottom-7 right-3 z-10">
+          <div className="flex items-center gap-2 backdrop-blur-sm bg-white/1 border-2 border-green-500 text-green-800 px-1 py-1 rounded shadow-2xl animate-slide-in-up text-md">
             <svg
               className="w-4 h-4 text-green-500"
               fill="none"

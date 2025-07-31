@@ -59,7 +59,7 @@ export default function CircuitStorage(props: CircuitManagerProps) {
   return (
     <>
       <button
-        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-sm text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center"
+        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
         onClick={() => setIsOpen(true)}
       >
         <FaFolder />

@@ -132,7 +132,10 @@ export default function RenderElement({
               }
               stroke={isHovered ? "black" : "transparent"}
               strokeWidth={isHovered ? 1.4 : 0}
-              onClick={() => props.handleNodeClick(node.id)}
+              onClick={(e) => {
+                e.cancelBubble = true;
+                props.handleNodeClick(node.id)
+              }}
               hitStrokeWidth={10}
               onMouseEnter={(e) => {
                 setHoveredNodeId(node.id);

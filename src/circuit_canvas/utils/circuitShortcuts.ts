@@ -21,6 +21,8 @@ type ShortcutArgs = {
   getNodeParent: (nodeId: string) => CircuitElement | null | undefined;
   undo: () => void;
   toggleSimulation: () => void;
+  updateWiresDirect?: () => void; // Add wire update function
+  setActiveControllerId: React.Dispatch<React.SetStateAction<string | null>>;
 };
 
 /**
@@ -56,7 +58,7 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
     {
       name: "Start/stop simulation",
       description: "Start or stop the circuit simulation",
-      keys: ["ctrl", "space"],
+      keys: ["space"],
     },
   ];
 }
@@ -80,6 +82,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
     getNodeParent,
     undo,
     toggleSimulation,
+    setActiveControllerId,
   } = args;
 
   return getShortcutMetadata().map((meta) => {
@@ -91,12 +94,16 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             setCreatingWireStartNode(null);
             setEditingWire(null);
             setSelectedElement(null);
+            setActiveControllerId(null);
           },
         };
       case "ctrl+l":
         return {
           ...meta,
-          handler: () => resetState(),
+          handler: () => {
+            setSelectedElement(null);
+            resetState();
+          },
         };
       case "ctrl+z":
         return {
@@ -140,7 +147,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             stopSimulation();
           },
         };
-      case "ctrl+space":
+      case "space":
         return {
           ...meta,
           handler: () => {

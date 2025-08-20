@@ -1,7 +1,10 @@
+// RenderElement.tsx
+
 import { useState } from "react";
 import { CircuitElement } from "@/circuit_canvas/types/circuit";
-import { Rect, Group, Text, Label, Tag } from "react-konva"; // <-- Add Text
+import { Rect, Group, Text, Label, Tag } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
+import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
 import Lightbulb from "@/circuit_canvas/components/elements/Lightbulb";
 import Battery from "@/circuit_canvas/components/elements/Battery";
 import Led from "@/circuit_canvas/components/elements/Led";
@@ -9,12 +12,16 @@ import Resistor from "@/circuit_canvas/components/elements/Resistor";
 import Multimeter from "@/circuit_canvas/components/elements/Multimeter";
 import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
+import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 
+// ✅ add simulator to props type
 export default function RenderElement({
   element,
+  simulator, // ← Make sure this is here
   ...props
 }: {
   element: CircuitElement;
+  simulator?: any; // ← Make sure this is in the interface
   onDragMove: (e: KonvaEventObject<DragEvent>) => void;
   handleNodeClick: (nodeId: string) => void;
   handleRatioChange?: (elementId: string, ratio: number) => void;
@@ -27,11 +34,15 @@ export default function RenderElement({
   isSimulationOn?: boolean;
 }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const center = getElementCenter(element);
 
   return (
     <Group
       x={element.x}
       y={element.y}
+      offsetX={center.x}
+      offsetY={center.y}
+      rotation={element.rotation || 0}
       onDragMove={props.onDragMove}
       onDragStart={props.onDragStart}
       onDragEnd={props.onDragEnd}
@@ -112,6 +123,26 @@ export default function RenderElement({
           }
           selected={props.selectedElementId === element.id}
           isSimulationOn={props.isSimulationOn}
+          pins={
+            (element.controller?.pins as Record<
+              string,
+              { digital?: number }
+            >) ?? {}
+          }
+        />
+      )}
+      {element.type === "ultrasonicsensor4p" && (
+        <UltraSonicSensor4P
+          id={element.id}
+          x={0}
+          y={0}
+          selected={props.selectedElementId === element.id}
+          pins={{
+            trig: element.nodes.find((n) => n.placeholder === "TRIG")?.id,
+            echo: element.nodes.find((n) => n.placeholder === "ECHO")?.id,
+          }}
+          isSimulation={props.isSimulationOn}
+          simulator={simulator} // ← Pass the simulator prop
         />
       )}
 
@@ -134,7 +165,7 @@ export default function RenderElement({
               strokeWidth={isHovered ? 1.4 : 0}
               onClick={(e) => {
                 e.cancelBubble = true;
-                props.handleNodeClick(node.id)
+                props.handleNodeClick(node.id);
               }}
               hitStrokeWidth={10}
               onMouseEnter={(e) => {

@@ -33,10 +33,12 @@ const HighPerformanceGrid: React.FC<HighPerformanceGridProps> = ({
           // Adaptive grid density based on zoom level
           let effectiveGridSize = gridSize;
           if (adaptive) {
-            // When zoomed out, use larger grid spacing
-            if (scale < 0.5) effectiveGridSize = gridSize * 4;
-            else if (scale < 0.8) effectiveGridSize = gridSize * 2;
-            else if (scale > 1.5) effectiveGridSize = gridSize / 2;
+            // When zoomed in (scale > 1), use larger grid spacing for less clutter
+            if (scale > 2) effectiveGridSize = gridSize * 4;
+            else if (scale > 1.5) effectiveGridSize = gridSize * 2;
+            // When zoomed out (scale < 1), use smaller grid spacing for more reference points
+            else if (scale < 0.5) effectiveGridSize = gridSize / 4;
+            else if (scale < 0.8) effectiveGridSize = gridSize / 2;
           }
 
           // Calculate visible bounds with minimal padding
@@ -72,8 +74,8 @@ const HighPerformanceGrid: React.FC<HighPerformanceGridProps> = ({
           context.strokeStyle = `rgba(229, 231, 235, ${opacity})`;
           context.lineWidth = Math.max(0.5, 1.3 / scale);
 
-          // Use solid lines when zoomed in, dashed when zoomed out
-          if (scale > 1) {
+          // Use dashed lines when zoomed out, solid lines when zoomed in
+          if (scale < 1) {
             context.setLineDash([2 / scale, 2 / scale]);
           } else {
             context.setLineDash([]);

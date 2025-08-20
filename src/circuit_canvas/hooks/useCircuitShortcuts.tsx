@@ -9,10 +9,12 @@ export type ShortcutDefinition = {
 
 type UseCircuitShortcutsProps = {
   getShortcuts: () => ShortcutDefinition[];
+  disableShortcut?: boolean; // Optional flag to disable the shortcut
 };
 
 export default function useCircuitShortcuts({
   getShortcuts,
+  disableShortcut,
 }: UseCircuitShortcutsProps) {
   useEffect(() => {
     const matchShortcut = (e: KeyboardEvent, keys: string[]) => {
@@ -28,6 +30,7 @@ export default function useCircuitShortcuts({
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (disableShortcut) return; // Ignore if default action is prevented
       const shortcuts = getShortcuts();
       for (const shortcut of shortcuts) {
         if (matchShortcut(e, shortcut.keys)) {

@@ -99,7 +99,7 @@ export class PythonInterpreter {
 
   async run(code: string): Promise<string> {
     if (!this.pyodide) throw new Error("Interpreter not initialized");
-
+    code = this.transformCode(code);
     try {
       await this.injectPrintRedirect();
       await this.pyodide.runPythonAsync(code);
@@ -107,6 +107,27 @@ export class PythonInterpreter {
     } catch (err: any) {
       return err.toString();
     }
+  }
+
+  private transformCode(code: string): string {
+    // List of blocking functions to insert `await` before
+    const awaitFunctions = ["basic.show_string", "basic.pause"];
+
+    const lines = code.split("\n");
+    const transformedLines = lines.map((line) => {
+      const trimmed = line.trim();
+
+      for (const func of awaitFunctions) {
+        const pattern = new RegExp(`^(${func}\\s*\\()`);
+        if (pattern.test(trimmed) && !trimmed.startsWith("await")) {
+          return line.replace(pattern, "await " + func + "(");
+        }
+      }
+
+      return line;
+    });
+
+    return transformedLines.join("\n");
   }
 
   private async injectPrintRedirect() {

@@ -10,13 +10,14 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-1",
         x: 13,
         y: 38,
         parentId: id,
-        polarity: "positive",
+        polarity: "positive" as const,
         placeholder: "Positive",
         fillColor: "green",
       },
@@ -25,7 +26,7 @@ export default function createElement(
         x: 13,
         y: 47,
         parentId: id,
-        polarity: "negative",
+        polarity: "negative" as const,
         placeholder: "Negative",
         fillColor: "red",
       },
@@ -44,6 +45,7 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-1",
@@ -76,6 +78,7 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-1",
@@ -108,24 +111,25 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
-      {
-        id: id + "-node-1",
-        x: 10.3,
-        y: 14,
-        parentId: id,
-        polarity: "negative",
-        placeholder: "Negative",
-        fillColor: "red",
-      },
       {
         id: id + "-node-2",
         x: 30.6,
         y: 14,
         parentId: id,
-        polarity: "positive",
+        polarity: "positive" as const,
         placeholder: "Positive",
         fillColor: "green",
+      },
+      {
+        id: id + "-node-1",
+        x: 10.3,
+        y: 14,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "red",
       },
     ],
     properties: {
@@ -142,13 +146,13 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-A", // Terminal A
         x: 11.3,
         y: 20,
         parentId: id,
-        name: "A", // optional for clarity
         placeholder: "Terminal 1",
         fillColor: "red",
       },
@@ -157,7 +161,6 @@ export default function createElement(
         x: 26,
         y: 16, // position it visually on top if needed
         parentId: id,
-        name: "W",
         placeholder: "Wiper",
         fillColor: "red",
       },
@@ -166,7 +169,6 @@ export default function createElement(
         x: 41.3,
         y: 20,
         parentId: id,
-        name: "B",
         placeholder: "Terminal 2",
         fillColor: "red",
       },
@@ -185,13 +187,14 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-1",
         x: 27,
         y: 60,
         parentId: id,
-        polarity: "positive",
+        polarity: "positive" as const,
         placeholder: "Cathode",
         fillColor: "red",
       },
@@ -200,7 +203,7 @@ export default function createElement(
         x: 41,
         y: 60,
         parentId: id,
-        polarity: "negative",
+        polarity: "negative" as const,
         placeholder: "Anode",
         fillColor: "red",
       },
@@ -219,6 +222,7 @@ export default function createElement(
     type: props.type,
     x: props.pos.x,
     y: props.pos.y,
+    rotation: props.rotation ?? 0,
     nodes: [
       {
         id: id + "-node-0",
@@ -271,6 +275,55 @@ export default function createElement(
       },
     ],
     properties: {
+      voltage: props.properties?.voltage ?? 3.3,
+      resistance: props.properties?.resistance ?? 0,
+      ...props.properties,
+    },
+  };
+
+  const ultraSonicSensor4P = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-vcc",
+        x: 76.7,
+        y: 117,
+        parentId: id,
+        placeholder: "VCC(+5V)",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-trig",
+        x: 100.3,
+        y: 117,
+        parentId: id,
+        placeholder: "TRIG",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-echo",
+        x: 124.3,
+        y: 117,
+        parentId: id,
+        placeholder: "ECHO",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-gnd",
+        x: 148.3,
+        y: 117,
+        parentId: id,
+        placeholder: "GND",
+        fillColor: "red",
+      }
+    ],
+    properties: {
+      voltage: props.properties?.voltage ?? 3.3,
+      resistance: props.properties?.resistance ?? 0,
       ...props.properties,
     },
   };
@@ -298,6 +351,9 @@ export default function createElement(
       break;
     case "microbit":
       element = microbitElement;
+      break;
+    case "ultrasonicsensor4p":
+      element = ultraSonicSensor4P;
       break;
     default:
       element = null;

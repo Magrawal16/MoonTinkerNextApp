@@ -75,7 +75,7 @@ export default function Multimeter(props: MultimeterProps) {
         )}
         <Line
           points={[0, 0, 0, -5]}
-          stroke="black"
+          stroke="red"
           strokeWidth={4}
           hitStrokeWidth={10}
           lineCap="round"

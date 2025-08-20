@@ -4,6 +4,7 @@ export type CircuitElement = {
   id: string;
   x: number;
   y: number;
+  rotation?: number; // rotation angle in degrees (0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330)
   nodes: Node[];
   connecters?: ElementConnecter[];
   type: string;
@@ -12,6 +13,7 @@ export type CircuitElement = {
     resistance?: number; // all components can have resistance
     ratio?: number; // for potentiometers, the ratio of resistance
     mode?: "voltage" | "current"; // for multimeters, can be voltage or current mode
+    distance?: number; // cm
   };
   computed?: {
     current?: number; // computed current through the element
@@ -64,6 +66,7 @@ export type CircuitElementProps = {
   type: string;
   idNumber: number;
   pos: { x: number; y: number };
+  rotation?: number;
   properties?: {
     resistance?: number;
     voltage?: number;
@@ -78,7 +81,8 @@ export type PaletteElementType =
   | "multimeter"
   | "potentiometer"
   | "led"
-  | "microbit";
+  | "microbit"
+  | "ultrasonicsensor4p";
 
 export type PropertiesPanelProps = {
   selectedElement: CircuitElement | null;

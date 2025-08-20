@@ -10,6 +10,7 @@ import { Group, Image, Rect, Text } from "react-konva";
 interface MicrobitProps extends BaseElementProps {
   onControllerInput?: (input: "A" | "B") => void;
   leds: boolean[][];
+  pins: Record<string, { digital?: number }>;
   isSimulationOn?: boolean;
 }
 
@@ -22,7 +23,7 @@ export default function Microbit({
   const [imgMicrobit, setImgMicrobit] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
-  const [btnPressed, setBtnPressed] = useState<'A' | 'B' | null>(null);
+  const [btnPressed, setBtnPressed] = useState<"A" | "B" | null>(null);
   useEffect(() => {
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit.svg";
@@ -49,7 +50,6 @@ export default function Microbit({
     onControllerInput?.(btn);
     setTimeout(() => setBtnPressed(null), 150);
   };
-
 
   return (
     <BaseElement {...props}>
@@ -143,7 +143,6 @@ export default function Microbit({
             fontStyle="bold"
           />
         </Group>
-
 
         {/* Button B */}
         <Group

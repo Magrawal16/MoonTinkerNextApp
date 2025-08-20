@@ -13,7 +13,7 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
   return (
     <div
       className={`ms-3.5
-        w-[940px] max-w-2xl min-w-[200px] h-[460px] min-h-[260px] max-h-[84vh]
+        w-[940px] max-w-2xl min-w-[200px] h-full  min-h-[260px] max-h-[84vh]
         flex flex-col rounded-xl overflow-hidden shadow-2xl border border-white/20
         monaco-transparent
         bg-gradient-to-br from-slate-900/80 via-blue-950/70 to-slate-700/70
@@ -76,7 +76,7 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
               vertical: "auto",
               horizontal: "auto",
               useShadows: false,
-            }
+            },
           }}
           height="100%"
           width="100%"

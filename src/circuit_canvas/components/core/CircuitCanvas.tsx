@@ -570,6 +570,18 @@ export default function CircuitCanvasOptimized() {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
+    // If not wiring/editing and user clicked on empty canvas (Stage/Layer), clear selection
+    if (!creatingWireStartNode && !editingWire) {
+      const className = e.target.getClassName?.();
+      const clickedEmpty = className === "Stage" || className === "Layer";
+      if (clickedEmpty) {
+        setSelectedElement(null);
+        setShowPropertiesPannel(false);
+        setActiveControllerId(null);
+        return; // do not process further
+      }
+    }
+
     if (editingWire) {
       const updated = wires.filter((w) => w.id !== editingWire.wireId);
       setWires(updated);
@@ -647,6 +659,15 @@ export default function CircuitCanvasOptimized() {
         animatedCircleRef.current.scaleX(scaleFactor);
         animatedCircleRef.current.scaleY(scaleFactor);
         inProgressWireRef.current.strokeWidth(2 / stage.scaleX());
+
+        // Immediately reset animatedCircle position to the start node
+        const startNode = getNodeById(nodeId);
+        const startParent = startNode ? getNodeParent(startNode.id) : null;
+        if (startNode && startParent) {
+          const startPos = getAbsoluteNodePosition(startNode, startParent);
+          animatedCircleRef.current.x(startPos.x);
+          animatedCircleRef.current.y(startPos.y);
+        }
       }
       return;
     }
@@ -716,9 +737,9 @@ export default function CircuitCanvasOptimized() {
       prev.map((el) =>
         el.id === elementId
           ? {
-              ...el,
-              properties: { ...el.properties, ratio },
-            }
+            ...el,
+            properties: { ...el.properties, ratio },
+          }
           : el
       )
     );
@@ -733,9 +754,9 @@ export default function CircuitCanvasOptimized() {
       prev.map((el) =>
         el.id === elementId
           ? {
-              ...el,
-              properties: { ...el.properties, mode },
-            }
+            ...el,
+            properties: { ...el.properties, mode },
+          }
           : el
       )
     );
@@ -785,9 +806,59 @@ export default function CircuitCanvasOptimized() {
     setElements((prev) => [...prev, newElement]);
 
     if (newElement.type === "microbit") {
+<<<<<<< HEAD
       console.log(
         `[handleDrop] Creating simulator for microbit: ${newElement.id}`
       );
+=======
+      // Init simulator in the background (non-blocking)
+      void (async () => {
+        const simulator = new Simulator({
+          language: "python",
+          controller: "microbit",
+          onOutput: (line) => console.log(`[${newElement.id}]`, line),
+          onEvent: async (event) => {
+            console.log(`[${newElement.id}] Event:`, event);
+            if (event.type === "reset") {
+              setElements((prev) =>
+                prev.map((el) =>
+                  el.id === newElement.id
+                    ? {
+                      ...el,
+                      controller: {
+                        leds: Array(5).fill(Array(5).fill(false)),
+                        pins: {},
+                      },
+                    }
+                    : el
+                )
+              );
+            }
+            if (event.type === "led-change") {
+              const state = await simulator.getStates();
+              const leds = state.leds;
+              const pins = state.pins;
+              setElements((prev) =>
+                prev.map((el) =>
+                  el.id === newElement.id
+                    ? { ...el, controller: { leds, pins } }
+                    : el
+                )
+              );
+            }
+            if (event.type === "pin-change") {
+              const state = await simulator.getStates();
+              const pins = state.pins;
+              const leds = state.leds;
+              setElements((prev) =>
+                prev.map((el) =>
+                  el.id === newElement.id
+                    ? { ...el, controller: { leds, pins } }
+                    : el
+                )
+              );
+              console.log(pins);
+>>>>>>> c39e11b99bb43fde4dd4bb60ac815bcfc97e491b
 
       void (async () => {
         try {
@@ -1353,9 +1424,8 @@ export default function CircuitCanvasOptimized() {
 
           <div className="flex flex-row items-center gap-2">
             <button
-              className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${
-                simulationRunning ? "bg-red-300" : "bg-emerald-300"
-              } flex items-center space-x-2 hover:shadow-emerald-600 hover:scale-105`}
+              className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${simulationRunning ? "bg-red-300" : "bg-emerald-300"
+                } flex items-center space-x-2 hover:shadow-emerald-600 hover:scale-105`}
               onClick={() =>
                 simulationRunning ? stopSimulation() : startSimulation()
               }
@@ -1433,7 +1503,7 @@ export default function CircuitCanvasOptimized() {
                       const updatedWires = wires.filter(
                         (w) =>
                           getNodeParent(w.fromNodeId)?.id !==
-                            updatedElement.id &&
+                          updatedElement.id &&
                           getNodeParent(w.toNodeId)?.id !== updatedElement.id
                       );
                       setWires(updatedWires);
@@ -1587,7 +1657,7 @@ export default function CircuitCanvasOptimized() {
                   stroke="orange"
                   strokeWidth={3}
                   opacity={1}
-                  visible={false}
+                  visible={!!creatingWireStartNode}
                   shadowBlur={15}
                   shadowEnabled={true}
                   shadowOffset={{ x: 2, y: 2 }}
@@ -1596,7 +1666,17 @@ export default function CircuitCanvasOptimized() {
                   ref={(ref) => {
                     inProgressWireRef.current = ref;
                   }}
-                  points={[]}
+                  //points={[]}
+                  // Provide stable fallback points from start + joints so the line doesn't disappear on re-render
+                  points={(function () {
+                    if (!creatingWireStartNode) return [] as number[];
+                    const startNode = getNodeById(creatingWireStartNode);
+                    const startParent = startNode ? getNodeParent(startNode.id) : null;
+                    if (!startNode || !startParent) return [] as number[];
+                    const startPos = getAbsoluteNodePosition(startNode, startParent);
+                    const jointPoints = creatingWireJoints.flatMap((p) => [p.x, p.y]);
+                    return [startPos.x, startPos.y, ...jointPoints];
+                  })()}
                   stroke="blue"
                   strokeWidth={2}
                   pointerEvents="none"
@@ -1606,7 +1686,7 @@ export default function CircuitCanvasOptimized() {
                   shadowColor="blue"
                   shadowBlur={4}
                   shadowOpacity={0.4}
-                  visible={false}
+                  visible={!!creatingWireStartNode}
                 />
               </Layer>
 
@@ -1668,9 +1748,8 @@ export default function CircuitCanvasOptimized() {
       </div>
 
       <div
-        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${
-          showPalette ? "w-72" : "w-10"
-        } `}
+        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"
+          } `}
         style={{
           pointerEvents: "auto",
           // Glass effect

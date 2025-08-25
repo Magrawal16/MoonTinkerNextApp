@@ -423,7 +423,7 @@ function buildMNAMatrices(
         G[ai][bi] -= g;
         G[bi][ai] -= g;
       }
-    }
+    } 
     // Potentiometer (3-terminal element) handled separately
     else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
@@ -457,7 +457,7 @@ function buildMNAMatrices(
         G[bi][wi] -= gb;
         G[wi][bi] -= gb;
       }
-    }
+    } 
     // Battery modeled as voltage source with small internal resistance
     else if (el.type === "battery") {
       console.log(`    🔋 Processing battery ${el.id}`);
@@ -484,7 +484,7 @@ function buildMNAMatrices(
       if (nIdx !== undefined) C[idx][nIdx] -= 1;
       D[idx][idx] += el.properties?.resistance ?? 0;
       E[idx] = el.properties?.voltage ?? 0;
-    }
+    } 
     // Microbit handled similarly to voltage source with added pin-level sources
     else if (el.type === "microbit") {
       console.log(`    📱 Processing microbit ${el.id}`);
@@ -541,7 +541,7 @@ function buildMNAMatrices(
           }
         }
       }
-    }
+    } 
     // Multimeter in current mode is modeled as current source connection
     else if (el.type === "multimeter" && el.properties?.mode === "current") {
       const idx = currentMap.get(el.id)!;

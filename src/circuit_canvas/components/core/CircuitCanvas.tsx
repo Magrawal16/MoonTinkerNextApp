@@ -1,5 +1,3 @@
-// CircuitCanvas.tsx
-
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Stage, Layer, Line, Rect, Star, Circle } from "react-konva";
@@ -52,7 +50,6 @@ export default function CircuitCanvasOptimized() {
     x: 0,
     y: 0,
   });
-
   const [canvasOffset, setCanvasOffset] = useState({ x: 0, y: 0 });
   const [draggingElement, setDraggingElement] = useState<string | null>(null);
   const [activeControllerId, setActiveControllerId] = useState<string | null>(
@@ -274,151 +271,6 @@ export default function CircuitCanvasOptimized() {
       return getElementById(node.parentId);
     },
     [getElementById]
-  );
-
-  const getSensorMicrobitConnection = useCallback(
-    (sensorElement: CircuitElement) => {
-      // Find all wires connected to this sensor
-      const sensorNodeIds = sensorElement.nodes.map((node) => node.id);
-      const connectedWires = wires.filter(
-        (wire) =>
-          sensorNodeIds.includes(wire.fromNodeId) ||
-          sensorNodeIds.includes(wire.toNodeId)
-      );
-
-      let trigPin = "";
-      let echoPin = "";
-      let microbitId = "";
-
-      console.log(
-        "[getSensorMicrobitConnection] Checking sensor:",
-        sensorElement.id
-      );
-      console.log(
-        "[getSensorMicrobitConnection] Connected wires:",
-        connectedWires.length
-      );
-
-      for (const wire of connectedWires) {
-        const fromNode = getNodeById(wire.fromNodeId);
-        const toNode = getNodeById(wire.toNodeId);
-
-        if (!fromNode || !toNode) continue;
-
-        const fromParent = getNodeParent(fromNode.id);
-        const toParent = getNodeParent(toNode.id);
-
-        console.log("[getSensorMicrobitConnection] Wire:", {
-          fromParent: fromParent?.type,
-          fromNode: fromNode.placeholder,
-          toParent: toParent?.type,
-          toNode: toNode.placeholder,
-        });
-
-        // Check if one end is the sensor and the other is a microbit
-        if (
-          fromParent?.id === sensorElement.id &&
-          toParent?.type === "microbit"
-        ) {
-          // Wire goes from sensor to microbit
-          microbitId = toParent.id;
-
-          // Determine which sensor pin based on node label
-          const sensorNodeLabel = fromNode.placeholder || "";
-          const microbitPin = toNode.placeholder || `P${toNode.id.slice(-1)}`;
-
-          if (sensorNodeLabel.toLowerCase().includes("trig")) {
-            trigPin = microbitPin;
-          } else if (sensorNodeLabel.toLowerCase().includes("echo")) {
-            echoPin = microbitPin;
-          }
-
-          console.log("[getSensorMicrobitConnection] Sensor->Microbit:", {
-            sensorPin: sensorNodeLabel,
-            microbitPin,
-            assigned: sensorNodeLabel.toLowerCase().includes("trig")
-              ? "TRIG"
-              : sensorNodeLabel.toLowerCase().includes("echo")
-              ? "ECHO"
-              : "UNKNOWN",
-          });
-        } else if (
-          toParent?.id === sensorElement.id &&
-          fromParent?.type === "microbit"
-        ) {
-          // Wire goes from microbit to sensor
-          microbitId = fromParent.id;
-
-          // Determine which sensor pin based on node label
-          const sensorNodeLabel = toNode.placeholder || "";
-          const microbitPin =
-            fromNode.placeholder || `P${fromNode.id.slice(-1)}`;
-
-          if (sensorNodeLabel.toLowerCase().includes("trig")) {
-            trigPin = microbitPin;
-          } else if (sensorNodeLabel.toLowerCase().includes("echo")) {
-            echoPin = microbitPin;
-          }
-
-          console.log("[getSensorMicrobitConnection] Microbit->Sensor:", {
-            sensorPin: sensorNodeLabel,
-            microbitPin,
-            assigned: sensorNodeLabel.toLowerCase().includes("trig")
-              ? "TRIG"
-              : sensorNodeLabel.toLowerCase().includes("echo")
-              ? "ECHO"
-              : "UNKNOWN",
-          });
-        }
-      }
-
-      const result =
-        microbitId && (trigPin || echoPin)
-          ? { microbitId, trigPin, echoPin }
-          : null;
-
-      console.log("[getSensorMicrobitConnection] Final result:", result);
-      return result;
-    },
-    [wires, getNodeById, getNodeParent]
-  );
-
-  const getConnectedMicrobitSimulator = useCallback(
-    (sensorElement: CircuitElement) => {
-      // Only check for ultrasonic sensors
-      if (sensorElement.type !== "ultrasonicsensor4p") {
-        return null;
-      }
-
-      console.log(
-        "[getConnectedMicrobitSimulator] Checking ultrasonic sensor:",
-        sensorElement.id
-      );
-      console.log(
-        "[getConnectedMicrobitSimulator] Available simulators:",
-        Object.keys(controllerMap)
-      );
-
-      const connection = getSensorMicrobitConnection(sensorElement);
-      if (!connection) {
-        console.log("[getConnectedMicrobitSimulator] No connection found");
-        return null;
-      }
-
-      console.log(
-        "[getConnectedMicrobitSimulator] Found connection:",
-        connection
-      );
-
-      const simulator = controllerMap[connection.microbitId];
-      console.log(
-        "[getConnectedMicrobitSimulator] Simulator found:",
-        !!simulator
-      );
-
-      return simulator || null;
-    },
-    [getSensorMicrobitConnection, controllerMap]
   );
 
   // Optimized function to calculate wire points
@@ -737,9 +589,9 @@ export default function CircuitCanvasOptimized() {
       prev.map((el) =>
         el.id === elementId
           ? {
-            ...el,
-            properties: { ...el.properties, ratio },
-          }
+              ...el,
+              properties: { ...el.properties, ratio },
+            }
           : el
       )
     );
@@ -754,9 +606,9 @@ export default function CircuitCanvasOptimized() {
       prev.map((el) =>
         el.id === elementId
           ? {
-            ...el,
-            properties: { ...el.properties, mode },
-          }
+              ...el,
+              properties: { ...el.properties, mode },
+            }
           : el
       )
     );
@@ -806,11 +658,6 @@ export default function CircuitCanvasOptimized() {
     setElements((prev) => [...prev, newElement]);
 
     if (newElement.type === "microbit") {
-<<<<<<< HEAD
-      console.log(
-        `[handleDrop] Creating simulator for microbit: ${newElement.id}`
-      );
-=======
       // Init simulator in the background (non-blocking)
       void (async () => {
         const simulator = new Simulator({
@@ -824,12 +671,12 @@ export default function CircuitCanvasOptimized() {
                 prev.map((el) =>
                   el.id === newElement.id
                     ? {
-                      ...el,
-                      controller: {
-                        leds: Array(5).fill(Array(5).fill(false)),
-                        pins: {},
-                      },
-                    }
+                        ...el,
+                        controller: {
+                          leds: Array(5).fill(Array(5).fill(false)),
+                          pins: {},
+                        },
+                      }
                     : el
                 )
               );
@@ -858,113 +705,33 @@ export default function CircuitCanvasOptimized() {
                 )
               );
               console.log(pins);
->>>>>>> c39e11b99bb43fde4dd4bb60ac815bcfc97e491b
 
-      void (async () => {
-        try {
-          const simulator = new Simulator({
-            language: "python",
-            controller: "microbit",
-            onOutput: (line) => console.log(`[${newElement.id}]`, line),
-            onEvent: async (event) => {
-              console.log(`[${newElement.id}] Event:`, event);
-              if (event.type === "reset") {
-                setElements((prev) =>
-                  prev.map((el) =>
-                    el.id === newElement.id
-                      ? {
-                          ...el,
-                          controller: {
-                            leds: Array(5).fill(Array(5).fill(false)),
-                            pins: {},
-                          },
-                        }
-                      : el
-                  )
+              if (simulationRunningRef.current) {
+                console.log("Simulation running, computing circuit...");
+                computeCircuit(wiresRef.current);
+              } else {
+                console.log(
+                  "Simulation not running, skipping circuit computation."
                 );
               }
-              if (event.type === "led-change") {
-                const state = await simulator.getStates();
-                const leds = state.leds;
-                const pins = state.pins;
-                setElements((prev) =>
-                  prev.map((el) =>
-                    el.id === newElement.id
-                      ? { ...el, controller: { leds, pins } }
-                      : el
-                  )
-                );
-              }
-              if (event.type === "pin-change") {
-                const state = await simulator.getStates();
-                const pins = state.pins;
-                const leds = state.leds;
-                setElements((prev) =>
-                  prev.map((el) =>
-                    el.id === newElement.id
-                      ? { ...el, controller: { leds, pins } }
-                      : el
-                  )
-                );
-                console.log(pins);
+            }
+          },
+        });
 
-                if (simulationRunningRef.current) {
-                  console.log("Simulation running, computing circuit...");
-                  computeCircuit(wiresRef.current);
-                } else {
-                  console.log(
-                    "Simulation not running, skipping circuit computation."
-                  );
-                }
-              }
-            },
-          });
+        await simulator.initialize();
+        const states = await simulator.getStates();
 
-          console.log(
-            `[handleDrop] Initializing simulator for: ${newElement.id}`
-          );
-          await simulator.initialize();
+        console.log(states);
 
-          console.log(
-            `[handleDrop] Getting initial states for: ${newElement.id}`
-          );
-          const states = await simulator.getStates();
-
-          console.log(
-            `[handleDrop] Simulator ready for: ${newElement.id}`,
-            states
-          );
-
-          // Update map and controller LED state
-          setControllerMap((prev) => {
-            const newMap = { ...prev, [newElement.id]: simulator };
-            console.log(
-              `[handleDrop] Updated controller map:`,
-              Object.keys(newMap)
-            );
-            return newMap;
-          });
-
-          setElements((prev) =>
-            prev.map((el) =>
-              el.id === newElement.id
-                ? {
-                    ...el,
-                    controller: { leds: states.leds, pins: states.pins },
-                  }
-                : el
-            )
-          );
-
-          console.log(
-            `[handleDrop] Simulator setup complete for: ${newElement.id}`
-          );
-        } catch (error) {
-          console.error(
-            `[handleDrop] Error setting up simulator for ${newElement.id}:`,
-            error
-          );
-        }
+        // Update map and controller LED state
+        setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
+        setElements((prev) =>
+          prev.map((el) =>
+            el.id === newElement.id
+              ? { ...el, controller: { leds: states.leds, pins: states.pins } } // Initialize controller state
+              : el
+          )
+        );
       })();
     }
   }
@@ -1095,190 +862,6 @@ export default function CircuitCanvasOptimized() {
     }
   };
 
-  const debugConnections = useCallback(() => {
-    console.log("=== DEBUG CONNECTIONS ===");
-    console.log(
-      "Elements:",
-      elements.map((el) => ({ id: el.id, type: el.type }))
-    );
-    console.log(
-      "Wires:",
-      wires.map((w) => ({
-        id: w.id,
-        from: w.fromNodeId,
-        to: w.toNodeId,
-        fromParent: getNodeParent(w.fromNodeId)?.type,
-        toParent: getNodeParent(w.toNodeId)?.type,
-      }))
-    );
-    console.log("Controller Map:", Object.keys(controllerMap));
-
-    // Check each ultrasonic sensor
-    elements
-      .filter((el) => el.type === "ultrasonicsensor4p")
-      .forEach((sensor) => {
-        console.log(`Sensor ${sensor.id}:`);
-        console.log(
-          "  Nodes:",
-          sensor.nodes.map((n) => ({ id: n.id, placeholder: n.placeholder }))
-        );
-        const connection = getSensorMicrobitConnection(sensor);
-        console.log("  Connection:", connection);
-        const sim = getConnectedMicrobitSimulator(sensor);
-        console.log("  Simulator:", !!sim);
-      });
-    console.log("========================");
-  }, [
-    elements,
-    wires,
-    controllerMap,
-    getSensorMicrobitConnection,
-    getConnectedMicrobitSimulator,
-    getNodeParent,
-  ]);
-
-  const debugSimulatorStatus = useCallback(() => {
-    console.log("=== SIMULATOR DEBUG STATUS ===");
-    console.log(
-      "Elements:",
-      elements.map((el) => ({ id: el.id, type: el.type }))
-    );
-    console.log("Controller Map Keys:", Object.keys(controllerMap));
-    console.log(
-      "Controller Map Values:",
-      Object.values(controllerMap).map((sim) => !!sim)
-    );
-
-    // Check each microbit
-    elements
-      .filter((el) => el.type === "microbit")
-      .forEach((microbit) => {
-        const simulator = controllerMap[microbit.id];
-        console.log(`Microbit ${microbit.id}:`, {
-          hasSimulator: !!simulator,
-          simulatorType: simulator ? typeof simulator : "none",
-          simulatorMethods: simulator ? Object.keys(simulator) : [],
-        });
-      });
-
-    // Check ultrasonic sensors
-    elements
-      .filter((el) => el.type === "ultrasonicsensor4p")
-      .forEach((sensor) => {
-        const connection = getSensorMicrobitConnection(sensor);
-        const simulator = connection
-          ? controllerMap[connection.microbitId]
-          : null;
-        console.log(`Sensor ${sensor.id}:`, {
-          connection,
-          hasSimulator: !!simulator,
-        });
-      });
-    console.log("===============================");
-  }, [elements, controllerMap, getSensorMicrobitConnection]);
-
-  // Enhanced debug data preparation
-  const getDebugData = useCallback(() => {
-    return {
-      // Basic state
-      mousePos,
-      canvasOffset,
-      draggingElement,
-      selectedElement,
-      editingWire,
-      simulationRunning,
-      activeControllerId,
-
-      // Element and wire data
-      elements,
-      wires,
-
-      // Simulator data
-      controllerMap,
-      controllerCodeMap,
-
-      // Helper functions for analysis
-      getNodeParent,
-      getSensorMicrobitConnection,
-      getConnectedMicrobitSimulator,
-
-      // Additional debug info
-      debugInfo: {
-        timestamp: new Date().toISOString(),
-        totalElements: elements.length,
-        totalWires: wires.length,
-        simulatorCount: Object.keys(controllerMap).length,
-
-        // Quick checks
-        microbitsWithSimulators: elements
-          .filter((el) => el.type === "microbit")
-          .map((mb) => ({
-            id: mb.id,
-            hasSimulator: !!controllerMap[mb.id],
-            simulatorType: typeof controllerMap[mb.id],
-          })),
-
-        ultrasonicSensors: elements
-          .filter((el) => el.type === "ultrasonicsensor4p")
-          .map((sensor) => {
-            const connection = getSensorMicrobitConnection(sensor);
-            const simulator = getConnectedMicrobitSimulator(sensor);
-            return {
-              id: sensor.id,
-              connection,
-              hasSimulator: !!simulator,
-              nodeCount: sensor.nodes?.length || 0,
-              connectedWires: wires.filter((w) =>
-                sensor.nodes?.some(
-                  (n) => n.id === w.fromNodeId || n.id === w.toNodeId
-                )
-              ).length,
-            };
-          }),
-
-        wireConnectionSummary: wires.map((wire) => {
-          const fromNode = getNodeById(wire.fromNodeId);
-          const toNode = getNodeById(wire.toNodeId);
-          const fromParent = getNodeParent(wire.fromNodeId);
-          const toParent = getNodeParent(wire.toNodeId);
-
-          return {
-            wireId: wire.id,
-            from: {
-              nodeId: wire.fromNodeId,
-              nodePlaceholder: fromNode?.placeholder,
-              parentType: fromParent?.type,
-              parentId: fromParent?.id,
-            },
-            to: {
-              nodeId: wire.toNodeId,
-              nodePlaceholder: toNode?.placeholder,
-              parentType: toParent?.type,
-              parentId: toParent?.id,
-            },
-            isValidConnection: !!(fromNode && toNode && fromParent && toParent),
-          };
-        }),
-      },
-    };
-  }, [
-    mousePos,
-    canvasOffset,
-    draggingElement,
-    selectedElement,
-    editingWire,
-    simulationRunning,
-    activeControllerId,
-    elements,
-    wires,
-    controllerMap,
-    controllerCodeMap,
-    getNodeParent,
-    getSensorMicrobitConnection,
-    getConnectedMicrobitSimulator,
-    getNodeById,
-  ]);
-
   return (
     <div
       className={styles.canvasContainer}
@@ -1288,7 +871,15 @@ export default function CircuitCanvasOptimized() {
       {/* Debug Panel */}
       {showDebugBox && (
         <DebugBox
-          data={getDebugData()}
+          data={{
+            mousePos,
+            canvasOffset,
+            draggingElement,
+            selectedElement,
+            editingWire,
+            elements,
+            wires,
+          }}
           onClose={() => setShowDebugBox(false)}
         />
       )}
@@ -1299,58 +890,6 @@ export default function CircuitCanvasOptimized() {
         <div className="w-full h-12 bg-[#F4F5F6] flex items-center px-4 space-x-4 py-2 justify-between mt-1">
           {/* Controls */}
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                console.log("=== FIXING SIMULATOR MISMATCH ===");
-
-                const microbits = elements.filter(
-                  (el) => el.type === "microbit"
-                );
-                const simulatorKeys = Object.keys(controllerMap);
-
-                console.log(
-                  "Actual microbits:",
-                  microbits.map((mb) => mb.id)
-                );
-                console.log("Simulator keys:", simulatorKeys);
-
-                // Check if we have a simulator mismatch
-                microbits.forEach((microbit) => {
-                  if (!controllerMap[microbit.id]) {
-                    console.log(`❌ Missing simulator for ${microbit.id}`);
-
-                    // Check if there's a simulator with a different ID
-                    const availableSimulator = Object.values(controllerMap)[0];
-                    if (availableSimulator) {
-                      console.log(
-                        `🔄 Moving simulator from ${simulatorKeys[0]} to ${microbit.id}`
-                      );
-
-                      // Move the simulator to the correct ID
-                      setControllerMap((prev) => {
-                        const newMap = { ...prev };
-                        delete newMap[simulatorKeys[0]]; // Remove old entry
-                        newMap[microbit.id] = availableSimulator; // Add with correct ID
-                        return newMap;
-                      });
-
-                      console.log(`✅ Simulator moved to ${microbit.id}`);
-                    }
-                  } else {
-                    console.log(
-                      `✅ Correct simulator exists for ${microbit.id}`
-                    );
-                  }
-                });
-
-                console.log("=== FIX COMPLETE ===");
-              }}
-              className="px-1 py-1 bg-orange-200 rounded-sm border-2 border-gray-300 text-sm cursor-pointer"
-              title="Fix simulator ID mismatch"
-            >
-              🔧 Fix IDs
-            </button>
-
             {/* Color Palette */}
             <ColorPaletteDropdown
               colors={defaultColors}
@@ -1424,8 +963,9 @@ export default function CircuitCanvasOptimized() {
 
           <div className="flex flex-row items-center gap-2">
             <button
-              className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${simulationRunning ? "bg-red-300" : "bg-emerald-300"
-                } flex items-center space-x-2 hover:shadow-emerald-600 hover:scale-105`}
+              className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${
+                simulationRunning ? "bg-red-300" : "bg-emerald-300"
+              } flex items-center space-x-2 hover:shadow-emerald-600 hover:scale-105`}
               onClick={() =>
                 simulationRunning ? stopSimulation() : startSimulation()
               }
@@ -1503,7 +1043,7 @@ export default function CircuitCanvasOptimized() {
                       const updatedWires = wires.filter(
                         (w) =>
                           getNodeParent(w.fromNodeId)?.id !==
-                          updatedElement.id &&
+                            updatedElement.id &&
                           getNodeParent(w.toNodeId)?.id !== updatedElement.id
                       );
                       setWires(updatedWires);
@@ -1671,10 +1211,18 @@ export default function CircuitCanvasOptimized() {
                   points={(function () {
                     if (!creatingWireStartNode) return [] as number[];
                     const startNode = getNodeById(creatingWireStartNode);
-                    const startParent = startNode ? getNodeParent(startNode.id) : null;
+                    const startParent = startNode
+                      ? getNodeParent(startNode.id)
+                      : null;
                     if (!startNode || !startParent) return [] as number[];
-                    const startPos = getAbsoluteNodePosition(startNode, startParent);
-                    const jointPoints = creatingWireJoints.flatMap((p) => [p.x, p.y]);
+                    const startPos = getAbsoluteNodePosition(
+                      startNode,
+                      startParent
+                    );
+                    const jointPoints = creatingWireJoints.flatMap((p) => [
+                      p.x,
+                      p.y,
+                    ]);
                     return [startPos.x, startPos.y, ...jointPoints];
                   })()}
                   stroke="blue"
@@ -1696,7 +1244,6 @@ export default function CircuitCanvasOptimized() {
                     key={element.id}
                     isSimulationOn={simulationRunning}
                     element={element}
-                    simulator={getConnectedMicrobitSimulator(element)} // ← ADD THIS LINE!
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
                     handleRatioChange={handleRatioChange}
@@ -1726,12 +1273,14 @@ export default function CircuitCanvasOptimized() {
                       setShowSimulationPanel(false);
                       if (element?.type === "microbit") {
                         setActiveControllerId(element.id);
+                        // Show simulation panel if simulation is running and microbit is selected
                         if (simulationRunning) {
                           setShowSimulationPanel(true);
                         }
                       }
                     }}
                     selectedElementId={selectedElement?.id || null}
+                    // @ts-ignore
                     onControllerInput={(elementId, input) => {
                       const sim = controllerMap[elementId];
                       if (sim && (input === "A" || input === "B")) {
@@ -1748,8 +1297,9 @@ export default function CircuitCanvasOptimized() {
       </div>
 
       <div
-        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"
-          } `}
+        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${
+          showPalette ? "w-72" : "w-10"
+        } `}
         style={{
           pointerEvents: "auto",
           // Glass effect

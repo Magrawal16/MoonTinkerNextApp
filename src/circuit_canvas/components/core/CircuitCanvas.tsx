@@ -22,7 +22,6 @@ import {
   getCircuitShortcuts,
   getShortcutMetadata,
 } from "@/circuit_canvas/utils/circuitShortcuts";
-// import { Simulator } from "@/lib/code/Simulator";
 import { SimulatorProxy as Simulator } from "@/python_code_editor/lib/SimulatorProxy";
 import CircuitSelector from "@/circuit_canvas/components/toolbar/panels/Palette";
 import {
@@ -46,6 +45,8 @@ import { Window } from "@/common/components/ui/Window";
 import ElementRotationButtons from "../toolbar/customization/ElementRoationButtons";
 
 export default function CircuitCanvasOptimized() {
+  // ... [Keep all existing state and hooks as they are] ...
+
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
     x: 0,
     y: 0,
@@ -69,22 +70,19 @@ export default function CircuitCanvasOptimized() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const wireLayerRef = useRef<Konva.Layer | null>(null);
 
-  // Viewport tracking for grid optimization
   const { viewport, updateViewport } = useViewport(stageRef);
-
-  // Store refs to wire Line components for direct updates
   const wireRefs = useRef<Record<string, Konva.Line>>({});
-
-  // Ref for the in-progress wire during creation
   const inProgressWireRef = useRef<Konva.Line | null>(null);
   const animatedCircleRef = useRef<Konva.Circle | null>(null);
 
   const [elements, setElements] = useState<CircuitElement[]>([]);
   const [wires, setWires] = useState<Wire[]>([]);
   const wiresRef = useRef<Wire[]>(wires);
+  
   useEffect(() => {
     wiresRef.current = wires;
   }, [wires]);
+  
   const [wireCounter, setWireCounter] = useState(0);
   const [showPalette, setShowPalette] = useState(true);
   const [showDebugBox, setShowDebugBox] = useState(false);
@@ -93,7 +91,6 @@ export default function CircuitCanvasOptimized() {
   const [creatingWireJoints, setCreatingWireJoints] = useState<
     { x: number; y: number }[]
   >([]);
-  // @ts-ignore
   const [history, setHistory] = useState<
     { elements: CircuitElement[]; wires: Wire[] }[]
   >([]);
@@ -103,6 +100,7 @@ export default function CircuitCanvasOptimized() {
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
   }, [simulationRunning]);
+  
   const [selectedElement, setSelectedElement] = useState<CircuitElement | null>(
     null
   );
@@ -124,13 +122,14 @@ export default function CircuitCanvasOptimized() {
     resetState();
   }, []);
 
-  // Update viewport on mount and resize
   useEffect(() => {
     const handleResize = () => updateViewport();
-    updateViewport(); // Initial update
+    updateViewport();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, [updateViewport]);
+
+  // ... [Keep all existing functions as they are until the render section] ...
 
   function resetState() {
     pushToHistory();
@@ -139,9 +138,7 @@ export default function CircuitCanvasOptimized() {
     setWireCounter(0);
     setCreatingWireStartNode(null);
     setEditingWire(null);
-    // Clear wire refs
     wireRefs.current = {};
-    // Hide in-progress wire components
     if (inProgressWireRef.current) {
       inProgressWireRef.current.visible(false);
     }
@@ -150,12 +147,8 @@ export default function CircuitCanvasOptimized() {
     }
   }
 
-  //changing the element state on element position change
   useEffect(() => {
     elementsRef.current = elements;
-
-    // Clean up temp positions for elements that have been updated in state
-    // This prevents wire jumping after drag end
     Object.keys(tempDragPositions.current).forEach((id) => {
       const element = elements.find((el) => el.id === id);
       const tempPos = tempDragPositions.current[id];
@@ -165,12 +158,10 @@ export default function CircuitCanvasOptimized() {
         element.x === tempPos.x &&
         element.y === tempPos.y
       ) {
-        // Element state matches temp position, safe to clear
         delete tempDragPositions.current[id];
       }
     });
   }, [elements]);
-  //end
 
   useEffect(() => {
     if (!creatingWireStartNode) {
@@ -188,11 +179,10 @@ export default function CircuitCanvasOptimized() {
     if (!simulationRunning) return;
 
     setSimulationRunning(false);
-    setShowSimulationPanel(false); // Hide simulation panel when simulation stops
+    setShowSimulationPanel(false);
     setElements((prev) =>
       prev.map((el) => ({
         ...el,
-        // set computed values to undefined when simulation stops
         computed: {
           current: undefined,
           voltage: undefined,
@@ -203,7 +193,7 @@ export default function CircuitCanvasOptimized() {
     );
     setControllerMap((prev) => {
       Object.values(prev).forEach((sim) => sim.disposeAndReload());
-      return prev; // Keep the map intact!
+      return prev;
     });
   }
 
@@ -211,14 +201,12 @@ export default function CircuitCanvasOptimized() {
     setSimulationRunning(true);
     computeCircuit(wires);
 
-    // if microbit is selected, show the simulation panel
     if (elements.some((el) => el.type === "microbit")) {
       setShowSimulationPanel(true);
     } else {
       setShowSimulationPanel(false);
     }
 
-    // Run user code for all controllers
     elements.forEach((el) => {
       if (el.type === "microbit") {
         const sim = controllerMap[el.id];
@@ -239,7 +227,6 @@ export default function CircuitCanvasOptimized() {
           wires: JSON.parse(JSON.stringify(wires)),
         },
       ];
-
       return next.length > 50 ? next.slice(1) : next;
     });
   }
@@ -273,7 +260,6 @@ export default function CircuitCanvasOptimized() {
     [getElementById]
   );
 
-  // Optimized function to calculate wire points
   const getWirePoints = useCallback(
     (wire: Wire): number[] => {
       const fromNode = getNodeById(wire.fromNodeId);
@@ -284,11 +270,9 @@ export default function CircuitCanvasOptimized() {
       const toParent = getNodeParent(toNode.id);
       if (!fromParent || !toParent) return [];
 
-      // Use rotation-aware absolute position calculation
       const start = getAbsoluteNodePosition(fromNode, fromParent);
       const end = getAbsoluteNodePosition(toNode, toParent);
 
-      // Include joints between start and end
       const jointPoints = wire.joints.flatMap((pt) => [pt.x, pt.y]);
 
       return [start.x, start.y, ...jointPoints, end.x, end.y];
@@ -296,13 +280,11 @@ export default function CircuitCanvasOptimized() {
     [getNodeParent]
   );
 
-  // Optimized function to update wires directly in Konva
   const updateWiresDirect = useCallback(() => {
     wires.forEach((wire) => {
       const wireLineRef = wireRefs.current[wire.id];
       if (wireLineRef) {
         const newPoints = getWirePoints(wire);
-        // Apply the same midpoint logic as in JSX rendering
         if (newPoints.length === 4) {
           const [x1, y1, x2, y2] = newPoints;
           const midX = (x1 + x2) / 2;
@@ -313,13 +295,11 @@ export default function CircuitCanvasOptimized() {
       }
     });
 
-    // Batch the layer redraw for performance
     if (wireLayerRef.current) {
       wireLayerRef.current.batchDraw();
     }
   }, [wires, getWirePoints]);
 
-  // Optimized function to update in-progress wire during creation
   const updateInProgressWire = useCallback(
     (mousePos: { x: number; y: number }) => {
       if (!creatingWireStartNode || !stageRef.current) return;
@@ -330,7 +310,6 @@ export default function CircuitCanvasOptimized() {
       const startParent = getNodeParent(startNode.id);
       if (!startParent) return;
 
-      // Use rotation-aware absolute position calculation
       const startPos = getAbsoluteNodePosition(startNode, startParent);
 
       const stage = stageRef.current;
@@ -346,24 +325,58 @@ export default function CircuitCanvasOptimized() {
         adjustedMouse.y,
       ];
 
-      // Update in-progress wire directly
       if (inProgressWireRef.current) {
         inProgressWireRef.current.points(inProgressPoints);
       }
 
-      // Update animated circle position
       if (animatedCircleRef.current) {
         animatedCircleRef.current.x(adjustedMouse.x);
         animatedCircleRef.current.y(adjustedMouse.y);
       }
 
-      // Batch redraw
       if (wireLayerRef.current) {
         wireLayerRef.current.batchDraw();
       }
     },
     [creatingWireStartNode, creatingWireJoints, getNodeParent]
   );
+
+  // Helper function to find connected microbit simulator for any element
+  const getConnectedMicrobitSimulator = useCallback((elementId: string) => {
+    // Find all microbits
+    const microbits = elements.filter(el => el.type === "microbit");
+    
+    // For each microbit, check if it's connected to the target element
+    for (const microbit of microbits) {
+      // Check if there's a wire connection between microbit and target element
+      const targetElement = elements.find(el => el.id === elementId);
+      if (!targetElement) continue;
+      
+      // Check all wires to see if they connect microbit nodes to target element nodes
+      const isConnected = wires.some(wire => {
+        const fromNode = getNodeById(wire.fromNodeId);
+        const toNode = getNodeById(wire.toNodeId);
+        if (!fromNode || !toNode) return false;
+        
+        const fromParent = getNodeParent(fromNode.id);
+        const toParent = getNodeParent(toNode.id);
+        
+        // Check if wire connects microbit to target element (in either direction)
+        return (
+          (fromParent?.id === microbit.id && toParent?.id === elementId) ||
+          (toParent?.id === microbit.id && fromParent?.id === elementId)
+        );
+      });
+      
+      if (isConnected) {
+        return controllerMap[microbit.id];
+      }
+    }
+    
+    return null;
+  }, [elements, wires, controllerMap, getNodeById, getNodeParent]);
+
+  // ... [Keep all other functions as they are] ...
 
   useCircuitShortcuts({
     getShortcuts: () =>
@@ -406,12 +419,9 @@ export default function CircuitCanvasOptimized() {
   function handleStageMouseMove(e: KonvaEventObject<PointerEvent>) {
     const pos = e.target.getStage()?.getPointerPosition();
     if (pos) {
-      // Only update React state if we're NOT creating a wire to avoid re-renders
       if (!creatingWireStartNode) {
         setMousePos(pos);
       }
-
-      // If creating a wire, update in-progress wire directly without React re-render
       if (creatingWireStartNode) {
         updateInProgressWire(pos);
       }
@@ -422,7 +432,6 @@ export default function CircuitCanvasOptimized() {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
-    // If not wiring/editing and user clicked on empty canvas (Stage/Layer), clear selection
     if (!creatingWireStartNode && !editingWire) {
       const className = e.target.getClassName?.();
       const clickedEmpty = className === "Stage" || className === "Layer";
@@ -430,14 +439,13 @@ export default function CircuitCanvasOptimized() {
         setSelectedElement(null);
         setShowPropertiesPannel(false);
         setActiveControllerId(null);
-        return; // do not process further
+        return;
       }
     }
 
     if (editingWire) {
       const updated = wires.filter((w) => w.id !== editingWire.wireId);
       setWires(updated);
-      //computeCircuit(updated);
       stopSimulation();
       setEditingWire(null);
       return;
@@ -456,12 +464,10 @@ export default function CircuitCanvasOptimized() {
         { x: adjusted.x, y: adjusted.y },
       ]);
 
-      // Update in-progress wire to include the new joint
       updateInProgressWire(pos);
     }
   }
 
-  // Optimized drag move handler - updates wires directly without React re-render
   function handleElementDragMove(e: KonvaEventObject<DragEvent>) {
     e.cancelBubble = true;
     const id = e.target.id();
@@ -470,13 +476,11 @@ export default function CircuitCanvasOptimized() {
 
     tempDragPositions.current[id] = { x, y };
 
-    // Directly update wires in Konva without triggering React re-render
     updateWiresDirect();
   }
 
   function handleNodeClick(nodeId: string) {
     if (editingWire) {
-      // complete wire editing logic
       pushToHistory();
       setWires((prev) =>
         prev.map((wire) =>
@@ -489,12 +493,10 @@ export default function CircuitCanvasOptimized() {
       return;
     }
 
-    // First click: set start node
     if (!creatingWireStartNode) {
       setCreatingWireStartNode(nodeId);
       setCreatingWireJoints([]);
 
-      // Show and initialize in-progress wire components
       if (
         inProgressWireRef.current &&
         animatedCircleRef.current &&
@@ -503,16 +505,13 @@ export default function CircuitCanvasOptimized() {
         const stage = stageRef.current;
         const scaleFactor = 1 / stage.scaleX();
 
-        // Show components
         inProgressWireRef.current.visible(true);
         animatedCircleRef.current.visible(true);
 
-        // Initialize scaling
         animatedCircleRef.current.scaleX(scaleFactor);
         animatedCircleRef.current.scaleY(scaleFactor);
         inProgressWireRef.current.strokeWidth(2 / stage.scaleX());
 
-        // Immediately reset animatedCircle position to the start node
         const startNode = getNodeById(nodeId);
         const startParent = startNode ? getNodeParent(startNode.id) : null;
         if (startNode && startParent) {
@@ -524,12 +523,10 @@ export default function CircuitCanvasOptimized() {
       return;
     }
 
-    // Clicked same node again: cancel
     if (creatingWireStartNode === nodeId) {
       setCreatingWireStartNode(null);
       setCreatingWireJoints([]);
 
-      // Hide in-progress wire components
       if (inProgressWireRef.current) {
         inProgressWireRef.current.visible(false);
       }
@@ -539,7 +536,6 @@ export default function CircuitCanvasOptimized() {
       return;
     }
 
-    // Second click: create wire
     pushToHistory();
 
     const newWire: Wire = {
@@ -557,7 +553,6 @@ export default function CircuitCanvasOptimized() {
     setCreatingWireStartNode(null);
     setCreatingWireJoints([]);
 
-    // Hide in-progress wire components
     if (inProgressWireRef.current) {
       inProgressWireRef.current.visible(false);
     }
@@ -572,18 +567,17 @@ export default function CircuitCanvasOptimized() {
 
       return prevElements.map((oldEl) => {
         const updated = solved.find((e) => e.id === oldEl.id);
-        if (!updated) return oldEl; // If it's missing from the solved list, preserve it
+        if (!updated) return oldEl;
 
         return {
-          ...oldEl, // keep everything (e.g., controller state, UI stuff)
-          ...updated, // overwrite any simulated data (like computed values)
-          controller: oldEl.controller, // explicitly preserve controller just in case
+          ...oldEl,
+          ...updated,
+          controller: oldEl.controller,
         };
       });
     });
   }
 
-  // handle resistance change for potentiometer
   function handleRatioChange(elementId: string, ratio: number) {
     setElements((prev) =>
       prev.map((el) =>
@@ -598,7 +592,6 @@ export default function CircuitCanvasOptimized() {
     if (simulationRunning) {
       computeCircuit(wires);
     }
-    // stopSimulation();
   }
 
   function handleModeChange(elementId: string, mode: "voltage" | "current") {
@@ -627,18 +620,14 @@ export default function CircuitCanvasOptimized() {
     const stage = stageRef.current;
     if (!stage) return;
 
-    // DOM coordinates
     const pointerX = e.clientX;
     const pointerY = e.clientY;
 
-    // Get bounding box of canvas DOM
     const containerRect = stage.container().getBoundingClientRect();
 
-    // Convert screen coords to stage coords
     const xOnStage = pointerX - containerRect.left;
     const yOnStage = pointerY - containerRect.top;
 
-    // Convert to actual canvas position (account for pan & zoom)
     const scale = stage.scaleX();
     const position = stage.position();
 
@@ -654,11 +643,9 @@ export default function CircuitCanvasOptimized() {
 
     if (!newElement) return;
 
-    // Immediately add to canvas
     setElements((prev) => [...prev, newElement]);
 
     if (newElement.type === "microbit") {
-      // Init simulator in the background (non-blocking)
       void (async () => {
         const simulator = new Simulator({
           language: "python",
@@ -723,12 +710,11 @@ export default function CircuitCanvasOptimized() {
 
         console.log(states);
 
-        // Update map and controller LED state
         setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
         setElements((prev) =>
           prev.map((el) =>
             el.id === newElement.id
-              ? { ...el, controller: { leds: states.leds, pins: states.pins } } // Initialize controller state
+              ? { ...el, controller: { leds: states.leds, pins: states.pins } }
               : el
           )
         );
@@ -740,7 +726,6 @@ export default function CircuitCanvasOptimized() {
     return wire.color || "#000000";
   };
 
-  // for canvas zoom in and zoom out
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
     e.evt.preventDefault();
 
@@ -757,16 +742,13 @@ export default function CircuitCanvasOptimized() {
 
     if (newScale < 0.5 || newScale > 2.5) return;
 
-    // Get the position of the pointer relative to the stage's current transform
     const mousePointTo = {
       x: (pointer.x - stage.x()) / oldScale,
       y: (pointer.y - stage.y()) / oldScale,
     };
 
-    // Apply the new scale
     stage.scale({ x: newScale, y: newScale });
 
-    // Calculate new position to keep pointer under cursor
     const newPos = {
       x: pointer.x - mousePointTo.x * newScale,
       y: pointer.y - mousePointTo.y * newScale,
@@ -775,11 +757,9 @@ export default function CircuitCanvasOptimized() {
     stage.position(newPos);
     stage.batchDraw();
 
-    // Update viewport for grid optimization
     updateViewport();
   };
 
-  // end
   const [pulse, setPulse] = useState(1);
 
   useEffect(() => {
@@ -795,7 +775,7 @@ export default function CircuitCanvasOptimized() {
 
       frameCount++;
       if (frameCount % 5 === 0) {
-        setPulse(scale); // 🔄 Update every 5 frames (~12 FPS)
+        setPulse(scale);
       }
 
       rafId = requestAnimationFrame(animate);
@@ -804,7 +784,6 @@ export default function CircuitCanvasOptimized() {
     return () => cancelAnimationFrame(rafId);
   }, []);
 
-  // Animate the in-progress wire circle
   useEffect(() => {
     let animationFrame: number;
     let startTime: number | null = null;
@@ -835,7 +814,6 @@ export default function CircuitCanvasOptimized() {
   }, [creatingWireStartNode]);
 
   const handlePropertiesPannelClose = () => {
-    // setSelectedElement(null);
     setShowPropertiesPannel(false);
   };
 
@@ -852,9 +830,7 @@ export default function CircuitCanvasOptimized() {
       )
     );
 
-    // if selected controller is equal to active controller, reset selected element to the updated version
     if (selectedElement?.id === controllerId) {
-      // setSelectedElement to the updated element
       const updatedElement = elements.find((el) => el.id === controllerId);
       if (updatedElement) {
         setSelectedElement(updatedElement);
@@ -862,6 +838,7 @@ export default function CircuitCanvasOptimized() {
     }
   };
 
+  // Render section with fixed simulator prop passing
   return (
     <div
       className={styles.canvasContainer}
@@ -886,11 +863,10 @@ export default function CircuitCanvasOptimized() {
 
       {/* Left Side: Main Canvas */}
       <div className="flex-grow h-full flex flex-col">
-        {/* Toolbar */}
+        {/* Toolbar - Keep as is */}
         <div className="w-full h-12 bg-[#F4F5F6] flex items-center px-4 space-x-4 py-2 justify-between mt-1">
-          {/* Controls */}
+          {/* ... Keep toolbar content as is ... */}
           <div className="flex items-center gap-4">
-            {/* Color Palette */}
             <ColorPaletteDropdown
               colors={defaultColors}
               selectedColor={selectedWireColor}
@@ -904,7 +880,6 @@ export default function CircuitCanvasOptimized() {
               }}
             />
 
-            {/* Rotation Buttons - right next to color palette */}
             <ElementRotationButtons
               selectedElement={selectedElement}
               setElements={setElements}
@@ -914,14 +889,11 @@ export default function CircuitCanvasOptimized() {
               isSimulationRunning={simulationRunning}
             />
 
-            {/* Tooltip Group */}
             <div className="relative group">
-              {/* Trigger Button */}
               <div className="w-6 h-6 flex items-center justify-center shadow-lg bg-gray-200 rounded-full cursor-pointer hover:shadow-blue-400 hover:scale-105 transition">
                 ?
               </div>
 
-              {/* Tooltip Box */}
               <div className="absolute backdrop-blur-sm bg-white/10 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
                 <div className="font-semibold text-sm mb-2 text-gray-800">
                   Keyboard Shortcuts
@@ -1022,6 +994,8 @@ export default function CircuitCanvasOptimized() {
             />
           </div>
         </div>
+
+        {/* Properties Panel - Keep as is */}
         {selectedElement &&
           (showPropertiesPannel ? (
             <div className="absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl">
@@ -1131,6 +1105,7 @@ export default function CircuitCanvasOptimized() {
             >
               <HighPerformanceGrid viewport={viewport} gridSize={25} />
               <Layer ref={wireLayerRef}>
+                {/* Wire rendering - Keep as is */}
                 {wires.map((wire) => {
                   const points = getWirePoints(wire);
                   if (points.length === 4) {
@@ -1206,8 +1181,6 @@ export default function CircuitCanvasOptimized() {
                   ref={(ref) => {
                     inProgressWireRef.current = ref;
                   }}
-                  //points={[]}
-                  // Provide stable fallback points from start + joints so the line doesn't disappear on re-render
                   points={(function () {
                     if (!creatingWireStartNode) return [] as number[];
                     const startNode = getNodeById(creatingWireStartNode);
@@ -1239,76 +1212,82 @@ export default function CircuitCanvasOptimized() {
               </Layer>
 
               <Layer>
-                {elements.map((element) => (
-                  <RenderElement
-                    key={element.id}
-                    isSimulationOn={simulationRunning}
-                    element={element}
-                    onDragMove={handleElementDragMove}
-                    handleNodeClick={handleNodeClick}
-                    handleRatioChange={handleRatioChange}
-                    handleModeChange={handleModeChange}
-                    onDragStart={() => {
-                      pushToHistory();
-                      setDraggingElement(element.id);
-                      stageRef.current?.draggable(false);
-                    }}
-                    onDragEnd={(e) => {
-                      setDraggingElement(null);
-                      stageRef.current?.draggable(true);
-                      const id = e.target.id();
-                      const x = e.target.x();
-                      const y = e.target.y();
-                      setElements((prev) =>
-                        prev.map((el) => (el.id === id ? { ...el, x, y } : el))
-                      );
-                    }}
-                    onSelect={(id) => {
-                      if (creatingWireStartNode) return;
-                      const element = getElementById(id);
-                      setSelectedElement(element ?? null);
-                      setShowPropertiesPannel(true);
-                      setActiveControllerId(null);
-                      setOpenCodeEditor(false);
-                      setShowSimulationPanel(false);
-                      if (element?.type === "microbit") {
-                        setActiveControllerId(element.id);
-                        // Show simulation panel if simulation is running and microbit is selected
-                        if (simulationRunning) {
-                          setShowSimulationPanel(true);
+                {/* CRITICAL CHANGE: Pass simulator to elements */}
+                {elements.map((element) => {
+                  // Find the connected microbit simulator for this element
+                  const connectedSimulator = element.type === "ultrasonicsensor4p" 
+                    ? getConnectedMicrobitSimulator(element.id)
+                    : null;
+                  
+                  return (
+                    <RenderElement
+                      key={element.id}
+                      isSimulationOn={simulationRunning}
+                      element={element}
+                      simulator={connectedSimulator} // Pass the connected simulator
+                      onDragMove={handleElementDragMove}
+                      handleNodeClick={handleNodeClick}
+                      handleRatioChange={handleRatioChange}
+                      handleModeChange={handleModeChange}
+                      onDragStart={() => {
+                        pushToHistory();
+                        setDraggingElement(element.id);
+                        stageRef.current?.draggable(false);
+                      }}
+                      onDragEnd={(e) => {
+                        setDraggingElement(null);
+                        stageRef.current?.draggable(true);
+                        const id = e.target.id();
+                        const x = e.target.x();
+                        const y = e.target.y();
+                        setElements((prev) =>
+                          prev.map((el) => (el.id === id ? { ...el, x, y } : el))
+                        );
+                      }}
+                      onSelect={(id) => {
+                        if (creatingWireStartNode) return;
+                        const element = getElementById(id);
+                        setSelectedElement(element ?? null);
+                        setShowPropertiesPannel(true);
+                        setActiveControllerId(null);
+                        setOpenCodeEditor(false);
+                        setShowSimulationPanel(false);
+                        if (element?.type === "microbit") {
+                          setActiveControllerId(element.id);
+                          if (simulationRunning) {
+                            setShowSimulationPanel(true);
+                          }
                         }
-                      }
-                    }}
-                    selectedElementId={selectedElement?.id || null}
-                    // @ts-ignore
-                    onControllerInput={(elementId, input) => {
-                      const sim = controllerMap[elementId];
-                      if (sim && (input === "A" || input === "B")) {
-                        sim.simulateInput(input);
-                      }
-                    }}
-                  />
-                ))}
+                      }}
+                      selectedElementId={selectedElement?.id || null}
+                      onControllerInput={(elementId, input) => {
+                        const sim = controllerMap[elementId];
+                        if (sim && (input === "A" || input === "B")) {
+                          sim.simulateInput(input);
+                        }
+                      }}
+                    />
+                  );
+                })}
               </Layer>
-              {/* draggable circle for testing purposes */}
             </Stage>
           )}
         </div>
       </div>
 
+      {/* Palette, Code Editor, and Simulation Panel - Keep as is */}
       <div
         className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${
           showPalette ? "w-72" : "w-10"
         } `}
         style={{
           pointerEvents: "auto",
-          // Glass effect
-          background: "rgba(255, 255, 255, 0.1)", // white with 10% opacity
-          backdropFilter: "blur(15px)", // blur the background behind
-          WebkitBackdropFilter: "blur(15px)", // fix for Safari
-          border: "0.3px solid rgba(255, 255, 255, 0.3)", // subtle white border
-          boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.37)", // soft shadow for depth
-          borderRadius: "15px", // rounded corners
+          background: "rgba(255, 255, 255, 0.1)",
+          backdropFilter: "blur(15px)",
+          WebkitBackdropFilter: "blur(15px)",
+          border: "0.3px solid rgba(255, 255, 255, 0.3)",
+          boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.37)",
+          borderRadius: "15px",
         }}
       >
         <button
@@ -1330,7 +1309,6 @@ export default function CircuitCanvasOptimized() {
         {showPalette && <CircuitSelector />}
       </div>
 
-      {/* ...other code... */}
       {openCodeEditor && (
         <div
           className="absolute right-0 top-10 h-[460px] w-[700px] bg-white border-l border-gray-300 shadow-xl z-50 transition-transform duration-300"
@@ -1338,7 +1316,6 @@ export default function CircuitCanvasOptimized() {
             transform: openCodeEditor ? "translateX(0)" : "translateX(100%)",
           }}
         >
-          {/* Header with close */}
           <div className="flex justify-between items-center p-2 border-b border-gray-300 bg-gray-100">
             <span className="font-semibold">Editor</span>
             <button
@@ -1349,7 +1326,6 @@ export default function CircuitCanvasOptimized() {
             </button>
           </div>
 
-          {/* Editor */}
           <div className="flex flex-col h-full w-full">
             <div className="flex-1 overflow-hidden">
               <UnifiedEditor
@@ -1363,7 +1339,6 @@ export default function CircuitCanvasOptimized() {
         </div>
       )}
 
-      {/* Simulation Panel - appears when microbit is selected during simulation */}
       {showSimulationPanel &&
         selectedElement &&
         selectedElement.type === "microbit" && (
@@ -1391,7 +1366,6 @@ export default function CircuitCanvasOptimized() {
                 </div>
               </div>
 
-              {/* Temperature Slider */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Temperature (°C)
@@ -1415,7 +1389,6 @@ export default function CircuitCanvasOptimized() {
                 </div>
               </div>
 
-              {/* Brightness Slider */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Brightness (0–255)
@@ -1438,8 +1411,6 @@ export default function CircuitCanvasOptimized() {
                   {(selectedElement.controller?.brightness ?? 128).toString()}
                 </div>
               </div>
-
-              {/* Future simulation controls will be added here */}
             </div>
           </Window>
         )}

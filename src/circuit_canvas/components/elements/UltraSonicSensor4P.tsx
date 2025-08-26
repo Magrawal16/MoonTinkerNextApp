@@ -84,7 +84,11 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
 
   // Check if properly connected to microbit and pin 0 is high
   const isProperlyConnected = props.connectedMicrobit?.connections?.allConnected ?? false;
-  const isTriggerHigh = (props.connectedMicrobit?.pins?.["0"]?.digital ?? 0) === 1;
+  // Determine trigger HIGH: previously hard-coded to pin 0, now allow P0/P1/P2 (and numeric keys) so user code using P1 works.
+  const microbitPinsState = props.connectedMicrobit?.pins ?? {} as any;
+  const isTriggerHigh = ["P0", "0"].some(
+    (k) => microbitPinsState[k]?.digital === 1
+  );
   const canMeasure = isProperlyConnected && isTriggerHigh;
 
   // Notify parent component of distance changes if callback provided

@@ -23,7 +23,6 @@ function Potentiometer(props: PotentiometerProps) {
   const maxAngle = 315;
   const centerX = 25;
   const centerY = 25;
-
   const clampAngle = (deg: number) => {
     if (deg < minAngle && deg > 180) return minAngle;
     if (deg > maxAngle && deg < 360) return maxAngle;

@@ -24,6 +24,7 @@ export type CircuitElement = {
   controller?: {
     [key: string]: unknown;
   };
+  wires?: Wire[];
 };
 
 export type Wire = {

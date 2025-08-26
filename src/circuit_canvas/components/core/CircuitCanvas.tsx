@@ -704,7 +704,6 @@ export default function CircuitCanvasOptimized() {
                     : el
                 )
               );
-              console.log(pins);
 
               if (simulationRunningRef.current) {
                 console.log("Simulation running, computing circuit...");
@@ -1244,6 +1243,8 @@ export default function CircuitCanvasOptimized() {
                     key={element.id}
                     isSimulationOn={simulationRunning}
                     element={element}
+                    wires={wires}
+                    elements={elements}
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
                     handleRatioChange={handleRatioChange}

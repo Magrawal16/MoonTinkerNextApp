@@ -1,7 +1,7 @@
 // RenderElement.tsx
 
 import { useState } from "react";
-import { CircuitElement } from "@/circuit_canvas/types/circuit";
+import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 import { Rect, Group, Text, Label, Tag } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
@@ -18,6 +18,8 @@ import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 export default function RenderElement({
   element,
   simulator, // ← Make sure this is here
+  elements,
+  wires,
   ...props
 }: {
   element: CircuitElement;
@@ -32,9 +34,86 @@ export default function RenderElement({
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onControllerInput: (elementId: string, input: string) => void;
   isSimulationOn?: boolean;
+  elements?: CircuitElement[]; // Add this type
+  wires?: Wire[];
 }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const center = getElementCenter(element);
+
+  // Function to find connected microbit for ultrasonic sensor
+  const findConnectedMicrobit = () => {
+    if (element.type !== "ultrasonicsensor4p" || !elements || !wires) {
+      return null;
+    }
+
+    // Get sensor nodes
+    const sensorNodes = element.nodes;
+    const vccNode = sensorNodes.find(n => n.placeholder === "VCC(+5V)");
+    const gndNode = sensorNodes.find(n => n.placeholder === "GND");
+    const trigNode = sensorNodes.find(n => n.placeholder === "TRIG");
+    const echoNode = sensorNodes.find(n => n.placeholder === "ECHO");
+
+    // Find all microbits in the circuit
+    const microbits = elements.filter(el => el.type === "microbit");
+
+    for (const microbit of microbits) {
+      // Check if this microbit is connected to the sensor
+      const microbitNodes = microbit.nodes;
+      
+      // Find microbit pins
+      const microbit3V3Node = microbitNodes.find(n => n.placeholder === "3.3V");
+      const microbitGndNode = microbitNodes.find(n => n.placeholder === "GND");
+      const microbitPin0Node = microbitNodes.find(n => n.placeholder === "P0");
+      const microbitPin1Node = microbitNodes.find(n => n.placeholder === "P1");
+
+      // Check connections through wires
+      const isVccConnected = !!(vccNode && microbit3V3Node && 
+        wires.some(w => 
+          (w.fromNodeId === vccNode.id && w.toNodeId === microbit3V3Node.id) ||
+          (w.toNodeId === vccNode.id && w.fromNodeId === microbit3V3Node.id)
+        ));
+
+      const isGndConnected = !!(gndNode && microbitGndNode && 
+        wires.some(w => 
+          (w.fromNodeId === gndNode.id && w.toNodeId === microbitGndNode.id) ||
+          (w.toNodeId === gndNode.id && w.fromNodeId === microbitGndNode.id)
+        ));
+
+      const isTrigConnected = !!(trigNode && microbitPin0Node && 
+        wires.some(w => 
+          (w.fromNodeId === trigNode.id && w.toNodeId === microbitPin0Node.id) ||
+          (w.toNodeId === trigNode.id && w.fromNodeId === microbitPin0Node.id)
+        ));
+
+      const isEchoConnected = !!(echoNode && microbitPin1Node && 
+        wires.some(w => 
+          (w.fromNodeId === echoNode.id && w.toNodeId === microbitPin1Node.id) ||
+          (w.toNodeId === echoNode.id && w.fromNodeId === microbitPin1Node.id)
+        ));
+
+      // If all connections are proper, return this microbit and connection status
+      if (isVccConnected || isGndConnected || isTrigConnected || isEchoConnected) {
+        return {
+          microbit,
+          connections: {
+            vcc: isVccConnected,
+            gnd: isGndConnected,
+            trig: isTrigConnected,
+            echo: isEchoConnected,
+            allConnected: isVccConnected && isGndConnected && isTrigConnected && isEchoConnected
+          }
+        };
+      }
+    }
+
+    return null;
+  };
+
+  // Get connected microbit data for ultrasonic sensor
+  const connectedMicrobitData = findConnectedMicrobit();
+
+  console.log("ELEMENT STATE : ", element);
+  console.log("CONNECTED MICROBIT DATA : ", connectedMicrobitData);
 
   return (
     <Group
@@ -137,12 +216,21 @@ export default function RenderElement({
           x={0}
           y={0}
           selected={props.selectedElementId === element.id}
-          pins={{
+          connectionPins={{
             trig: element.nodes.find((n) => n.placeholder === "TRIG")?.id,
             echo: element.nodes.find((n) => n.placeholder === "ECHO")?.id,
+            vcc: element.nodes.find((n) => n.placeholder === "VCC(+5V)")?.id,
+            gnd: element.nodes.find((n) => n.placeholder === "GND")?.id,
           }}
+          // Pass the connected microbit data
+          connectedMicrobit={connectedMicrobitData ? {
+            pins: (connectedMicrobitData.microbit.controller?.pins as Record<
+              string,
+              { digital?: number }
+            >) ?? {},
+            connections: connectedMicrobitData.connections
+          } : undefined}
           isSimulation={props.isSimulationOn}
-          simulator={simulator} // ← Pass the simulator prop
         />
       )}
 

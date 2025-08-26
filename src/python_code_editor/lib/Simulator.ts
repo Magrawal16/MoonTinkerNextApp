@@ -63,7 +63,6 @@ export class Simulator {
     return this.microbit.getStateSnapshot();
   }
 
-  // Public method to get the MicrobitSimulator instance
   getMicrobitInstance(): MicrobitSimulator | null {
     return this.microbit;
   }
@@ -74,21 +73,6 @@ export class Simulator {
       // stop any ongoing simulation
     } else {
       throw new Error("Microbit controller not initialized.");
-    }
-  }
-  
-  // Method for disposal/cleanup
-  disposeAndReload() {
-    if (this.microbit) {
-      this.microbit.reset();
-    }
-    // Add any other cleanup logic here
-  }
-  
-  // Method to simulate button input
-  simulateInput(input: string) {
-    if (this.microbit && (input === "A" || input === "B")) {
-      this.microbit.pressButton(input);
     }
   }
 }

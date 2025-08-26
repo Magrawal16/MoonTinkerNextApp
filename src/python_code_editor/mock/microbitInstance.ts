@@ -44,10 +44,8 @@ class MicrobitEventEmitter {
 }
 
 export class MicrobitSimulator {
+
   private digitalWriteListeners: Record<string, Set<(value: number) => void>> = {};
-  
-  // Allow external components to set pin values (for sensor simulation)
-  public externalPinValues: Record<string, { digital: number; analog: number }> = {};
 
   public readonly pins = {
     digital_write_pin: this.digitalWritePin.bind(this),
@@ -55,13 +53,18 @@ export class MicrobitSimulator {
     analog_write_pin: this.analogWritePin.bind(this),
     read_analog_pin: this.readAnalogPin.bind(this),
 
-    // Subscribe to writes on a specific digital pin
+    // NEW: subscribe to writes on a specific digital pin
     onDigitalWrite: (pin: string, cb: (value: number) => void) => {
+      debugger;
       if (!this.digitalWriteListeners[pin]) this.digitalWriteListeners[pin] = new Set();
       this.digitalWriteListeners[pin].add(cb);
-      return () => this.digitalWriteListeners[pin]?.delete(cb);
+      return () => this.digitalWriteListeners[pin].delete(cb);
     },
   };
+
+
+  // NEW: Allow external components to set pin values (for sensor simulation)
+  private externalPinValues: Record<string, { digital: number; analog: number }> = {};
 
   // Method for external components (like sensors) to set pin values
   public setExternalPinValue(pin: string, value: number, type: 'digital' | 'analog' = 'digital') {
@@ -69,11 +72,10 @@ export class MicrobitSimulator {
       this.externalPinValues[pin] = { digital: 0, analog: 0 };
     }
     this.externalPinValues[pin][type] = value;
-    console.log(`[MicrobitSimulator] External pin ${pin} ${type} set to ${value}`);
   }
 
   // Update the read methods to check external values first
-  public readDigitalPin(pin: string): number {
+  private readDigitalPin(pin: string) {
     // Check if external component has set a value for this pin
     if (this.externalPinValues[pin]?.digital !== undefined) {
       return this.externalPinValues[pin].digital;
@@ -81,7 +83,7 @@ export class MicrobitSimulator {
     return this.pinStates[pin].digital;
   }
 
-  private readAnalogPin(pin: string): number {
+  private readAnalogPin(pin: string) {
     // Check if external component has set a value for this pin
     if (this.externalPinValues[pin]?.analog !== undefined) {
       return this.externalPinValues[pin].analog;
@@ -89,7 +91,7 @@ export class MicrobitSimulator {
     return this.pinStates[pin].analog;
   }
 
-  // Method to get access to pin operations for external components
+  // NEW: Method to get access to pin operations for external components
   public getPinController() {
     return {
       onDigitalWrite: (pin: string, cb: (value: number) => void) => {
@@ -97,7 +99,7 @@ export class MicrobitSimulator {
           this.digitalWriteListeners[pin] = new Set();
         }
         this.digitalWriteListeners[pin].add(cb);
-        return () => this.digitalWriteListeners[pin]?.delete(cb);
+        return () => this.digitalWriteListeners[pin].delete(cb);
       },
       setDigitalValue: (pin: string, value: number) => {
         this.setExternalPinValue(pin, value, 'digital');
@@ -110,18 +112,11 @@ export class MicrobitSimulator {
 
   private digitalWritePin(pin: string, value: number) {
     this.pinStates[pin].digital = value;
-    console.log(`[MicrobitSimulator] Digital write pin ${pin} = ${value}`);
-    
     // notify generic event stream
     this.eventEmitter.emit({ type: "pin-change", pin, value, pinType: "digital" });
-    
-    // notify direct listeners
+    // NEW: notify direct listeners
     const listeners = this.digitalWriteListeners[pin];
-    if (listeners) {
-      for (const cb of listeners) {
-        cb(value);
-      }
-    }
+    if (listeners) for (const cb of listeners) cb(value);
   }
   
   private pyodide: PyodideInterface;
@@ -129,7 +124,7 @@ export class MicrobitSimulator {
   private ledMatrix: boolean[][] = Array.from({ length: 5 }, () =>
     Array(5).fill(false)
   );
-  public pinStates: Record<string, { digital: number; analog: number }> = {};
+  private pinStates: Record<string, { digital: number; analog: number }> = {};
   private buttonStates: Record<"A" | "B", boolean> = { A: false, B: false };
   private inputHandlers: Record<"A" | "B", any[]> = { A: [], B: [] };
   private foreverCallbacks: Set<any> = new Set();
@@ -275,10 +270,6 @@ export class MicrobitSimulator {
     for (const pin in this.pinStates) {
       this.pinStates[pin] = { digital: 0, analog: 0 };
     }
-    
-    // Clear external pin values on reset
-    this.externalPinValues = {};
-    
     for (let y = 0; y < 5; y++) {
       for (let x = 0; x < 5; x++) {
         this.ledMatrix[y][x] = false;
@@ -290,6 +281,11 @@ export class MicrobitSimulator {
     console.log("Microbit state reset");
   }
 
+
+  // private readDigitalPin(pin: string) {
+  //   return this.pinStates[pin].digital;
+  // }
+
   private analogWritePin(pin: string, value: number) {
     this.pinStates[pin].analog = value;
     this.eventEmitter.emit({
@@ -299,6 +295,10 @@ export class MicrobitSimulator {
       pinType: "analog",
     });
   }
+
+  // private readAnalogPin(pin: string) {
+  //   return this.pinStates[pin].analog;
+  // }
 
   private plot(x: number, y: number) {
     this.ledMatrix[y][x] = true;
@@ -351,68 +351,68 @@ export class MicrobitSimulator {
     };
   }
 
-  // Add ultrasonic sensor support
+   // Add ultrasonic sensor support
   public readonly ultrasonic = {
     distance_cm: this.getDistanceCm.bind(this),
   };
 
   private async getDistanceCm(trigPin: string, echoPin: string): Promise<number> {
-    console.log(`[Ultrasonic] Measuring distance on pins ${trigPin} (trig) -> ${echoPin} (echo)`);
-    
-    // Step 1: Send 10µs HIGH pulse to trigger pin
-    this.digitalWritePin(trigPin, 1);
-    await new Promise(resolve => setTimeout(resolve, 0.01)); // 10µs
-    this.digitalWritePin(trigPin, 0);
-    
-    // Step 2: Wait for echo pin to go HIGH
-    const startTime = performance.now();
-    const maxWaitTime = 30; // 30ms timeout
-    
-    // Wait for echo to go HIGH
-    while (this.readDigitalPin(echoPin) === 0) {
-      if (performance.now() - startTime > maxWaitTime) {
-        console.log(`[Ultrasonic] Timeout waiting for echo HIGH on pin ${echoPin}`);
-        return -1; // Timeout
-      }
-      await new Promise(resolve => setTimeout(resolve, 0.1));
+  console.log(`[Ultrasonic] Measuring distance on pins ${trigPin} (trig) -> ${echoPin} (echo)`);
+  
+  // Step 1: Send 10µs HIGH pulse to trigger pin
+  this.digitalWritePin(trigPin, 1);
+  await new Promise(resolve => setTimeout(resolve, 0.01)); // 10µs
+  this.digitalWritePin(trigPin, 0);
+  
+  // Step 2: Wait for echo pin to go HIGH
+  const startTime = performance.now();
+  const maxWaitTime = 30; // 30ms timeout
+  
+  // Wait for echo to go HIGH
+  while (this.readDigitalPin(echoPin) === 0) {
+    if (performance.now() - startTime > maxWaitTime) {
+      console.log(`[Ultrasonic] Timeout waiting for echo HIGH on pin ${echoPin}`);
+      return -1; // Timeout
     }
-    
-    const echoStartTime = performance.now();
-    console.log(`[Ultrasonic] Echo started at ${echoStartTime}`);
-    
-    // Wait for echo to go LOW
-    while (this.readDigitalPin(echoPin) === 1) {
-      if (performance.now() - echoStartTime > maxWaitTime) {
-        console.log(`[Ultrasonic] Timeout waiting for echo LOW on pin ${echoPin}`);
-        return -1; // Timeout
-      }
-      await new Promise(resolve => setTimeout(resolve, 0.1));
-    }
-    
-    const echoEndTime = performance.now();
-    const pulseDuration = (echoEndTime - echoStartTime) * 1000; // Convert to microseconds
-    
-    console.log(`[Ultrasonic] Echo ended at ${echoEndTime}, duration: ${pulseDuration}µs`);
-    
-    // Calculate distance: duration(µs) * 0.0343 cm/µs / 2
-    const distanceCm = (pulseDuration * 0.0343) / 2;
-    
-    console.log(`[Ultrasonic] Calculated distance: ${distanceCm}cm`);
-    
-    return Math.round(distanceCm * 10) / 10; // Round to 1 decimal place
+    await new Promise(resolve => setTimeout(resolve, 0.1));
   }
+  
+  const echoStartTime = performance.now();
+  console.log(`[Ultrasonic] Echo started at ${echoStartTime}`);
+  
+  // Wait for echo to go LOW
+  while (this.readDigitalPin(echoPin) === 1) {
+    if (performance.now() - echoStartTime > maxWaitTime) {
+      console.log(`[Ultrasonic] Timeout waiting for echo LOW on pin ${echoPin}`);
+      return -1; // Timeout
+    }
+    await new Promise(resolve => setTimeout(resolve, 0.1));
+  }
+  
+  const echoEndTime = performance.now();
+  const pulseDuration = (echoEndTime - echoStartTime) * 1000; // Convert to microseconds
+  
+  console.log(`[Ultrasonic] Echo ended at ${echoEndTime}, duration: ${pulseDuration}µs`);
+  
+  // Calculate distance: duration(µs) * 0.0343 cm/µs / 2
+  const distanceCm = (pulseDuration * 0.0343) / 2;
+  
+  console.log(`[Ultrasonic] Calculated distance: ${distanceCm}cm`);
+  
+  return Math.round(distanceCm * 10) / 10; // Round to 1 decimal place
+}
+
 
   getPythonModule() {
-    console.log("[MicrobitSimulator] Creating Python module with ultrasonic support");
-    return {
-      pins: this.pins,
-      led: this.led,
-      input: this.input,
-      Button: this.Button,
-      DigitalPin: this.DigitalPin,
-      basic: this.basic,
-      ultrasonic: this.ultrasonic,
-      running_time: () => performance.now(),
-    };
+  console.log("[MicrobitSimulator] Creating Python module with ultrasonic support");
+  return {
+    pins: this.pins,
+    led: this.led,
+    input: this.input,
+    Button: this.Button,
+    DigitalPin: this.DigitalPin,
+    basic: this.basic,
+    ultrasonic: this.ultrasonic, 
+  };
   }
 }

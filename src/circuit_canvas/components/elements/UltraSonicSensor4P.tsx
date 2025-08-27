@@ -277,8 +277,8 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
           {/* // 2cm to 400cm */}
           {/* also operates on 5V, for distance 2 decimal places */}
 
-          {/* Show interactive elements only in simulation mode and when selected */}
-          {props.isSimulation && props.selected && (
+          {/* Show interactive elements when simulation is running; selection just adds shadows */}
+          {props.isSimulation && (
             <>
               {/* Range arc */}
               <Arc
@@ -332,14 +332,21 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 shadowOpacity={props.selected ? 2 : 0}
               />
 
-              {/* Draggable ball */}
+              {/* Draggable ball (always draggable in simulation) */}
               <Circle
                 x={ball.x}
                 y={ball.y}
                 radius={BALL_RADIUS}
                 fill={canMeasure ? "blue" : "gray"}
                 draggable
-                onDragMove={onDragMove}
+                onDragStart={(e) => {
+                  // Prevent parent element drag logic from interfering
+                  e.cancelBubble = true;
+                }}
+                onDragMove={(e) => {
+                  e.cancelBubble = true;
+                  onDragMove(e);
+                }}
               />
 
               {/* Echo pulse circle animation */}

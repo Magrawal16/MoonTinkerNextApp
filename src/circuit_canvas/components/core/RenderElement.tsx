@@ -36,6 +36,7 @@ export default function RenderElement({
   isSimulationOn?: boolean;
   elements?: CircuitElement[]; // Add this type
   wires?: Wire[];
+  canDrag?: boolean; // optional explicit drag control
 }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const center = getElementCenter(element);
@@ -127,7 +128,8 @@ export default function RenderElement({
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
       id={element.id}
-      draggable={true}
+  // Disable dragging when simulation is running unless explicit canDrag overrides
+  draggable={props.canDrag !== undefined ? props.canDrag : !props.isSimulationOn}
     >
       {/* Render circuit elements */}
       {element.type === "lightbulb" && (
@@ -253,6 +255,8 @@ export default function RenderElement({
               strokeWidth={isHovered ? 1.4 : 0}
               onClick={(e) => {
                 e.cancelBubble = true;
+                // Prevent wiring interactions while simulation is running
+                if (props.isSimulationOn) return;
                 props.handleNodeClick(node.id);
               }}
               hitStrokeWidth={10}

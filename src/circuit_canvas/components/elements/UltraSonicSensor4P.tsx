@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { Image, Group, Arc, Circle, Line, Text } from "react-konva";
+import { Image, Group, Arc, Circle, Line, Text, Rect } from "react-konva";
 import {
   BaseElement,
   BaseElementProps,
@@ -9,13 +9,20 @@ import Konva from "konva";
 // Sensor and UI constants
 const SENSOR_IMG_WIDTH = 230;
 const SENSOR_IMG_HEIGHT = 130;
+// Real-world sensor limits
+const SENSOR_MIN_CM = 2;
+const SENSOR_MAX_CM = 400;
+
+// Scale factor (cm → px mapping)
+const CM_TO_PX = 0.38; // adjust so that 400 cm ≈ your RANGE_RADIUS in canvas
+
 const SENSOR_X = SENSOR_IMG_WIDTH / 2.1; // Horizontal center
 const SENSOR_Y = -25; // Sensor face Y (adjust for your image asset)
 const EYE_OFFSET_X = 37; // Offset from center for sensor eyes
 const EYE_RADIUS = 18;
-const RANGE_RADIUS = 153.1; // Range radius in "cm"
+const RANGE_RADIUS = SENSOR_MAX_CM * CM_TO_PX;
 const RANGE_ANGLE = 45; // 45° either side (90° spread)
-const BALL_RADIUS = 8;
+const BALL_RADIUS = 9;
 
 interface BallPosition {
   x: number;
@@ -78,14 +85,15 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
 
   // Check if ball is in valid range region (exclude inner radius)
   const ballInRange =
-    distance >= EYE_RADIUS &&
+    distance >= SENSOR_MIN_CM * CM_TO_PX &&
     distance <= RANGE_RADIUS &&
     Math.abs(angleDeg) <= RANGE_ANGLE;
 
   // Check if properly connected to microbit and pin 0 is high
-  const isProperlyConnected = props.connectedMicrobit?.connections?.allConnected ?? false;
+  const isProperlyConnected =
+    props.connectedMicrobit?.connections?.allConnected ?? false;
   // Determine trigger HIGH: previously hard-coded to pin 0, now allow P0/P1/P2 (and numeric keys) so user code using P1 works.
-  const microbitPinsState = props.connectedMicrobit?.pins ?? {} as any;
+  const microbitPinsState = props.connectedMicrobit?.pins ?? ({} as any);
   const isTriggerHigh = ["P0", "0"].some(
     (k) => microbitPinsState[k]?.digital === 1
   );
@@ -99,9 +107,14 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
   }, [distance, props, canMeasure]);
 
   // Displayed distance in selected unit
+  const distanceCm = distance / CM_TO_PX;
+
   const displayedDistance = canMeasure
-    ? (unit === "cm" ? distance.toFixed(1) : (distance / 2.54).toFixed(1))
+    ? unit === "cm"
+      ? distanceCm.toFixed(2)
+      : (distanceCm / 2.54).toFixed(2)
     : "N/A";
+
   const displayedUnit = canMeasure ? unit : "";
 
   // Simulate ultrasonic sensor trigger and echo pulses
@@ -110,7 +123,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     setTriggered(true);
     setEchoTime(null);
 
-    const timeForEcho = (distance / 34300) * 2 * 1e6; // microseconds (speed of sound in cm/s)
+    const timeForEcho = (distanceCm / 34300) * 2 * 1e6; // microseconds
     // Echo time update with delay simulation (10ms)
     setTimeout(() => {
       setEchoTime(timeForEcho);
@@ -130,19 +143,8 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
 
   // Constrain ball movement within sensor range circle
   const onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
-    let x = e.target.x();
-    let y = e.target.y();
-    const dx = x - SENSOR_X;
-    const dy = y - SENSOR_Y;
-    let dist = Math.sqrt(dx * dx + dy * dy);
-
-    if (dist > RANGE_RADIUS) {
-      const angle = Math.atan2(dy, dx);
-      x = SENSOR_X + RANGE_RADIUS * Math.cos(angle);
-      y = SENSOR_Y + RANGE_RADIUS * Math.sin(angle);
-      e.target.position({ x, y });
-      dist = RANGE_RADIUS;
-    }
+    const x = e.target.x();
+    const y = e.target.y();
     setBall({ x, y });
   };
 
@@ -187,13 +189,13 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
   // Debug logging
   useEffect(() => {
     if (props.connectedMicrobit) {
-      console.log('Microbit connected!');
-      console.log('Connections:', props.connectedMicrobit.connections);
-      console.log('Pin 0 state:', props.connectedMicrobit.pins?.["0"]?.digital);
-      console.log('Can measure:', canMeasure);
+      console.log("Microbit connected!");
+      console.log("Connections:", props.connectedMicrobit.connections);
+      console.log("Pin 0 state:", props.connectedMicrobit.pins?.["0"]?.digital);
+      console.log("Can measure:", canMeasure);
     }
   }, [props.connectedMicrobit, canMeasure]);
-  
+
   // Animate echo pulse radius visualization
   const [pulseRadius, setPulseRadius] = useState(0);
   useEffect(() => {
@@ -250,41 +252,16 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 stroke="black"
                 strokeWidth={1}
               />
-              {/* <Text
-                x={-90}
-                y={100}
-                fontSize={12}
-                fill="red"
-                text={
-                  !props.connectedMicrobit
-                    ? "No Microbit Connected"
-                    : !isProperlyConnected
-                    ? `Missing: ${[
-                        !props.connectedMicrobit.connections.vcc && "VCC",
-                        !props.connectedMicrobit.connections.gnd && "GND",
-                        !props.connectedMicrobit.connections.trig && "TRIG",
-                        !props.connectedMicrobit.connections.echo && "ECHO",
-                      ]
-                        .filter(Boolean)
-                        .join(", ")}`
-                    : !isTriggerHigh
-                    ? "Trigger Pin 0 = LOW"
-                    : ""
-                }
-              /> */}
             </Group>
           )}
-          {/* // 2cm to 400cm */}
-          {/* also operates on 5V, for distance 2 decimal places */}
 
-          {/* Show interactive elements only in simulation mode and when selected */}
           {props.isSimulation && props.selected && (
             <>
               {/* Range arc */}
               <Arc
                 x={SENSOR_X}
                 y={SENSOR_Y}
-                innerRadius={EYE_RADIUS}
+                innerRadius={0}
                 outerRadius={RANGE_RADIUS}
                 angle={RANGE_ANGLE * 2}
                 rotation={225}
@@ -359,7 +336,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
               {/* Sensor output data */}
               <Text
                 x={-100}
-                y={SENSOR_IMG_HEIGHT - 200}
+                y={SENSOR_IMG_HEIGHT - 160}
                 fontSize={14}
                 fill="green"
                 text={`Echo time: ${
@@ -369,46 +346,59 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 }`}
               />
 
-              <Text
-                x={-100}
-                y={SENSOR_IMG_HEIGHT - 170}
-                fontSize={14}
-                fill="green"
-                text={`Distance: ${
-                  canMeasure && ballInRange && distance !== null
-                    ? unit === "cm"
-                      ? distance.toFixed(1) + " cm"
-                      : (distance / 2.54).toFixed(1) + " in"
-                    : "N/A"
-                }`}
-              />
-
               {/* Unit toggle button (only enabled when measuring) */}
               {canMeasure && (
-                <Text
-                  x={-100}
-                  y={SENSOR_IMG_HEIGHT + 60}
-                  fontSize={14}
-                  fill="blue"
-                  text={`Switch to ${unit === "cm" ? "inches" : "cm"}`}
-                  onClick={() => setUnit(unit === "cm" ? "in" : "cm")}
-                  style={{ cursor: "pointer" }}
-                />
+                <Group>
+                  {/* Toggle button background */}
+                  <Rect
+                    x={-50}
+                    y={SENSOR_IMG_HEIGHT - 70}
+                    width={60}
+                    height={30}
+                    cornerRadius={15}
+                    fill={unit === "cm" ? "#4CAF50" : "#2196F3"}
+                    stroke="#333"
+                    strokeWidth={2}
+                    onClick={() => setUnit(unit === "cm" ? "in" : "cm")}
+                    style={{ cursor: "pointer" }}
+                  />
+                  
+                  {/* Toggle slider */}
+                  <Circle
+                    x={unit === "cm" ? -34.5 : -5.5}
+                    y={SENSOR_IMG_HEIGHT - 55}
+                    radius={15}
+                    fill="white"
+                    stroke="#333"
+                    strokeWidth={1}
+                    onClick={() => setUnit(unit === "cm" ? "in" : "cm")}
+                    style={{ cursor: "pointer" }}
+                  />
+                  
+                  {/* Toggle labels */}
+                  <Text
+                    x={-44}
+                    y={SENSOR_IMG_HEIGHT - 60}
+                    fontSize={13}
+                    fill="white"
+                    text="cm"
+                    fontStyle={unit === "cm" ? "bold" : "normal"}
+                    onClick={() => setUnit("cm")}
+                    style={{ cursor: "pointer" }}
+                  />
+                  
+                  <Text
+                    x={-10}
+                    y={SENSOR_IMG_HEIGHT - 60}
+                    fontSize={13}
+                    fill="white"
+                    text="in"
+                    fontStyle={unit === "in" ? "bold" : "normal"}
+                    onClick={() => setUnit("in")}
+                    style={{ cursor: "pointer" }}
+                  />
+                </Group>
               )}
-
-              {/* Connection requirements info */}
-              {/* {!canMeasure && (
-                <Text
-                  x={-170}
-                  y={SENSOR_IMG_HEIGHT - 30}
-                  fontSize={12}
-                  fill="red"
-                  text={
-                    "\nConnect: VCC→3.3V, GND→GND\n\n,TRIG→Pin0, ECHO→Pin1\n\n\n" +
-                    "Set Pin 0 = HIGH to enable measurement"
-                  }
-                />
-              )} */}
 
               {/* Out of range warning */}
               {!ballInRange && canMeasure && (

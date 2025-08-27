@@ -209,13 +209,6 @@ export default function CircuitCanvasOptimized() {
 
   function startSimulation() {
     setSimulationRunning(true);
-    // Cancel any in-progress wire creation when simulation starts
-    if (creatingWireStartNode) {
-      setCreatingWireStartNode(null);
-      setCreatingWireJoints([]);
-      if (inProgressWireRef.current) inProgressWireRef.current.visible(false);
-      if (animatedCircleRef.current) animatedCircleRef.current.visible(false);
-    }
     computeCircuit(wires);
 
     // if microbit is selected, show the simulation panel
@@ -470,7 +463,6 @@ export default function CircuitCanvasOptimized() {
 
   // Optimized drag move handler - updates wires directly without React re-render
   function handleElementDragMove(e: KonvaEventObject<DragEvent>) {
-    if (simulationRunning) return;
     e.cancelBubble = true;
     const id = e.target.id();
     const x = e.target.x();
@@ -483,7 +475,6 @@ export default function CircuitCanvasOptimized() {
   }
 
   function handleNodeClick(nodeId: string) {
-    if (simulationRunning) return;
     if (editingWire) {
       // complete wire editing logic
       pushToHistory();
@@ -1252,7 +1243,6 @@ export default function CircuitCanvasOptimized() {
                     key={element.id}
                     isSimulationOn={simulationRunning}
                     element={element}
-                    canDrag={!simulationRunning}
                     wires={wires}
                     elements={elements}
                     onDragMove={handleElementDragMove}
@@ -1260,13 +1250,11 @@ export default function CircuitCanvasOptimized() {
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
                     onDragStart={() => {
-                      if (simulationRunning) return
                       pushToHistory();
                       setDraggingElement(element.id);
                       stageRef.current?.draggable(false);
                     }}
                     onDragEnd={(e) => {
-                      if (simulationRunning) return;
                       setDraggingElement(null);
                       stageRef.current?.draggable(true);
                       const id = e.target.id();

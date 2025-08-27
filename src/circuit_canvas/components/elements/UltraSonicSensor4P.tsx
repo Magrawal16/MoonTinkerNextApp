@@ -250,7 +250,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 stroke="black"
                 strokeWidth={1}
               />
-              <Text
+              {/* <Text
                 x={-90}
                 y={100}
                 fontSize={12}
@@ -271,7 +271,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                     ? "Trigger Pin 0 = LOW"
                     : ""
                 }
-              />
+              /> */}
             </Group>
           )}
           {/* // 2cm to 400cm */}

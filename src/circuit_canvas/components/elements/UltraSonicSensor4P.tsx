@@ -251,27 +251,31 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 strokeWidth={1}
               />
               <Text
-                x={10}
-                y={5}
+                x={-90}
+                y={100}
                 fontSize={12}
-                fill="#333"
+                fill="red"
                 text={
-                  !props.connectedMicrobit 
-                    ? "No Microbit Connected" 
-                    : !isProperlyConnected 
+                  !props.connectedMicrobit
+                    ? "No Microbit Connected"
+                    : !isProperlyConnected
                     ? `Missing: ${[
                         !props.connectedMicrobit.connections.vcc && "VCC",
                         !props.connectedMicrobit.connections.gnd && "GND",
                         !props.connectedMicrobit.connections.trig && "TRIG",
-                        !props.connectedMicrobit.connections.echo && "ECHO"
-                      ].filter(Boolean).join(", ")}`
+                        !props.connectedMicrobit.connections.echo && "ECHO",
+                      ]
+                        .filter(Boolean)
+                        .join(", ")}`
                     : !isTriggerHigh
                     ? "Trigger Pin 0 = LOW"
-                    : "Active"
+                    : ""
                 }
               />
             </Group>
           )}
+          {/* // 2cm to 400cm */}
+          {/* also operates on 5V, for distance 2 decimal places */}
 
           {/* Show interactive elements only in simulation mode and when selected */}
           {props.isSimulation && props.selected && (
@@ -284,7 +288,11 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 outerRadius={RANGE_RADIUS}
                 angle={RANGE_ANGLE * 2}
                 rotation={225}
-                fill={ballInRange && canMeasure ? "rgba(0,255,0,0.3)" : "rgba(255,0,0,0.3)"}
+                fill={
+                  ballInRange && canMeasure
+                    ? "rgba(0,255,0,0.3)"
+                    : "rgba(255,0,0,0.3)"
+                }
                 stroke={ballInRange && canMeasure ? "green" : "red"}
                 strokeWidth={2}
                 shadowBlur={props.selected ? 6 : 0}
@@ -350,60 +358,57 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
 
               {/* Sensor output data */}
               <Text
-                x={10}
-                y={SENSOR_IMG_HEIGHT + 10}
+                x={-100}
+                y={SENSOR_IMG_HEIGHT - 200}
                 fontSize={14}
-                fill="#555"
+                fill="green"
                 text={`Echo time: ${
-                  canMeasure && echoTime ? echoTime.toFixed(0) + " μs" : "N/A"
+                  canMeasure && ballInRange && echoTime
+                    ? echoTime.toFixed(0) + " μs"
+                    : "N/A"
                 }`}
-                shadowBlur={props.selected ? 6 : 0}
-                shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 2 : 0}
               />
+
               <Text
-                x={10}
-                y={SENSOR_IMG_HEIGHT + 30}
+                x={-100}
+                y={SENSOR_IMG_HEIGHT - 170}
                 fontSize={14}
-                fill="#555"
-                text={`Distance: ${canMeasure ? distance.toFixed(1) + " cm" : "N/A"}`}
-                shadowBlur={props.selected ? 6 : 0}
-                shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 2 : 0}
+                fill="green"
+                text={`Distance: ${
+                  canMeasure && ballInRange && distance !== null
+                    ? unit === "cm"
+                      ? distance.toFixed(1) + " cm"
+                      : (distance / 2.54).toFixed(1) + " in"
+                    : "N/A"
+                }`}
               />
 
               {/* Unit toggle button (only enabled when measuring) */}
               {canMeasure && (
                 <Text
-                  x={10}
+                  x={-100}
                   y={SENSOR_IMG_HEIGHT + 60}
                   fontSize={14}
                   fill="blue"
                   text={`Switch to ${unit === "cm" ? "inches" : "cm"}`}
                   onClick={() => setUnit(unit === "cm" ? "in" : "cm")}
                   style={{ cursor: "pointer" }}
-                  shadowBlur={props.selected ? 6 : 0}
-                  shadowOffset={{ x: 15, y: -15 }}
-                  shadowOpacity={props.selected ? 2 : 0}
                 />
               )}
 
               {/* Connection requirements info */}
-              {!canMeasure && (
+              {/* {!canMeasure && (
                 <Text
-                  x={10}
-                  y={SENSOR_IMG_HEIGHT + 80}
+                  x={-170}
+                  y={SENSOR_IMG_HEIGHT - 30}
                   fontSize={12}
-                  fill="#666"
+                  fill="red"
                   text={
-                    "Connect: VCC→3V3, GND→GND, TRIG→Pin0, ECHO→Pin1\n" +
+                    "\nConnect: VCC→3.3V, GND→GND\n\n,TRIG→Pin0, ECHO→Pin1\n\n\n" +
                     "Set Pin 0 = HIGH to enable measurement"
                   }
-                  shadowBlur={props.selected ? 6 : 0}
-                  shadowOffset={{ x: 15, y: -15 }}
-                  shadowOpacity={props.selected ? 2 : 0}
                 />
-              )}
+              )} */}
 
               {/* Out of range warning */}
               {!ballInRange && canMeasure && (
@@ -413,9 +418,6 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                   fontSize={16}
                   fill="red"
                   text="Out of range"
-                  shadowBlur={props.selected ? 6 : 0}
-                  shadowOffset={{ x: 15, y: -15 }}
-                  shadowOpacity={props.selected ? 2 : 0}
                 />
               )}
             </>

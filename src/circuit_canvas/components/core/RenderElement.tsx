@@ -127,8 +127,7 @@ export default function RenderElement({
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
       id={element.id}
-  // Prevent dragging while simulation is running
-  draggable={!props.isSimulationOn}
+      draggable={true}
     >
       {/* Render circuit elements */}
       {element.type === "lightbulb" && (
@@ -254,7 +253,6 @@ export default function RenderElement({
               strokeWidth={isHovered ? 1.4 : 0}
               onClick={(e) => {
                 e.cancelBubble = true;
-                if (props.isSimulationOn) return; // block wiring while simulating
                 props.handleNodeClick(node.id);
               }}
               hitStrokeWidth={10}

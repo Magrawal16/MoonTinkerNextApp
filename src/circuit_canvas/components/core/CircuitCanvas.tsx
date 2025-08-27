@@ -115,8 +115,6 @@ export default function CircuitCanvasOptimized() {
     {}
   );
   const [loadingSavedCircuit, setLoadingSavedCircuit] = useState(false);
-  // Control whether stage can pan during simulation (only when starting on empty space)
-  const [stageDraggableSim, setStageDraggableSim] = useState(false);
 
   useEffect(() => {
     elementsRef.current = elements;
@@ -211,13 +209,6 @@ export default function CircuitCanvasOptimized() {
 
   function startSimulation() {
     setSimulationRunning(true);
-    // Cancel any in-progress wire creation to avoid dangling UI during simulation start
-    if (creatingWireStartNode) {
-      setCreatingWireStartNode(null);
-      setCreatingWireJoints([]);
-      if (inProgressWireRef.current) inProgressWireRef.current.visible(false);
-      if (animatedCircleRef.current) animatedCircleRef.current.visible(false);
-    }
     computeCircuit(wires);
 
     // if microbit is selected, show the simulation panel
@@ -428,17 +419,6 @@ export default function CircuitCanvasOptimized() {
   }
 
   function handleStageClick(e: KonvaEventObject<MouseEvent>) {
-    const className = e.target.getClassName?.();
-    if (simulationRunning) {
-      // Allow only deselect on empty space; block wiring/selection of new elements
-      const clickedEmpty = className === "Stage" || className === "Layer";
-      if (clickedEmpty) {
-        setSelectedElement(null);
-        setShowPropertiesPannel(false);
-        setActiveControllerId(null);
-      }
-      return;
-    }
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
@@ -483,7 +463,6 @@ export default function CircuitCanvasOptimized() {
 
   // Optimized drag move handler - updates wires directly without React re-render
   function handleElementDragMove(e: KonvaEventObject<DragEvent>) {
-  if (simulationRunning) return; // prevent moving elements during simulation
     e.cancelBubble = true;
     const id = e.target.id();
     const x = e.target.x();
@@ -496,7 +475,6 @@ export default function CircuitCanvasOptimized() {
   }
 
   function handleNodeClick(nodeId: string) {
-  if (simulationRunning) return; // lock wiring during simulation
     if (editingWire) {
       // complete wire editing logic
       pushToHistory();
@@ -1132,46 +1110,22 @@ export default function CircuitCanvasOptimized() {
           {loadingSavedCircuit ? (
             <Loader />
           ) : (
-              <Stage
+            <Stage
               id="canvas-stage"
               width={window.innerWidth}
               height={window.innerHeight - 48}
               onMouseMove={handleStageMouseMove}
               onClick={handleStageClick}
-                onMouseDown={(e) => {
-                  if (simulationRunning) {
-                    const cls = e.target.getClassName?.();
-                    const empty = cls === "Stage" || cls === "Layer";
-                    setStageDraggableSim(empty);
-                    // Apply immediately so first drag movement works without waiting for re-render
-                    if (stageRef.current) stageRef.current.draggable(empty);
-                  }
-                }}
-                onMouseUp={() => {
-                  if (simulationRunning) {
-                    // Stop panning after mouse release
-                    setStageDraggableSim(false);
-                    if (stageRef.current) stageRef.current.draggable(false);
-                  }
-                }}
-                onDragStart={(e) => {
-                  // If simulation running and we didn't start on empty canvas, cancel drag
-                  if (simulationRunning && !stageDraggableSim) {
-                    e.target.stopDrag();
-                  }
-                }}
               ref={stageRef}
               x={canvasOffset.x}
               y={canvasOffset.y}
               onDragMove={(e) => {
-                // Allow panning during simulation only if stageDraggableSim is true
-                if (simulationRunning && !stageDraggableSim) return;
                 if (draggingElement !== null) return;
                 const stage = e.target;
                 setCanvasOffset({ x: stage.x(), y: stage.y() });
                 updateViewport();
               }}
-              draggable={draggingElement == null && (!simulationRunning || stageDraggableSim)}
+              draggable={draggingElement == null}
               onWheel={handleWheel}
             >
               <HighPerformanceGrid viewport={viewport} gridSize={25} />
@@ -1215,8 +1169,6 @@ export default function CircuitCanvasOptimized() {
                       }
                       opacity={0.95}
                       onClick={() => {
-                        if (simulationRunning) return; // lock editing during simulation
-                        if (creatingWireStartNode) return;
                         setSelectedElement({
                           id: wire.id,
                           type: "wire",

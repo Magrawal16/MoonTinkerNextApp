@@ -39,6 +39,7 @@ interface UltraSonicSensor4PProps extends BaseElementProps {
     gnd?: string | undefined;
   };
   connectedMicrobit?: {
+    microbitId: string;
     pins: {
       [key: string]: { digital?: number };
     };
@@ -48,6 +49,8 @@ interface UltraSonicSensor4PProps extends BaseElementProps {
       trig: boolean;
       echo: boolean;
       allConnected: boolean;
+      trigPin?: string; // Which microbit pin TRIG is connected to
+      echoPin?: string; // Which microbit pin ECHO is connected to
     };
   };
 }
@@ -89,14 +92,23 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     distance <= RANGE_RADIUS &&
     Math.abs(angleDeg) <= RANGE_ANGLE;
 
-  // Check if properly connected to microbit and pin 0 is high
+  // Check if properly connected to microbit
   const isProperlyConnected =
     props.connectedMicrobit?.connections?.allConnected ?? false;
-  // Determine trigger HIGH: previously hard-coded to pin 0, now allow P0/P1/P2 (and numeric keys) so user code using P1 works.
-  const microbitPinsState = props.connectedMicrobit?.pins ?? ({} as any);
-  const isTriggerHigh = ["P0", "0"].some(
-    (k) => microbitPinsState[k]?.digital === 1
-  );
+
+  // Get microbit pins state
+  const microbitPinsState = props.connectedMicrobit?.pins ?? {};
+
+  // Check if the TRIG pin is HIGH - use the actual connected pin
+  const trigPin = props.connectedMicrobit?.connections?.trigPin;
+  const isTriggerHigh = useMemo(() => {
+    if (!trigPin) return false;
+    
+    // Check both the pin name (e.g., "P0") and its numeric equivalent (e.g., "0")
+    const pinVariants = [trigPin, trigPin.replace('P', '')];
+    return pinVariants.some(pin => microbitPinsState[pin]?.digital === 1);
+  }, [trigPin, microbitPinsState]);
+
   const canMeasure = isProperlyConnected && isTriggerHigh;
 
   // Notify parent component of distance changes if callback provided
@@ -186,15 +198,20 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [props.selected]);
 
-  // Debug logging
+  // Enhanced debug logging
   useEffect(() => {
-    if (props.connectedMicrobit) {
-      console.log("Microbit connected!");
-      console.log("Connections:", props.connectedMicrobit.connections);
-      console.log("Pin 0 state:", props.connectedMicrobit.pins?.["0"]?.digital);
-      console.log("Can measure:", canMeasure);
+    if (props.connectedMicrobit && props.isSimulation) {
+      console.log("🔗 UltraSonic Sensor Debug:");
+      console.log("  Microbit ID:", props.connectedMicrobit.microbitId);
+      console.log("  All Connected:", props.connectedMicrobit.connections.allConnected);
+      console.log("  TRIG Pin:", props.connectedMicrobit.connections.trigPin);
+      console.log("  ECHO Pin:", props.connectedMicrobit.connections.echoPin);
+      console.log("  TRIG Pin State:", microbitPinsState[trigPin || ""]?.digital);
+      console.log("  Is Trigger High:", isTriggerHigh);
+      console.log("  Can Measure:", canMeasure);
+      console.log("  Pin States:", microbitPinsState);
     }
-  }, [props.connectedMicrobit, canMeasure]);
+  }, [props.connectedMicrobit, trigPin, isTriggerHigh, canMeasure, microbitPinsState, props.isSimulation]);
 
   // Animate echo pulse radius visualization
   const [pulseRadius, setPulseRadius] = useState(0);
@@ -218,13 +235,15 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     return () => cancelAnimationFrame(animationFrameId);
   }, [triggered, canMeasure]);
 
-  // Get connection status color
+  // Get connection status color with more detailed states
   const getConnectionStatusColor = () => {
-    if (!props.connectedMicrobit) return "gray";
-    if (canMeasure) return "green";
-    if (isProperlyConnected && !isTriggerHigh) return "orange";
-    return "red";
+    if (!props.connectedMicrobit) return "gray"; // No connection
+    if (canMeasure) return "green"; // Fully operational
+    if (isProperlyConnected && !isTriggerHigh) return "orange"; // Connected but not triggered
+    if (!isProperlyConnected) return "red"; // Incomplete connection
+    return "gray";
   };
+
 
   return (
     <BaseElement {...props}>
@@ -410,6 +429,21 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                   text="Out of range"
                 />
               )}
+
+              {/* Connection warnings */}
+              {/* {!canMeasure && props.connectedMicrobit && (
+                <Text
+                  x={SENSOR_X - 80}
+                  y={SENSOR_Y + SENSOR_IMG_HEIGHT + -300}
+                  fontSize={14}
+                  fill="orange"
+                  text={
+                    !isProperlyConnected 
+                      ? "Check connections" 
+                      : `Set ${trigPin} HIGH to measure`
+                  }
+                />
+              )} */}
             </>
           )}
         </Group>

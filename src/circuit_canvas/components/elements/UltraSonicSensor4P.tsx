@@ -160,6 +160,23 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     setBall({ x, y });
   };
 
+  // While dragging the distance ball, temporarily disable stage dragging to avoid panning
+  const onBallDragStart = () => {
+    const stage = Konva.stages?.[0];
+    if (stage) {
+      // store original draggable flag
+      (stage as any)._prevDraggable = stage.draggable();
+      stage.draggable(false);
+    }
+  };
+  const onBallDragEnd = () => {
+    const stage = Konva.stages?.[0];
+    if (stage) {
+      const prev = (stage as any)._prevDraggable;
+      if (typeof prev === 'boolean') stage.draggable(prev);
+    }
+  };
+
   // Keyboard controls for ball movement when selected
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -335,7 +352,9 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 radius={BALL_RADIUS}
                 fill={canMeasure ? "blue" : "gray"}
                 draggable
+                onDragStart={onBallDragStart}
                 onDragMove={onDragMove}
+                onDragEnd={onBallDragEnd}
               />
 
               {/* Echo pulse circle animation */}

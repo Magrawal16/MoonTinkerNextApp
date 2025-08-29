@@ -213,7 +213,7 @@ export class MicrobitSimulator {
             patternCol < scrollPattern[row].length &&
             scrollPattern[row][patternCol]
           ) {
-            this.plot(col, row);
+            this.plot(row, col); // This should plot horizontally
           }
         }
       }
@@ -282,10 +282,6 @@ export class MicrobitSimulator {
   }
 
 
-  // private readDigitalPin(pin: string) {
-  //   return this.pinStates[pin].digital;
-  // }
-
   private analogWritePin(pin: string, value: number) {
     this.pinStates[pin].analog = value;
     this.eventEmitter.emit({
@@ -295,10 +291,6 @@ export class MicrobitSimulator {
       pinType: "analog",
     });
   }
-
-  // private readAnalogPin(pin: string) {
-  //   return this.pinStates[pin].analog;
-  // }
 
   private plot(x: number, y: number) {
     this.ledMatrix[y][x] = true;
@@ -351,60 +343,7 @@ export class MicrobitSimulator {
     };
   }
 
-   // Add ultrasonic sensor support
-  public readonly ultrasonic = {
-    distance_cm: this.getDistanceCm.bind(this),
-  };
-
-  private async getDistanceCm(trigPin: string, echoPin: string): Promise<number> {
-  console.log(`[Ultrasonic] Measuring distance on pins ${trigPin} (trig) -> ${echoPin} (echo)`);
-  
-  // Step 1: Send 10µs HIGH pulse to trigger pin
-  this.digitalWritePin(trigPin, 1);
-  await new Promise(resolve => setTimeout(resolve, 0.01)); // 10µs
-  this.digitalWritePin(trigPin, 0);
-  
-  // Step 2: Wait for echo pin to go HIGH
-  const startTime = performance.now();
-  const maxWaitTime = 30; // 30ms timeout
-  
-  // Wait for echo to go HIGH
-  while (this.readDigitalPin(echoPin) === 0) {
-    if (performance.now() - startTime > maxWaitTime) {
-      console.log(`[Ultrasonic] Timeout waiting for echo HIGH on pin ${echoPin}`);
-      return -1; // Timeout
-    }
-    await new Promise(resolve => setTimeout(resolve, 0.1));
-  }
-  
-  const echoStartTime = performance.now();
-  console.log(`[Ultrasonic] Echo started at ${echoStartTime}`);
-  
-  // Wait for echo to go LOW
-  while (this.readDigitalPin(echoPin) === 1) {
-    if (performance.now() - echoStartTime > maxWaitTime) {
-      console.log(`[Ultrasonic] Timeout waiting for echo LOW on pin ${echoPin}`);
-      return -1; // Timeout
-    }
-    await new Promise(resolve => setTimeout(resolve, 0.1));
-  }
-  
-  const echoEndTime = performance.now();
-  const pulseDuration = (echoEndTime - echoStartTime) * 1000; // Convert to microseconds
-  
-  console.log(`[Ultrasonic] Echo ended at ${echoEndTime}, duration: ${pulseDuration}µs`);
-  
-  // Calculate distance: duration(µs) * 0.0343 cm/µs / 2
-  const distanceCm = (pulseDuration * 0.0343) / 2;
-  
-  console.log(`[Ultrasonic] Calculated distance: ${distanceCm}cm`);
-  
-  return Math.round(distanceCm * 10) / 10; // Round to 1 decimal place
-}
-
-
   getPythonModule() {
-  console.log("[MicrobitSimulator] Creating Python module with ultrasonic support");
   return {
     pins: this.pins,
     led: this.led,
@@ -412,7 +351,6 @@ export class MicrobitSimulator {
     Button: this.Button,
     DigitalPin: this.DigitalPin,
     basic: this.basic,
-    ultrasonic: this.ultrasonic, 
   };
   }
 }

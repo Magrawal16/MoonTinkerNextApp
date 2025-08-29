@@ -45,7 +45,7 @@ import HighPerformanceGrid from "./HighPerformanceGrid";
 import { Window } from "@/common/components/ui/Window";
 import ElementRotationButtons from "../toolbar/customization/ElementRoationButtons";
 
-export default function CircuitCanvasOptimized() {
+export default function CircuitCanvas() {
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
     x: 0,
     y: 0,

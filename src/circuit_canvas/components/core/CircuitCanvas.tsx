@@ -617,6 +617,9 @@ export default function CircuitCanvasOptimized() {
 
   async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
     e.preventDefault();
+    if (simulationRunning) {
+      stopSimulation();
+    }
     pushToHistory();
 
     const elementData = e.dataTransfer.getData("application/element-type");

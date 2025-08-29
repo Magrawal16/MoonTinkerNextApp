@@ -914,6 +914,7 @@ export default function CircuitCanvasOptimized() {
               stopSimulation={stopSimulation}
               containsWire={wires?.length > 0}
               isSimulationRunning={simulationRunning}
+              wires={wires}
             />
 
             {/* Tooltip Group */}

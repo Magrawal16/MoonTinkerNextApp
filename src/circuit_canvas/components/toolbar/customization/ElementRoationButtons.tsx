@@ -8,8 +8,9 @@ interface Props {
   setElements: React.Dispatch<React.SetStateAction<CircuitElement[]>>;
   pushToHistory: () => void;
   stopSimulation: () => void;
-  containsWire: boolean;
+  containsWire: boolean; // legacy overall wire presence flag (kept for backwards compatibility)
   isSimulationRunning: boolean;
+  wires?: { fromNodeId: string; toNodeId: string }[]; // full wire list to evaluate connectivity
 }
 
 /**
@@ -26,38 +27,51 @@ const ElementRotationButtons: React.FC<Props> = ({
   stopSimulation,
   containsWire,
   isSimulationRunning,
+  wires = [],
 }) => {
   const { showMessage } = useMessage();
   const rotateElement = (direction: "left" | "right") => {
-    // 1) Block when simulation is running
-    if (isSimulationRunning) {
-      showMessage(
-        "Cannot rotate elements while simulation is running.",
-        "warning"
-      );
-      return;
-    }
-
-    // 2) No element selected
+    // 1) No element selected
     if (!selectedElement) {
       showMessage("No element selected for rotation.", "info");
       return;
     }
 
-    // 3) Selected element specifically is a wire
+    // 2) Selected element specifically is a wire
     if (selectedElement.type === "wire") {
       showMessage("Cannot rotate a wire element.", "warning");
       return;
     }
 
-    // 4) General guard: any wires present in the circuit
-    if (containsWire) {
+    // 3) Determine if selected element is connected to any wire
+    const elementNodeIds = new Set(selectedElement.nodes.map((n) => n.id));
+    const isElementConnected = wires.some(
+      (w) => elementNodeIds.has(w.fromNodeId) || elementNodeIds.has(w.toNodeId)
+    );
+
+    // 4) If simulation running AND element is unconnected, we allow rotation but first stop simulation
+    if (isSimulationRunning) {
+      if (isElementConnected) {
+        showMessage(
+          "Cannot rotate connected elements while simulation is running.",
+          "warning"
+        );
+        return;
+      } else {
+        // stop simulation then proceed
+        stopSimulation();
+      }
+    }
+
+    // 5) If simulation is OFF but element is connected to at least one wire => block with message
+    if (!isSimulationRunning && isElementConnected) {
       showMessage(
-        "Cannot rotate elements while wires are present in the circuit.",
+        "Cannot rotate an element that has wires attached.",
         "error"
       );
       return;
     }
+
     pushToHistory();
 
     setElements((prev) =>
@@ -74,7 +88,7 @@ const ElementRotationButtons: React.FC<Props> = ({
       )
     );
 
-    stopSimulation();
+  // do not auto stop simulation here; if we reached here while simulation was running it was already stopped above
   };
 
   return (

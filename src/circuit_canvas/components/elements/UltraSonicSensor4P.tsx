@@ -62,7 +62,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     y: SENSOR_Y - 30, // Start ball above sensor
   });
   const [triggered, setTriggered] = useState(false);
-  const [echoTime, setEchoTime] = useState<number | null>(null); // microseconds
+  //const [echoTime, setEchoTime] = useState<number | null>(null); // microseconds
   const [unit, setUnit] = useState<"cm" | "in">("cm");
 
   // Load sensor image
@@ -130,28 +130,60 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
   const displayedUnit = canMeasure ? unit : "";
 
   // Simulate ultrasonic sensor trigger and echo pulses
+  // const startMeasurement = () => {
+  //   if (!canMeasure || triggered) return; // Don't measure if not properly connected
+  //   setTriggered(true);
+  //   setEchoTime(null);
+
+  //   const timeForEcho = (distanceCm / 34300) * 2 * 1e6; // microseconds
+  //   // Echo time update with delay simulation (10ms)
+  //   setTimeout(() => {
+  //     setEchoTime(timeForEcho);
+  //     setTriggered(false);
+  //   }, 10);
+  // };
+  const echoTime = useMemo(() => {
+  // If we can't measure or the ball is out of range, echo time is null (N/A)
+  if (!canMeasure || !ballInRange) {
+    return null;
+  }
+  // Calculate the time for the echo round trip in microseconds
+  return (distanceCm / 34300) * 2 * 1e6;
+}, [canMeasure, ballInRange, distanceCm]);
+
   const startMeasurement = () => {
-    if (!canMeasure || triggered) return; // Don't measure if not properly connected
-    setTriggered(true);
-    setEchoTime(null);
+  // Don't measure if not properly connected or already in a measurement cycle
+  if (!canMeasure || triggered) return;
 
-    const timeForEcho = (distanceCm / 34300) * 2 * 1e6; // microseconds
-    // Echo time update with delay simulation (10ms)
-    setTimeout(() => {
-      setEchoTime(timeForEcho);
-      setTriggered(false);
-    }, 10);
-  };
+  // Visual Feedback: Start the pulse animation
+  setTriggered(true);
 
-  // Auto-start measurement on simulation + selected mode
-  useEffect(() => {
-    if (props.isSimulation && props.selected && canMeasure) {
-      const interval = setInterval(() => {
-        startMeasurement();
-      }, 1000); // Simulate measurement every second
-      return () => clearInterval(interval);
-    }
-  }, [props.isSimulation, props.selected, distance, canMeasure]);
+  // Simulate the measurement delay (e.g., sensor processing time)
+  setTimeout(() => {
+    // Visual Feedback: Stop the pulse animation
+    setTriggered(false);
+  }, 10); // This 10ms is just for the visual effect, not the calculation
+};
+
+  // // Auto-start measurement on simulation + selected mode
+  // useEffect(() => {
+  //   if (props.isSimulation && props.selected && canMeasure) {
+  //     const interval = setInterval(() => {
+  //       startMeasurement();
+  //     }, 1000); // Simulate measurement every second
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [props.isSimulation, props.selected, distance, canMeasure]);
+
+  // Auto-start measurement ANIMATION on simulation + selected mode
+useEffect(() => {
+  if (props.isSimulation && props.selected && canMeasure) {
+    const interval = setInterval(() => {
+      startMeasurement(); // This now only triggers the visual pulse
+    }, 1000); // This interval controls how often the sensor "pings" visually
+    return () => clearInterval(interval);
+  }
+}, [props.isSimulation, props.selected, canMeasure, startMeasurement]); // Add startMeasurement to dependencies
 
   // Constrain ball movement within sensor range circle
   const onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
@@ -378,7 +410,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 fontSize={14}
                 fill="green"
                 text={`Echo time: ${
-                  canMeasure && ballInRange && echoTime
+                  canMeasure && ballInRange && echoTime !== null
                     ? echoTime.toFixed(0) + " μs"
                     : "N/A"
                 }`}

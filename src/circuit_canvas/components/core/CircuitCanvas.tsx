@@ -150,6 +150,41 @@ export default function CircuitCanvas() {
     }
   }
 
+  // Utility: derive the highest numeric suffix used in existing wire IDs
+  function getMaxWireIndex(currentWires: Wire[]): number {
+    let max = -1;
+    for (const w of currentWires) {
+      const match = /^wire-(\d+)$/.exec(w.id);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    return max;
+  }
+
+  // Ensure all wire IDs are unique and return the sanitized list plus the highest numeric suffix encountered
+  function sanitizeWireIds(currentWires: Wire[]): { sanitized: Wire[]; maxIndex: number } {
+    const maxBefore = getMaxWireIndex(currentWires);
+    const seen = new Set<string>();
+    let nextIndex = maxBefore + 1; // start allocating new IDs after current max
+    const sanitized: Wire[] = currentWires.map((w) => {
+      if (!seen.has(w.id)) {
+        seen.add(w.id);
+        return w; // keep as-is
+      }
+      // duplicate id detected – allocate a fresh one
+      while (seen.has(`wire-${nextIndex}`)) nextIndex++;
+      const newWire = { ...w, id: `wire-${nextIndex}` };
+      seen.add(newWire.id);
+      nextIndex++;
+      return newWire;
+    });
+    // Compute final max index used (nextIndex was incremented after assignment)
+    const finalMax = Math.max(maxBefore, nextIndex - 1);
+    return { sanitized, maxIndex: finalMax };
+  }
+
   //changing the element state on element position change
   useEffect(() => {
     elementsRef.current = elements;
@@ -543,7 +578,20 @@ export default function CircuitCanvas() {
     pushToHistory();
 
     const newWire: Wire = {
-      id: `wire-${wireCounter}`,
+      // Ensure unique incremental ID even if wires were loaded from storage
+      // or counter was reset. We probe for the next free numeric suffix.
+      id: (function generateWireId() {
+        const existing = new Set(wires.map((w) => w.id));
+        let candidate = wireCounter;
+        while (existing.has(`wire-${candidate}`)) candidate++;
+        // Update counter so subsequent wires continue after this one
+        if (candidate !== wireCounter) {
+          setWireCounter(candidate + 1);
+        } else {
+          setWireCounter((c) => c + 1);
+        }
+        return `wire-${candidate}`;
+      })(),
       fromNodeId: creatingWireStartNode,
       toNodeId: nodeId,
       joints: creatingWireJoints,
@@ -551,7 +599,6 @@ export default function CircuitCanvas() {
     };
 
     setWires([...wires, newWire]);
-    setWireCounter((c) => c + 1);
     stopSimulation();
 
     setCreatingWireStartNode(null);
@@ -1010,7 +1057,10 @@ export default function CircuitCanvas() {
                 resetState();
                 setLoadingSavedCircuit(true);
                 setElements(data.elements);
-                setWires(data.wires);
+                // Sanitize wire IDs (handle duplicates) and advance counter accordingly
+                const { sanitized, maxIndex } = sanitizeWireIds(data.wires);
+                setWires(sanitized);
+                setWireCounter(maxIndex + 1);
                 setTimeout(() => {
                   const pos = stageRef.current?.getPointerPosition();
                   if (pos) setMousePos(pos);

@@ -1,4 +1,4 @@
-// RenderElement.tsx
+// Update your RenderElement.tsx props interface and component
 
 import { useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
@@ -6,6 +6,7 @@ import { Rect, Group, Text, Label, Tag } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
 import { findConnectedMicrobit, debugMicrobitConnection } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
+import { SimulatorProxy } from "@/python_code_editor/lib/SimulatorProxy";
 import Lightbulb from "@/circuit_canvas/components/elements/Lightbulb";
 import Battery from "@/circuit_canvas/components/elements/Battery";
 import Led from "@/circuit_canvas/components/elements/Led";
@@ -15,16 +16,14 @@ import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 
-// ✅ add simulator to props type
 export default function RenderElement({
   element,
-  simulator, // ← Make sure this is here
   elements,
   wires,
+  getSimulatorForMicrobit, // Add this new prop
   ...props
 }: {
   element: CircuitElement;
-  simulator?: any; // ← Make sure this is in the interface
   onDragMove: (e: KonvaEventObject<DragEvent>) => void;
   handleNodeClick: (nodeId: string) => void;
   handleRatioChange?: (elementId: string, ratio: number) => void;
@@ -35,8 +34,9 @@ export default function RenderElement({
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onControllerInput: (elementId: string, input: string) => void;
   isSimulationOn?: boolean;
-  elements?: CircuitElement[]; // Add this type
+  elements?: CircuitElement[];
   wires?: Wire[];
+  getSimulatorForMicrobit?: (microbitId: string) => SimulatorProxy | undefined; // Add this type
 }) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const center = getElementCenter(element);
@@ -65,9 +65,9 @@ export default function RenderElement({
       onDragStart={props.onDragStart}
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
-  id={element.id}
-  // Elements are not draggable while simulation is running
-  draggable={!props.isSimulationOn}
+      id={element.id}
+      // Elements are not draggable while simulation is running
+      draggable={!props.isSimulationOn}
     >
       {/* Render circuit elements */}
       {element.type === "lightbulb" && (
@@ -180,6 +180,7 @@ export default function RenderElement({
             }
           } : undefined}
           isSimulation={props.isSimulationOn}
+          getSimulatorForMicrobit={getSimulatorForMicrobit} // Pass the simulator function
         />
       )}
 

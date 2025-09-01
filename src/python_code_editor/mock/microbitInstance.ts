@@ -1,4 +1,4 @@
-// microbitInstance.tsx
+// Compatible microbitInstance.tsx that works with existing architecture
 
 import type { PyodideInterface } from "pyodide";
 import { CHARACTER_PATTERNS } from "./characterPatterns";
@@ -12,19 +12,63 @@ export type MicrobitEvent =
     }
   | { type: "led-change"; x: number; y: number; value: number }
   | { type: "button-press"; button: "A" | "B" }
-  | { type: "reset" };
+  | { type: "reset" }
+  | { 
+      type: "ultrasonic-trigger"; 
+      trigPin: string; 
+      echoPin: string; 
+    };
 
 type MicrobitEventCallback = (event: MicrobitEvent) => void;
 
 class ButtonInstance {
   constructor(private name: "A" | "B") {}
+  getName(): "A" | "B" { return this.name; }
+  toString(): string { return this.name; }
+}
 
-  getName(): "A" | "B" {
-    return this.name;
+class PinInstance {
+  constructor(private pinName: string, private simulator: MicrobitSimulator) {}
+
+  write_digital(value: number) {
+    this.simulator.digitalWritePin(this.pinName, value);
   }
 
-  toString(): string {
-    return this.name;
+  read_digital(): number {
+    return this.simulator.readDigitalPin(this.pinName);
+  }
+
+  write_analog(value: number) {
+    this.simulator.analogWritePin(this.pinName, value);
+  }
+
+  read_analog(): number {
+    return this.simulator.readAnalogPin(this.pinName);
+  }
+}
+
+// Simple timing module that works with existing setup
+class TimeModule {
+  private startTime = Date.now() * 1000; // Convert to microseconds
+
+  ticks_us(): number {
+    return (Date.now() * 1000) - this.startTime;
+  }
+
+  ticks_diff(end: number, start: number): number {
+    return end - start;
+  }
+
+  sleep_us(microseconds: number): Promise<void> {
+    return new Promise(resolve => {
+      setTimeout(resolve, microseconds / 1000);
+    });
+  }
+
+  sleep(milliseconds: number): Promise<void> {
+    return new Promise(resolve => {
+      setTimeout(resolve, milliseconds);
+    });
   }
 }
 
@@ -38,60 +82,170 @@ class MicrobitEventEmitter {
 
   emit(event: MicrobitEvent) {
     for (const cb of this.listeners) {
-      cb(event);
+      try {
+        cb(event);
+      } catch (error) {
+        console.error("Error in microbit event callback:", error);
+      }
     }
   }
 }
 
 export class MicrobitSimulator {
-
   private digitalWriteListeners: Record<string, Set<(value: number) => void>> = {};
+  private ultrasonicSensors: Map<string, {
+    trigPin: string;
+    echoPin: string;
+    onTrigger: (trigPin: string, echoPin: string) => void;
+  }> = new Map();
 
   public readonly pins = {
     digital_write_pin: this.digitalWritePin.bind(this),
     digital_read_pin: this.readDigitalPin.bind(this),
     analog_write_pin: this.analogWritePin.bind(this),
     read_analog_pin: this.readAnalogPin.bind(this),
-
-    // NEW: subscribe to writes on a specific digital pin
     onDigitalWrite: (pin: string, cb: (value: number) => void) => {
-      debugger;
       if (!this.digitalWriteListeners[pin]) this.digitalWriteListeners[pin] = new Set();
       this.digitalWriteListeners[pin].add(cb);
       return () => this.digitalWriteListeners[pin].delete(cb);
     },
   };
 
-
-  // NEW: Allow external components to set pin values (for sensor simulation)
   private externalPinValues: Record<string, { digital: number; analog: number }> = {};
+  private pyodide: PyodideInterface;
+  private eventEmitter = new MicrobitEventEmitter();
+  private ledMatrix: boolean[][] = Array.from({ length: 5 }, () => Array(5).fill(false));
+  private pinStates: Record<string, { digital: number; analog: number }> = {};
+  private buttonStates: Record<"A" | "B", boolean> = { A: false, B: false };
+  private inputHandlers: Record<"A" | "B", any[]> = { A: [], B: [] };
+  private foreverCallbacks: Set<any> = new Set();
+  private triggerPatternDetector: Map<string, { lastHigh: number; pulseCount: number }> = new Map();
 
-  // Method for external components (like sensors) to set pin values
+  public readonly Button = {
+    A: new ButtonInstance("A"),
+    B: new ButtonInstance("B"),
+  };
+
+  public readonly DigitalPin: Record<string, string> = {};
+
+  // Create pin instances for direct access (pin0, pin1, etc.)
+  public readonly pin0 = new PinInstance("P0", this);
+  public readonly pin1 = new PinInstance("P1", this);
+  public readonly pin2 = new PinInstance("P2", this);
+  // Add more pins as needed...
+
+  public readonly led = {
+    plot: this.plot.bind(this),
+    unplot: this.unplot.bind(this),
+    point: this.point.bind(this),
+    toggle: this.toggle.bind(this),
+  };
+
+  public readonly input = {
+    on_button_pressed: this.onButtonPressed.bind(this),
+    _clear: this.clearInputs.bind(this),
+  };
+
+  public readonly basic = {
+    show_string: this.showString.bind(this),
+    forever: this.forever.bind(this),
+    pause: this.pause.bind(this),
+  };
+
+  public readonly time = new TimeModule();
+
+  constructor(pyodide: PyodideInterface) {
+    this.pyodide = pyodide;
+
+    for (let i = 0; i <= 20; i++) {
+      const pin = `P${i}`;
+      this.pinStates[pin] = { digital: 0, analog: 0 };
+      this.DigitalPin[pin] = pin;
+    }
+  }
+
+  subscribe(callback: MicrobitEventCallback) {
+    return this.eventEmitter.subscribe(callback);
+  }
+
+  // Register an ultrasonic sensor with its TRIG and ECHO pins
+  registerUltrasonicSensor(
+    sensorId: string, 
+    trigPin: string, 
+    echoPin: string, 
+    onTrigger: (trigPin: string, echoPin: string) => void
+  ) {
+    this.ultrasonicSensors.set(sensorId, { trigPin, echoPin, onTrigger });
+    
+    // Initialize trigger pattern detection for this pin
+    this.triggerPatternDetector.set(trigPin, { lastHigh: 0, pulseCount: 0 });
+    
+    console.log(`Registered ultrasonic sensor ${sensorId} with TRIG:${trigPin}, ECHO:${echoPin}`);
+  }
+
+  unregisterUltrasonicSensor(sensorId: string) {
+    const sensor = this.ultrasonicSensors.get(sensorId);
+    if (sensor) {
+      this.triggerPatternDetector.delete(sensor.trigPin);
+      this.ultrasonicSensors.delete(sensorId);
+      console.log(`Unregistered ultrasonic sensor ${sensorId}`);
+    }
+  }
+
+  private detectTriggerPulse(pin: string, value: number) {
+    const detector = this.triggerPatternDetector.get(pin);
+    if (!detector) return;
+
+    const now = Date.now();
+
+    if (value === 1) {
+      // Pin went HIGH
+      detector.lastHigh = now;
+    } else if (value === 0 && detector.lastHigh > 0) {
+      // Pin went LOW - check if this was a valid trigger pulse (2-20 microseconds)
+      const pulseWidth = (now - detector.lastHigh) * 1000; // Convert to microseconds
+      
+      if (pulseWidth >= 2 && pulseWidth <= 50) { // Allow some tolerance
+        detector.pulseCount++;
+        
+        // Find the ultrasonic sensor using this TRIG pin
+        for (const [sensorId, sensor] of this.ultrasonicSensors) {
+          if (sensor.trigPin === pin) {
+            console.log(`Ultrasonic trigger detected on ${pin}, pulse width: ${pulseWidth.toFixed(1)}μs`);
+            sensor.onTrigger(sensor.trigPin, sensor.echoPin);
+            break;
+          }
+        }
+      }
+      
+      detector.lastHigh = 0;
+    }
+  }
+
   public setExternalPinValue(pin: string, value: number, type: 'digital' | 'analog' = 'digital') {
     if (!this.externalPinValues[pin]) {
       this.externalPinValues[pin] = { digital: 0, analog: 0 };
     }
     this.externalPinValues[pin][type] = value;
+    
+    // Emit pin change event for external updates (like ECHO pin from sensor)
+    this.eventEmitter.emit({ type: "pin-change", pin, value, pinType: type });
   }
 
-  // Update the read methods to check external values first
-  private readDigitalPin(pin: string) {
-    // Check if external component has set a value for this pin
+  public readDigitalPin(pin: string): number {
     if (this.externalPinValues[pin]?.digital !== undefined) {
       return this.externalPinValues[pin].digital;
     }
-    return this.pinStates[pin].digital;
+    return this.pinStates[pin]?.digital || 0;
   }
 
-  private readAnalogPin(pin: string) {
-    // Check if external component has set a value for this pin
+  public readAnalogPin(pin: string): number {
     if (this.externalPinValues[pin]?.analog !== undefined) {
       return this.externalPinValues[pin].analog;
     }
-    return this.pinStates[pin].analog;
+    return this.pinStates[pin]?.analog || 0;
   }
 
-  // NEW: Method to get access to pin operations for external components
   public getPinController() {
     return {
       onDigitalWrite: (pin: string, cb: (value: number) => void) => {
@@ -110,69 +264,46 @@ export class MicrobitSimulator {
     };
   }
 
-  private digitalWritePin(pin: string, value: number) {
-    this.pinStates[pin].digital = value;
-    // notify generic event stream
-    this.eventEmitter.emit({ type: "pin-change", pin, value, pinType: "digital" });
-    // NEW: notify direct listeners
-    const listeners = this.digitalWriteListeners[pin];
-    if (listeners) for (const cb of listeners) cb(value);
-  }
-  
-  private pyodide: PyodideInterface;
-  private eventEmitter = new MicrobitEventEmitter();
-  private ledMatrix: boolean[][] = Array.from({ length: 5 }, () =>
-    Array(5).fill(false)
-  );
-  private pinStates: Record<string, { digital: number; analog: number }> = {};
-  private buttonStates: Record<"A" | "B", boolean> = { A: false, B: false };
-  private inputHandlers: Record<"A" | "B", any[]> = { A: [], B: [] };
-  private foreverCallbacks: Set<any> = new Set();
-
-  public readonly Button = {
-    A: new ButtonInstance("A"),
-    B: new ButtonInstance("B"),
-  };
-
-  public readonly DigitalPin: Record<string, string> = {};
-  
-  public readonly led = {
-    plot: this.plot.bind(this),
-    unplot: this.unplot.bind(this),
-    point: this.point.bind(this),
-    toggle: this.toggle.bind(this),
-  };
-  public readonly input = {
-    on_button_pressed: this.onButtonPressed.bind(this),
-    _clear: this.clearInputs.bind(this),
-  };
-  public readonly basic = {
-    show_string: this.showString.bind(this),
-    forever: this.forever.bind(this),
-    pause: this.pause.bind(this),
-  };
-
-  constructor(pyodide: PyodideInterface) {
-    this.pyodide = pyodide;
-
-    for (let i = 0; i <= 20; i++) {
-      const pin = `P${i}`;
+  public digitalWritePin(pin: string, value: number) {
+    if (!this.pinStates[pin]) {
       this.pinStates[pin] = { digital: 0, analog: 0 };
-      this.DigitalPin[pin] = pin;
+    }
+    this.pinStates[pin].digital = value;
+    
+    // Detect ultrasonic trigger patterns
+    this.detectTriggerPulse(pin, value);
+    
+    // Emit generic pin change event
+    this.eventEmitter.emit({ type: "pin-change", pin, value, pinType: "digital" });
+    
+    // Notify direct listeners
+    const listeners = this.digitalWriteListeners[pin];
+    if (listeners) {
+      for (const cb of listeners) {
+        try {
+          cb(value);
+        } catch (error) {
+          console.error("Error in digital write listener:", error);
+        }
+      }
     }
   }
 
-  subscribe(callback: MicrobitEventCallback) {
-    return this.eventEmitter.subscribe(callback);
+  public analogWritePin(pin: string, value: number) {
+    if (!this.pinStates[pin]) {
+      this.pinStates[pin] = { digital: 0, analog: 0 };
+    }
+    this.pinStates[pin].analog = value;
+    this.eventEmitter.emit({
+      type: "pin-change",
+      pin,
+      value,
+      pinType: "analog",
+    });
   }
 
-  private async showString(
-    text: string,
-    interval: number = 150
-  ): Promise<void> {
-    const validChars = text
-      .split("")
-      .filter((char) => CHARACTER_PATTERNS[char]);
+  private async showString(text: string, interval: number = 150): Promise<void> {
+    const validChars = text.split("").filter((char) => CHARACTER_PATTERNS[char]);
 
     if (validChars.length === 0) {
       this.clearDisplay();
@@ -209,11 +340,8 @@ export class MicrobitSimulator {
       for (let row = 0; row < 5; row++) {
         for (let col = 0; col < 5; col++) {
           const patternCol = currentOffset + col;
-          if (
-            patternCol < scrollPattern[row].length &&
-            scrollPattern[row][patternCol]
-          ) {
-            this.plot(row, col); // This should plot horizontally
+          if (patternCol < scrollPattern[row].length && scrollPattern[row][patternCol]) {
+            this.plot(row, col);
           }
         }
       }
@@ -228,9 +356,13 @@ export class MicrobitSimulator {
   }
 
   private forever(callback: () => void) {
-    const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(callback);
-    this.foreverCallbacks.add(proxy);
-    this.startIndividualForeverLoop(proxy);
+    try {
+      const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(callback);
+      this.foreverCallbacks.add(proxy);
+      this.startIndividualForeverLoop(proxy);
+    } catch (error) {
+      console.error("Error in forever callback setup:", error);
+    }
   }
 
   private startIndividualForeverLoop(callback: any) {
@@ -261,8 +393,12 @@ export class MicrobitSimulator {
 
   reset() {
     this.foreverCallbacks.forEach((callback) => {
-      if (callback.destroy) {
-        callback.destroy();
+      try {
+        if (callback.destroy) {
+          callback.destroy();
+        }
+      } catch (error) {
+        console.warn("Error destroying callback:", error);
       }
     });
     this.foreverCallbacks.clear();
@@ -277,19 +413,11 @@ export class MicrobitSimulator {
     }
     this.buttonStates = { A: false, B: false };
     this.clearInputs();
+    this.ultrasonicSensors.clear();
+    this.triggerPatternDetector.clear();
+    this.externalPinValues = {};
     this.eventEmitter.emit({ type: "reset" });
     console.log("Microbit state reset");
-  }
-
-
-  private analogWritePin(pin: string, value: number) {
-    this.pinStates[pin].analog = value;
-    this.eventEmitter.emit({
-      type: "pin-change",
-      pin,
-      value,
-      pinType: "analog",
-    });
   }
 
   private plot(x: number, y: number) {
@@ -318,39 +446,67 @@ export class MicrobitSimulator {
 
   private onButtonPressed(button: ButtonInstance, handler: () => void) {
     const buttonName = button.getName();
-    const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(handler);
-    this.inputHandlers[buttonName].push(proxy);
+    try {
+      const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(handler);
+      this.inputHandlers[buttonName].push(proxy);
+    } catch (error) {
+      console.error("Error setting up button handler:", error);
+    }
   }
 
   public pressButton(button: ButtonInstance | "A" | "B") {
     const buttonName = typeof button === "string" ? button : button.getName();
     this.buttonStates[buttonName] = true;
-    this.inputHandlers[buttonName].forEach((h) => h());
+    this.inputHandlers[buttonName].forEach((h) => {
+      try {
+        h();
+      } catch (error) {
+        console.error("Error in button handler:", error);
+      }
+    });
     this.eventEmitter.emit({ type: "button-press", button: buttonName });
   }
 
   private clearInputs() {
-    this.inputHandlers.A.forEach((p) => p.destroy?.());
-    this.inputHandlers.B.forEach((p) => p.destroy?.());
+    this.inputHandlers.A.forEach((p) => {
+      try {
+        p.destroy?.();
+      } catch (error) {
+        console.warn("Error destroying input handler:", error);
+      }
+    });
+    this.inputHandlers.B.forEach((p) => {
+      try {
+        p.destroy?.();
+      } catch (error) {
+        console.warn("Error destroying input handler:", error);
+      }
+    });
     this.inputHandlers = { A: [], B: [] };
   }
 
   getStateSnapshot() {
     return {
-      pins: { ...this.pinStates },
+      pins: { ...this.pinStates, ...this.externalPinValues },
       leds: this.ledMatrix.map((row) => [...row]),
       buttons: { ...this.buttonStates },
     };
   }
 
   getPythonModule() {
-  return {
-    pins: this.pins,
-    led: this.led,
-    input: this.input,
-    Button: this.Button,
-    DigitalPin: this.DigitalPin,
-    basic: this.basic,
-  };
+    return {
+      pins: this.pins,
+      led: this.led,
+      input: this.input,
+      Button: this.Button,
+      DigitalPin: this.DigitalPin,
+      basic: this.basic,
+      time: this.time,
+      // Direct pin access
+      pin0: this.pin0,
+      pin1: this.pin1,
+      pin2: this.pin2,
+      // Add more pins as needed
+    };
   }
 }

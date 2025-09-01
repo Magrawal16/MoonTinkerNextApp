@@ -23,7 +23,7 @@ import {
   getShortcutMetadata,
 } from "@/circuit_canvas/utils/circuitShortcuts";
 // import { Simulator } from "@/lib/code/Simulator";
-import { SimulatorProxy as Simulator } from "@/python_code_editor/lib/SimulatorProxy";
+import { SimulatorProxy as Simulator, SimulatorProxy } from "@/python_code_editor/lib/SimulatorProxy";
 import CircuitSelector from "@/circuit_canvas/components/toolbar/panels/Palette";
 import {
   FaArrowRight,
@@ -44,6 +44,7 @@ import { useViewport } from "@/circuit_canvas/hooks/useViewport";
 import HighPerformanceGrid from "./HighPerformanceGrid";
 import { Window } from "@/common/components/ui/Window";
 import ElementRotationButtons from "../toolbar/customization/ElementRoationButtons";
+import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
 
 export default function CircuitCanvas() {
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
@@ -115,6 +116,31 @@ export default function CircuitCanvas() {
     {}
   );
   const [loadingSavedCircuit, setLoadingSavedCircuit] = useState(false);
+const [globalSimulatorMap, setGlobalSimulatorMap] = useState<Record<string, SimulatorProxy>>({});
+
+  // 1. Add this effect to store microbit simulator globally when simulation starts
+  useEffect(() => {
+  if (simulationRunning) {
+    // Store microbit simulators globally for ultrasonic sensors to access
+    const microbitElements = elements.filter(el => el.type === "microbit");
+    const simulatorMap: Record<string, SimulatorProxy> = {};
+    
+    microbitElements.forEach(element => {
+      const simulator = controllerMap[element.id];
+      if (simulator) {
+        simulatorMap[element.id] = simulator;
+      }
+    });
+    
+    setGlobalSimulatorMap(simulatorMap);
+    // Also store on window for ultrasonic sensors (temporary solution)
+    (window as any).microbitSimulators = simulatorMap;
+  } else {
+    // Clear global reference when simulation stops
+    setGlobalSimulatorMap({});
+    (window as any).microbitSimulators = {};
+  }
+}, [simulationRunning, elements, controllerMap]);
 
   useEffect(() => {
     elementsRef.current = elements;
@@ -185,28 +211,36 @@ export default function CircuitCanvas() {
   }, [creatingWireStartNode]);
 
   function stopSimulation() {
-    if (!simulationRunning) return;
+  if (!simulationRunning) return;
 
-    setSimulationRunning(false);
-    setShowSimulationPanel(false); // Hide simulation panel when simulation stops
-    setElements((prev) =>
-      prev.map((el) => ({
-        ...el,
-        // set computed values to undefined when simulation stops
-        computed: {
-          current: undefined,
-          voltage: undefined,
-          power: undefined,
-          measurement: el.computed?.measurement ?? undefined,
-        },
-      }))
-    );
-    setControllerMap((prev) => {
-      Object.values(prev).forEach((sim) => sim.disposeAndReload());
-      return prev; // Keep the map intact!
+  setSimulationRunning(false);
+  setShowSimulationPanel(false);
+  setElements((prev) =>
+    prev.map((el) => ({
+      ...el,
+      computed: {
+        current: undefined,
+        voltage: undefined,
+        power: undefined,
+        measurement: el.computed?.measurement ?? undefined,
+      },
+    }))
+  );
+  
+  // Clean up simulators
+  setControllerMap((prev) => {
+    Object.values(prev).forEach((sim) => {
+      if (sim instanceof SimulatorProxy) {
+        sim.disposeAndReload().catch(error => {
+          console.error("Failed to dispose simulator:", error);
+        });
+      }
     });
-  }
+    return prev;
+  });
+}
 
+  // 2. Modify your startSimulation function to include timing module setup
   function startSimulation() {
     setSimulationRunning(true);
     computeCircuit(wires);
@@ -224,6 +258,7 @@ export default function CircuitCanvas() {
         const sim = controllerMap[el.id];
         const code = controllerCodeMap[el.id] ?? "";
         if (sim && code) {
+          // Enhanced code execution with timing support
           sim.run(code);
         }
       }
@@ -615,128 +650,258 @@ export default function CircuitCanvas() {
     if (simulationRunning) computeCircuit(wires);
   }
 
-  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
-    e.preventDefault();
-    if (simulationRunning) {
-      stopSimulation();
+  // 2. Fixed handleDrop method that works with your existing types
+async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+  e.preventDefault();
+  if (simulationRunning) {
+    stopSimulation();
+  }
+  pushToHistory();
+
+  const elementData = e.dataTransfer.getData("application/element-type");
+  if (!elementData) return;
+
+  const elementType = JSON.parse(elementData);
+
+  const stage = stageRef.current;
+  if (!stage) return;
+
+  // DOM coordinates
+  const pointerX = e.clientX;
+  const pointerY = e.clientY;
+
+  // Get bounding box of canvas DOM
+  const containerRect = stage.container().getBoundingClientRect();
+
+  // Convert screen coords to stage coords
+  const xOnStage = pointerX - containerRect.left;
+  const yOnStage = pointerY - containerRect.top;
+
+  // Convert to actual canvas position (account for pan & zoom)
+  const scale = stage.scaleX();
+  const position = stage.position();
+
+  const canvasX = (xOnStage - position.x) / scale - 33;
+  const canvasY = (yOnStage - position.y) / scale - 35;
+
+  const newElement = createElement({
+    type: elementType.type,
+    idNumber: elements.length + 1,
+    pos: { x: canvasX, y: canvasY },
+    properties: elementType.defaultProps,
+  });
+
+  if (!newElement) return;
+
+  // Immediately add to canvas
+  setElements((prev) => [...prev, newElement]);
+
+  if (newElement.type === "microbit") {
+    // Init simulator in the background (non-blocking)
+    void (async () => {
+      const simulator = new SimulatorProxy({
+        language: "python",
+        controller: "microbit",
+        onOutput: (line) => console.log(`[${newElement.id}]`, line),
+        onEvent: async (event) => {
+          console.log(`[${newElement.id}] Event:`, event);
+          if (event.type === "reset") {
+            setElements((prev) =>
+              prev.map((el) =>
+                el.id === newElement.id
+                  ? {
+                      ...el,
+                      controller: {
+                        leds: Array(5).fill(Array(5).fill(false)),
+                        pins: {},
+                      },
+                    }
+                  : el
+              )
+            );
+          }
+          if (event.type === "led-change") {
+            const state = await simulator.getStates();
+            const leds = state.leds;
+            const pins = state.pins;
+            setElements((prev) =>
+              prev.map((el) =>
+                el.id === newElement.id
+                  ? { ...el, controller: { leds, pins } }
+                  : el
+              )
+            );
+          }
+          if (event.type === "pin-change") {
+            const state = await simulator.getStates();
+            const pins = state.pins;
+            const leds = state.leds;
+            setElements((prev) =>
+              prev.map((el) =>
+                el.id === newElement.id
+                  ? { ...el, controller: { leds, pins } }
+                  : el
+              )
+            );
+
+            if (simulationRunningRef.current) {
+              console.log("Simulation running, computing circuit...");
+              computeCircuit(wiresRef.current);
+            } else {
+              console.log(
+                "Simulation not running, skipping circuit computation."
+              );
+            }
+          }
+        },
+      });
+
+      await simulator.initialize();
+      const states = await simulator.getStates();
+
+      console.log("Microbit simulator initialized:", states);
+
+      // Update map and controller LED state
+      setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
+      setElements((prev) =>
+        prev.map((el) =>
+          el.id === newElement.id
+            ? { ...el, controller: { leds: states.leds, pins: states.pins } }
+            : el
+        )
+      );
+    })();
+  }
+}
+// 3. Add effect to register/unregister ultrasonic sensors when elements change
+useEffect(() => {
+  if (!simulationRunning) return;
+
+  const ultrasonicSensors = elements.filter(el => el.type === "ultrasonicsensor4p");
+  const microbitElements = elements.filter(el => el.type === "microbit");
+
+  // Register ultrasonic sensors with their connected microbits
+  ultrasonicSensors.forEach(sensor => {
+    const connectedMicrobit = findConnectedMicrobit(sensor, elements, wires);
+    if (connectedMicrobit?.connections.allConnected) {
+      const microbitId = connectedMicrobit.microbit.id;
+      const simulator = controllerMap[microbitId] as SimulatorProxy;
+      
+      if (simulator && connectedMicrobit.connections.trigPin && connectedMicrobit.connections.echoPin) {
+        console.log(`Registering ultrasonic sensor ${sensor.id} with microbit ${microbitId}`);
+        
+        // Create the trigger callback for this sensor
+        const triggerCallback = async (trigPin: string, echoPin: string) => {
+          console.log(`Ultrasonic trigger detected on sensor ${sensor.id}`);
+          // This will be handled by the UltraSonicSensor4P component
+          const event = new CustomEvent('ultrasonic-trigger', {
+            detail: { sensorId: sensor.id, trigPin, echoPin }
+          });
+          window.dispatchEvent(event);
+        };
+
+        simulator.registerUltrasonicSensor(
+          sensor.id,
+          connectedMicrobit.connections.trigPin,
+          connectedMicrobit.connections.echoPin,
+          triggerCallback
+        );
+      }
     }
-    pushToHistory();
+  });
 
-    const elementData = e.dataTransfer.getData("application/element-type");
-    if (!elementData) return;
-
-    const element = JSON.parse(elementData);
-
-    const stage = stageRef.current;
-    if (!stage) return;
-
-    // DOM coordinates
-    const pointerX = e.clientX;
-    const pointerY = e.clientY;
-
-    // Get bounding box of canvas DOM
-    const containerRect = stage.container().getBoundingClientRect();
-
-    // Convert screen coords to stage coords
-    const xOnStage = pointerX - containerRect.left;
-    const yOnStage = pointerY - containerRect.top;
-
-    // Convert to actual canvas position (account for pan & zoom)
-    const scale = stage.scaleX();
-    const position = stage.position();
-
-    const canvasX = (xOnStage - position.x) / scale - 33;
-    const canvasY = (yOnStage - position.y) / scale - 35;
-
-    const newElement = createElement({
-      type: element.type,
-      idNumber: elements.length + 1,
-      pos: { x: canvasX, y: canvasY },
-      properties: element.defaultProps,
+  // Cleanup function to unregister sensors when they're removed or simulation stops
+  return () => {
+    ultrasonicSensors.forEach(sensor => {
+      const connectedMicrobit = findConnectedMicrobit(sensor, elements, wires);
+      if (connectedMicrobit?.connections.allConnected) {
+        const microbitId = connectedMicrobit.microbit.id;
+        const simulator = controllerMap[microbitId] as SimulatorProxy;
+        
+        if (simulator) {
+          simulator.unregisterUltrasonicSensor(sensor.id);
+        }
+      }
     });
+  };
+}, [simulationRunning, elements, wires, controllerMap]);
 
-    if (!newElement) return;
 
-    // Immediately add to canvas
-    setElements((prev) => [...prev, newElement]);
+// 4. Add this helper function to find connected ultrasonic sensors
+const getConnectedUltrasonicSensors = useCallback((microbitId: string) => {
+  return elements
+    .filter(el => el.type === "ultrasonicsensor4p")
+    .map(sensor => {
+      const connectedMicrobit = findConnectedMicrobit(sensor, elements, wires);
+      return connectedMicrobit?.microbit.id === microbitId ? {
+        sensor,
+        connections: connectedMicrobit.connections
+      } : null;
+    })
+    .filter(Boolean);
+}, [elements, wires]);
 
-    if (newElement.type === "microbit") {
-      // Init simulator in the background (non-blocking)
-      void (async () => {
-        const simulator = new Simulator({
-          language: "python",
-          controller: "microbit",
-          onOutput: (line) => console.log(`[${newElement.id}]`, line),
-          onEvent: async (event) => {
-            console.log(`[${newElement.id}] Event:`, event);
-            if (event.type === "reset") {
-              setElements((prev) =>
-                prev.map((el) =>
-                  el.id === newElement.id
-                    ? {
-                        ...el,
-                        controller: {
-                          leds: Array(5).fill(Array(5).fill(false)),
-                          pins: {},
-                        },
-                      }
-                    : el
-                )
-              );
-            }
-            if (event.type === "led-change") {
-              const state = await simulator.getStates();
-              const leds = state.leds;
-              const pins = state.pins;
-              setElements((prev) =>
-                prev.map((el) =>
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds, pins } }
-                    : el
-                )
-              );
-            }
-            if (event.type === "pin-change") {
-              const state = await simulator.getStates();
-              const pins = state.pins;
-              const leds = state.leds;
-              setElements((prev) =>
-                prev.map((el) =>
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds, pins } }
-                    : el
-                )
-              );
+// 2. Add this helper function to get simulator for microbit
+const getSimulatorForMicrobit = useCallback((microbitId: string): SimulatorProxy | undefined => {
+  const simulator = controllerMap[microbitId] as SimulatorProxy;
+  return simulator?.getInitializationStatus?.() ? simulator : undefined;
+}, [controllerMap]);
 
-              if (simulationRunningRef.current) {
-                console.log("Simulation running, computing circuit...");
-                computeCircuit(wiresRef.current);
-              } else {
-                console.log(
-                  "Simulation not running, skipping circuit computation."
-                );
-              }
-            }
-          },
+// 3. Add this effect for ultrasonic sensor registration (ONLY add this, don't replace existing effects)
+useEffect(() => {
+  if (!simulationRunning) return;
+
+  const ultrasonicSensors = elements.filter(el => el.type === "ultrasonicsensor4p");
+  
+  // Register ultrasonic sensors with their connected microbits
+  const registrations: Array<() => Promise<void>> = [];
+
+  ultrasonicSensors.forEach(sensor => {
+    const connectedMicrobit = findConnectedMicrobit(sensor, elements, wires);
+    if (connectedMicrobit?.connections.allConnected) {
+      const microbitId = connectedMicrobit.microbit.id;
+      const simulator = getSimulatorForMicrobit(microbitId);
+      
+      if (simulator && connectedMicrobit.connections.trigPin && connectedMicrobit.connections.echoPin) {
+        console.log(`Registering ultrasonic sensor ${sensor.id} with microbit ${microbitId}`);
+        
+        // Create the trigger callback for this sensor
+        const triggerCallback = async (trigPin: string, echoPin: string) => {
+          console.log(`Ultrasonic trigger detected on sensor ${sensor.id}`);
+          // Dispatch custom event for the sensor to handle
+          const event = new CustomEvent('ultrasonic-trigger', {
+            detail: { sensorId: sensor.id, trigPin, echoPin }
+          });
+          window.dispatchEvent(event);
+        };
+
+        // Store cleanup function
+        registrations.push(async () => {
+          await simulator.unregisterUltrasonicSensor(sensor.id);
         });
 
-        await simulator.initialize();
-        const states = await simulator.getStates();
-
-        console.log(states);
-
-        // Update map and controller LED state
-        setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
-        setElements((prev) =>
-          prev.map((el) =>
-            el.id === newElement.id
-              ? { ...el, controller: { leds: states.leds, pins: states.pins } } // Initialize controller state
-              : el
-          )
-        );
-      })();
+        // Register the sensor
+        simulator.registerUltrasonicSensor(
+          sensor.id,
+          connectedMicrobit.connections.trigPin,
+          connectedMicrobit.connections.echoPin,
+          triggerCallback
+        ).catch(error => {
+          console.error("Failed to register ultrasonic sensor:", error);
+        });
+      }
     }
-  }
+  });
+
+  // Cleanup function
+  return () => {
+    registrations.forEach(cleanup => {
+      cleanup().catch(error => {
+        console.error("Failed to unregister ultrasonic sensor:", error);
+      });
+    });
+  };
+}, [simulationRunning, elements, wires, getSimulatorForMicrobit]);
 
   const getWireColor = (wire: Wire): string => {
     return wire.color || "#000000";
@@ -1243,57 +1408,59 @@ export default function CircuitCanvas() {
 
               <Layer>
                 {elements.map((element) => (
-                  <RenderElement
-                    key={element.id}
-                    isSimulationOn={simulationRunning}
-                    element={element}
-                    wires={wires}
-                    elements={elements}
-                    onDragMove={handleElementDragMove}
-                    handleNodeClick={handleNodeClick}
-                    handleRatioChange={handleRatioChange}
-                    handleModeChange={handleModeChange}
-                    onDragStart={() => {
-                      pushToHistory();
-                      setDraggingElement(element.id);
-                      stageRef.current?.draggable(false);
-                    }}
-                    onDragEnd={(e) => {
-                      setDraggingElement(null);
-                      stageRef.current?.draggable(true);
-                      const id = e.target.id();
-                      const x = e.target.x();
-                      const y = e.target.y();
-                      setElements((prev) =>
-                        prev.map((el) => (el.id === id ? { ...el, x, y } : el))
-                      );
-                    }}
-                    onSelect={(id) => {
-                      if (creatingWireStartNode) return;
-                      const element = getElementById(id);
-                      setSelectedElement(element ?? null);
-                      setShowPropertiesPannel(true);
-                      setActiveControllerId(null);
-                      setOpenCodeEditor(false);
-                      setShowSimulationPanel(false);
-                      if (element?.type === "microbit") {
-                        setActiveControllerId(element.id);
-                        // Show simulation panel if simulation is running and microbit is selected
-                        if (simulationRunning) {
-                          setShowSimulationPanel(true);
-                        }
-                      }
-                    }}
-                    selectedElementId={selectedElement?.id || null}
-                    // @ts-ignore
-                    onControllerInput={(elementId, input) => {
-                      const sim = controllerMap[elementId];
-                      if (sim && (input === "A" || input === "B")) {
-                        sim.simulateInput(input);
-                      }
-                    }}
-                  />
-                ))}
+  <RenderElement
+    key={element.id}
+    isSimulationOn={simulationRunning}
+    element={element}
+    elements={elements}
+    wires={wires}
+    onDragMove={handleElementDragMove}
+    handleNodeClick={handleNodeClick}
+    handleRatioChange={handleRatioChange}
+    handleModeChange={handleModeChange}
+    onDragStart={() => {
+      pushToHistory();
+      setDraggingElement(element.id);
+      stageRef.current?.draggable(false);
+    }}
+    onDragEnd={(e) => {
+      setDraggingElement(null);
+      stageRef.current?.draggable(true);
+      const id = e.target.id();
+      const x = e.target.x();
+      const y = e.target.y();
+      setElements((prev) =>
+        prev.map((el) => (el.id === id ? { ...el, x, y } : el))
+      );
+    }}
+    onSelect={(id) => {
+      if (creatingWireStartNode) return;
+      const element = getElementById(id);
+      setSelectedElement(element ?? null);
+      setShowPropertiesPannel(true);
+      setActiveControllerId(null);
+      setOpenCodeEditor(false);
+      setShowSimulationPanel(false);
+      if (element?.type === "microbit") {
+        setActiveControllerId(element.id);
+        if (simulationRunning) {
+          setShowSimulationPanel(true);
+        }
+      }
+    }}
+    selectedElementId={selectedElement?.id || null}
+    onControllerInput={(elementId, input) => {
+      const sim = controllerMap[elementId] as SimulatorProxy;
+      if (sim && (input === "A" || input === "B")) {
+        sim.simulateInput(input).catch(error => {
+          console.error("Failed to simulate input:", error);
+        });
+      }
+    }}
+    // Add this new prop
+    getSimulatorForMicrobit={getSimulatorForMicrobit}
+  />
+))}
               </Layer>
               {/* draggable circle for testing purposes */}
             </Stage>

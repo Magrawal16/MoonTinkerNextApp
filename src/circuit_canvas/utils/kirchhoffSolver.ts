@@ -10,43 +10,18 @@ export default function solveCircuit(
   elements: CircuitElement[],
   wires: Wire[]
 ): CircuitElement[] {
-  console.log("🔧 CIRCUIT SOLVER START");
-
-  console.log(
-    "Elements:",
-    elements.map((e) => ({
-      type: e.type,
-      id: e.id,
-      nodes: e.nodes.length,
-      properties: e.properties,
-    }))
-  );
-  console.log(
-    "Wires:",
-    wires.map((w) => ({ from: w.fromNodeId, to: w.toNodeId }))
-  );
 
   // Break circuit into isolated connected subcircuits
   const subcircuits = getConnectedSubcircuits(elements, wires);
-  console.log(`Found ${subcircuits.length} subcircuits`);
 
   const allResults: CircuitElement[] = [];
 
   // Solve each subcircuit and collect results
   for (let i = 0; i < subcircuits.length; i++) {
     const { elements: subEls, wires: subWires } = subcircuits[i];
-    console.log(`\n--- Solving subcircuit ${i + 1} ---`);
-    console.log(
-      "Subcircuit elements:",
-      subEls.map((e) => e.type)
-    );
-    console.log("Subcircuit wires:", subWires.length);
-
     const results = solveSingleSubcircuit(subEls, subWires);
     allResults.push(...results);
   }
-
-  console.log("🔧 CIRCUIT SOLVER END\n");
   return allResults;
 }
 
@@ -60,29 +35,18 @@ function solveSingleSubcircuit(
   elements: CircuitElement[],
   wires: Wire[]
 ): CircuitElement[] {
-  console.log("  📊 Solving single subcircuit");
 
   // Create node equivalence classes to merge nodes connected by wires
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
-  console.log(
-    "  Node equivalence map:",
-    Object.fromEntries(nodeEquivalenceMap)
-  );
-
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
-  console.log("  Effective node IDs:", Array.from(effectiveNodeIds));
 
   if (effectiveNodeIds.size === 0) {
-    console.log("  ⚠️ No effective nodes, zeroing out");
     return zeroOutComputed(elements);
   }
 
   // Map nodes to indices for matrix construction and find ground node (reference)
   const { groundId, nonGroundIds, nodeIndex } =
     getNodeMappings(effectiveNodeIds);
-  console.log("  Ground node:", groundId);
-  console.log("  Non-ground nodes:", nonGroundIds);
-  console.log("  Node index mapping:", Object.fromEntries(nodeIndex));
 
   const n = nonGroundIds.length;
 
@@ -91,17 +55,9 @@ function solveSingleSubcircuit(
     elements,
     nodeEquivalenceMap
   );
-  console.log(
-    "  Elements with current sources:",
-    elementsWithCurrent.map((e) => ({ type: e.type, id: e.id }))
-  );
 
   // Map these current source elements to indices
   const currentSourceIndexMap = mapCurrentSourceIndices(elementsWithCurrent);
-  console.log(
-    "  Current source index map:",
-    Object.fromEntries(currentSourceIndexMap)
-  );
 
   // Build the MNA matrices G, B, C, D and vectors I, E
   const { G, B, C, D, I, E } = buildMNAMatrices(
@@ -111,31 +67,17 @@ function solveSingleSubcircuit(
     currentSourceIndexMap
   );
 
-  console.log("  📈 MNA Matrices:");
-  console.log("  G (conductance):", G);
-  console.log("  B (current-voltage):", B);
-  console.log("  C (voltage-current):", C);
-  console.log("  D (current-current):", D);
-  console.log("  I (current sources):", I);
-  console.log("  E (voltage sources):", E);
-
   // Assemble full system matrix and vector for Ax=z
   const { A, z } = buildFullSystem(G, B, C, D, I, E);
-  console.log("  📐 Full system matrix A:", A);
-  console.log("  📐 Full system vector z:", z);
 
   // Solve the system of linear equations
   const x = solveLinearSystem(A, z);
   if (!x) {
-    console.log("  ❌ Linear system solution failed");
     return zeroOutComputed(elements);
   }
 
-  console.log("  ✅ Solution vector x:", x);
-
   // Extract node voltages from solution vector
   const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
-  console.log("  🔋 Node voltages:", nodeVoltages);
 
   // Compute per-element results from voltages and currents
   const results = computeElementResults(
@@ -146,11 +88,6 @@ function solveSingleSubcircuit(
     currentSourceIndexMap,
     n
   );
-
-  console.log("  📊 Final element results:");
-  results.forEach((el) => {
-    console.log(`    ${el.type} (${el.id}):`, el.computed);
-  });
 
   return results;
 }
@@ -391,9 +328,7 @@ function buildMNAMatrices(
   const E = Array(m).fill(0);
 
   for (const el of elements) {
-    console.log(`    Processing element: ${el.type} (${el.id})`);
     if (el.nodes.length < 2) {
-      console.log(`      ⚠️ Skipping element with less than 2 nodes`);
       continue;
     }
     // Map element nodes through node equivalence and indexing
@@ -402,20 +337,14 @@ function buildMNAMatrices(
     const ai = nodeIndex.get(a!);
     const bi = nodeIndex.get(b!);
 
-    console.log(
-      `      Node mapping: ${el.nodes[0].id} -> ${a} (index ${ai}), ${el.nodes[1].id} -> ${b} (index ${bi})`
-    );
-
     // Handle passive resistive elements: resistor, led, lightbulb
     if (
       el.type === "resistor" ||
       el.type === "lightbulb" ||
       el.type === "led"
     ) {
-      console.log(`    ⚡ Processing resistive element ${el.type}`);
       const R = el.properties?.resistance ?? 1;
       const g = 1 / R; // Conductance
-      console.log(`      Resistance: ${R}Ω, Conductance: ${g}S`);
 
       if (ai !== undefined) G[ai][ai] += g;
       if (bi !== undefined) G[bi][bi] += g;
@@ -460,23 +389,14 @@ function buildMNAMatrices(
     } 
     // Battery modeled as voltage source with small internal resistance
     else if (el.type === "battery") {
-      console.log(`    🔋 Processing battery ${el.id}`);
       const pos =
         el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1].id;
       const neg =
         el.nodes.find((n) => n.polarity === "negative")?.id ?? el.nodes[0].id;
 
-      console.log(`      Positive node: ${pos}, Negative node: ${neg}`);
-      console.log(`      Battery voltage: ${el.properties?.voltage ?? 0}V`);
-      console.log(`      Battery resistance: ${el.properties?.resistance ?? 0}Ω`);
-
       const pIdx = nodeIndex.get(nodeMap.get(pos)!);
       const nIdx = nodeIndex.get(nodeMap.get(neg)!);
       const idx = currentMap.get(el.id)!;
-
-      console.log(
-        `      Positive index: ${pIdx}, Negative index: ${nIdx}, Current source index: ${idx}`
-      );
 
       if (pIdx !== undefined) B[pIdx][idx] -= 1;
       if (nIdx !== undefined) B[nIdx][idx] += 1;
@@ -487,24 +407,16 @@ function buildMNAMatrices(
     } 
     // Microbit handled similarly to voltage source with added pin-level sources
     else if (el.type === "microbit") {
-      console.log(`    📱 Processing microbit ${el.id}`);
-
       const pos = el.nodes.find((n) => n.placeholder === "3.3V")?.id;
       const neg = el.nodes.find((n) => n.placeholder === "GND")?.id;
-      console.log(`      3.3V node: ${pos}, GND node: ${neg}`);
-      console.log(`      Microbit voltage: ${el.properties?.voltage ?? 0}V`);
-      console.log(`      Microbit resistance: ${el.properties?.resistance ?? 0}Ω`);
 
       if (!pos || !neg) {
-        console.log(`      ❌ ERROR: Missing 3.3V or GND node on microbit!`);
         continue; // Skip this element
       }
 
       const pIdx = nodeIndex.get(nodeMap.get(pos)!);
       const nIdx = nodeIndex.get(nodeMap.get(neg)!);
       const idx = currentMap.get(el.id)!;
-
-      console.log(`      Positive index: ${pIdx}, Negative index: ${nIdx}, Current source index: ${idx}`);
 
       if (pIdx !== undefined) B[pIdx][idx] -= 1;
       if (nIdx !== undefined) B[nIdx][idx] += 1;

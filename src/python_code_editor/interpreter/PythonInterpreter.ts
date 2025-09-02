@@ -72,7 +72,6 @@ export class PythonInterpreter {
 
         this.pyodide = await loadPyodide({ indexURL });
         this.isReady = true;
-        console.log("[Pyodide] Loaded from:", indexURL);
         return;
       } catch (e) {
         console.warn("[Pyodide] Failed to load from:", src, e);

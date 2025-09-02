@@ -16,6 +16,11 @@ export type MicrobitEvent =
 
 type MicrobitEventCallback = (event: MicrobitEvent) => void;
 
+interface HandlerProxy {
+  wrapperProxy: any;
+  persistentHandler: any;
+}
+
 class ButtonInstance {
   constructor(private name: "A" | "B") {}
 
@@ -44,8 +49,8 @@ class MicrobitEventEmitter {
 }
 
 export class MicrobitSimulator {
-
-  private digitalWriteListeners: Record<string, Set<(value: number) => void>> = {};
+  private digitalWriteListeners: Record<string, Set<(value: number) => void>> =
+    {};
 
   public readonly pins = {
     digital_write_pin: this.digitalWritePin.bind(this),
@@ -56,18 +61,25 @@ export class MicrobitSimulator {
     // NEW: subscribe to writes on a specific digital pin
     onDigitalWrite: (pin: string, cb: (value: number) => void) => {
       debugger;
-      if (!this.digitalWriteListeners[pin]) this.digitalWriteListeners[pin] = new Set();
+      if (!this.digitalWriteListeners[pin])
+        this.digitalWriteListeners[pin] = new Set();
       this.digitalWriteListeners[pin].add(cb);
       return () => this.digitalWriteListeners[pin].delete(cb);
     },
   };
 
-
   // NEW: Allow external components to set pin values (for sensor simulation)
-  private externalPinValues: Record<string, { digital: number; analog: number }> = {};
+  private externalPinValues: Record<
+    string,
+    { digital: number; analog: number }
+  > = {};
 
   // Method for external components (like sensors) to set pin values
-  public setExternalPinValue(pin: string, value: number, type: 'digital' | 'analog' = 'digital') {
+  public setExternalPinValue(
+    pin: string,
+    value: number,
+    type: "digital" | "analog" = "digital"
+  ) {
     if (!this.externalPinValues[pin]) {
       this.externalPinValues[pin] = { digital: 0, analog: 0 };
     }
@@ -102,23 +114,28 @@ export class MicrobitSimulator {
         return () => this.digitalWriteListeners[pin].delete(cb);
       },
       setDigitalValue: (pin: string, value: number) => {
-        this.setExternalPinValue(pin, value, 'digital');
+        this.setExternalPinValue(pin, value, "digital");
       },
       setAnalogValue: (pin: string, value: number) => {
-        this.setExternalPinValue(pin, value, 'analog');
-      }
+        this.setExternalPinValue(pin, value, "analog");
+      },
     };
   }
 
   private digitalWritePin(pin: string, value: number) {
     this.pinStates[pin].digital = value;
     // notify generic event stream
-    this.eventEmitter.emit({ type: "pin-change", pin, value, pinType: "digital" });
+    this.eventEmitter.emit({
+      type: "pin-change",
+      pin,
+      value,
+      pinType: "digital",
+    });
     // NEW: notify direct listeners
     const listeners = this.digitalWriteListeners[pin];
     if (listeners) for (const cb of listeners) cb(value);
   }
-  
+
   private pyodide: PyodideInterface;
   private eventEmitter = new MicrobitEventEmitter();
   private ledMatrix: boolean[][] = Array.from({ length: 5 }, () =>
@@ -126,7 +143,7 @@ export class MicrobitSimulator {
   );
   private pinStates: Record<string, { digital: number; analog: number }> = {};
   private buttonStates: Record<"A" | "B", boolean> = { A: false, B: false };
-  private inputHandlers: Record<"A" | "B", any[]> = { A: [], B: [] };
+private inputHandlers: Record<"A" | "B", HandlerProxy[]> = { A: [], B: [] };
   private foreverCallbacks: Set<any> = new Set();
 
   public readonly Button = {
@@ -135,7 +152,7 @@ export class MicrobitSimulator {
   };
 
   public readonly DigitalPin: Record<string, string> = {};
-  
+
   public readonly led = {
     plot: this.plot.bind(this),
     unplot: this.unplot.bind(this),
@@ -245,10 +262,14 @@ export class MicrobitSimulator {
     setTimeout(runCallback, 20);
   }
 
+  // private async pause(ms: number) {
+  //   return new Promise<void>((resolve) => {
+  //     setTimeout(resolve, ms);
+  //   });
+  // }
+
   private async pause(ms: number) {
-    return new Promise<void>((resolve) => {
-      setTimeout(resolve, ms);
-    });
+    return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
 
   private clearDisplay() {
@@ -278,9 +299,7 @@ export class MicrobitSimulator {
     this.buttonStates = { A: false, B: false };
     this.clearInputs();
     this.eventEmitter.emit({ type: "reset" });
-    console.log("Microbit state reset");
   }
-
 
   private analogWritePin(pin: string, value: number) {
     this.pinStates[pin].analog = value;
@@ -316,24 +335,61 @@ export class MicrobitSimulator {
     return this.ledMatrix[y][x];
   }
 
-  private onButtonPressed(button: ButtonInstance, handler: () => void) {
-    const buttonName = button.getName();
-    const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(handler);
-    this.inputHandlers[buttonName].push(proxy);
+  // Fixed onButtonPressed method
+private onButtonPressed(button: ButtonInstance, handler: any) {
+  const buttonName = button.getName();
+
+  const { create_proxy } = this.pyodide.pyimport("pyodide.ffi");
+
+  // Create a persistent proxy for the handler to prevent automatic destruction
+  const persistentHandler = create_proxy(handler);
+  
+  const wrapperProxy = create_proxy(() => {
+    try {
+      return Promise.resolve(persistentHandler()); // Use the persistent proxy
+    } catch (err) {
+      console.error("Error in button handler:", err);
+    }
+  });
+
+  // Store both proxies so we can clean them up later
+  this.inputHandlers[buttonName].push({
+    wrapperProxy,
+    persistentHandler
+  });
+}
+
+  // public pressButton(button: ButtonInstance | "A" | "B") {
+  //   const buttonName = typeof button === "string" ? button : button.getName();
+  //   this.buttonStates[buttonName] = true;
+  //   this.inputHandlers[buttonName].forEach((h) => h());
+  //   this.eventEmitter.emit({ type: "button-press", button: buttonName });
+  // }
+
+  // Updated pressButton method
+public async pressButton(button: ButtonInstance | "A" | "B") {
+  const buttonName = typeof button === "string" ? button : button.getName();
+  this.buttonStates[buttonName] = true;
+
+  for (const handlerProxy of this.inputHandlers[buttonName]) {
+    await handlerProxy.wrapperProxy(); // Use the wrapper proxy
   }
 
-  public pressButton(button: ButtonInstance | "A" | "B") {
-    const buttonName = typeof button === "string" ? button : button.getName();
-    this.buttonStates[buttonName] = true;
-    this.inputHandlers[buttonName].forEach((h) => h());
-    this.eventEmitter.emit({ type: "button-press", button: buttonName });
-  }
+  this.eventEmitter.emit({ type: "button-press", button: buttonName });
+}
 
-  private clearInputs() {
-    this.inputHandlers.A.forEach((p) => p.destroy?.());
-    this.inputHandlers.B.forEach((p) => p.destroy?.());
-    this.inputHandlers = { A: [], B: [] };
-  }
+// Updated clearInputs method
+private clearInputs() {
+  this.inputHandlers.A.forEach((handlerProxy) => {
+    handlerProxy.wrapperProxy.destroy?.();
+    handlerProxy.persistentHandler.destroy?.();
+  });
+  this.inputHandlers.B.forEach((handlerProxy) => {
+    handlerProxy.wrapperProxy.destroy?.();
+    handlerProxy.persistentHandler.destroy?.();
+  });
+  this.inputHandlers = { A: [], B: [] };
+}
 
   getStateSnapshot() {
     return {
@@ -344,13 +400,13 @@ export class MicrobitSimulator {
   }
 
   getPythonModule() {
-  return {
-    pins: this.pins,
-    led: this.led,
-    input: this.input,
-    Button: this.Button,
-    DigitalPin: this.DigitalPin,
-    basic: this.basic,
-  };
+    return {
+      pins: this.pins,
+      led: this.led,
+      input: this.input,
+      Button: this.Button,
+      DigitalPin: this.DigitalPin,
+      basic: this.basic,
+    };
   }
 }

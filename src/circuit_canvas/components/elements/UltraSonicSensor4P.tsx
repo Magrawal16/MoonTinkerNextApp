@@ -247,21 +247,6 @@ useEffect(() => {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [props.selected]);
 
-  // Enhanced debug logging
-  useEffect(() => {
-    if (props.connectedMicrobit && props.isSimulation) {
-      console.log("🔗 UltraSonic Sensor Debug:");
-      console.log("  Microbit ID:", props.connectedMicrobit.microbitId);
-      console.log("  All Connected:", props.connectedMicrobit.connections.allConnected);
-      console.log("  TRIG Pin:", props.connectedMicrobit.connections.trigPin);
-      console.log("  ECHO Pin:", props.connectedMicrobit.connections.echoPin);
-      console.log("  TRIG Pin State:", microbitPinsState[trigPin || ""]?.digital);
-      console.log("  Is Trigger High:", isTriggerHigh);
-      console.log("  Can Measure:", canMeasure);
-      console.log("  Pin States:", microbitPinsState);
-    }
-  }, [props.connectedMicrobit, trigPin, isTriggerHigh, canMeasure, microbitPinsState, props.isSimulation]);
-
   // Animate echo pulse radius visualization
   const [pulseRadius, setPulseRadius] = useState(0);
   useEffect(() => {

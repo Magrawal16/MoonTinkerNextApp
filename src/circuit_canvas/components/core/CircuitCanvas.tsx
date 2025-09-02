@@ -22,7 +22,6 @@ import {
   getCircuitShortcuts,
   getShortcutMetadata,
 } from "@/circuit_canvas/utils/circuitShortcuts";
-// import { Simulator } from "@/lib/code/Simulator";
 import { SimulatorProxy as Simulator } from "@/python_code_editor/lib/SimulatorProxy";
 import CircuitSelector from "@/circuit_canvas/components/toolbar/panels/Palette";
 import {
@@ -44,6 +43,7 @@ import { useViewport } from "@/circuit_canvas/hooks/useViewport";
 import HighPerformanceGrid from "./HighPerformanceGrid";
 import { Window } from "@/common/components/ui/Window";
 import ElementRotationButtons from "../toolbar/customization/ElementRoationButtons";
+import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 
 export default function CircuitCanvas() {
   const [mousePos, setMousePos] = useState<{ x: number; y: number }>({
@@ -99,6 +99,7 @@ export default function CircuitCanvas() {
   >([]);
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationRunningRef = useRef(simulationRunning);
+  const {showMessage} = useMessage();
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -220,6 +221,7 @@ export default function CircuitCanvas() {
   }, [creatingWireStartNode]);
 
   function stopSimulation() {
+    debugger;
     if (!simulationRunning) return;
 
     setSimulationRunning(false);
@@ -243,6 +245,7 @@ export default function CircuitCanvas() {
   }
 
   function startSimulation() {
+    debugger;
     setSimulationRunning(true);
     computeCircuit(wires);
 
@@ -715,7 +718,6 @@ export default function CircuitCanvas() {
           controller: "microbit",
           onOutput: (line) => console.log(`[${newElement.id}]`, line),
           onEvent: async (event) => {
-            console.log(`[${newElement.id}] Event:`, event);
             if (event.type === "reset") {
               setElements((prev) =>
                 prev.map((el) =>
@@ -756,11 +758,11 @@ export default function CircuitCanvas() {
               );
 
               if (simulationRunningRef.current) {
-                console.log("Simulation running, computing circuit...");
+                showMessage("Simulation running, computing circuit...", 'info');
                 computeCircuit(wiresRef.current);
               } else {
-                console.log(
-                  "Simulation not running, skipping circuit computation."
+                showMessage(
+                  "Simulation not running, skipping circuit computation.", 'info'
                 );
               }
             }
@@ -769,8 +771,6 @@ export default function CircuitCanvas() {
 
         await simulator.initialize();
         const states = await simulator.getStates();
-
-        console.log(states);
 
         // Update map and controller LED state
         setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));

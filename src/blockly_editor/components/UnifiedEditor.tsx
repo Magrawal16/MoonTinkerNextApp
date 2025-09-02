@@ -181,8 +181,6 @@ export default function UnifiedEditor({
               setIsUpdatingFromBlocks(true);
 
               const generatedCode = converter.blocksToPython();
-              console.log("generated code:", generatedCode);
-
               // Only update if code actually changed
               if (generatedCode !== lastCodeRef.current) {
                 setControllerCodeMap((prev) => ({

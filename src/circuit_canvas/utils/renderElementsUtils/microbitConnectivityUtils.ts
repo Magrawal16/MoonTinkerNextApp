@@ -298,13 +298,6 @@ export function validateMicrobitConnections(
     recommendations.push("Connect ECHO to any microbit digital pin (P0, P1, P2, etc.)");
   }
 
-  // Add information about current pin connections
-  if (connectedMicrobit.connections.trig && connectedMicrobit.connections.trigPin) {
-    console.log(`TRIG is connected to pin: ${connectedMicrobit.connections.trigPin}`);
-  }
-  if (connectedMicrobit.connections.echo && connectedMicrobit.connections.echoPin) {
-    console.log(`ECHO is connected to pin: ${connectedMicrobit.connections.echoPin}`);
-  }
 
   return {
     isValid: warnings.length === 0,
@@ -345,29 +338,4 @@ export function getTrigEchoPinConnections(
     echoPin: connectedMicrobit.connections.echoPin || null,
     microbitId: connectedMicrobit.microbit.id
   };
-}
-
-/**
- * Debug function to log connection details
- */
-export function debugMicrobitConnection(
-  element: CircuitElement,
-  elements: CircuitElement[],
-  wires: Wire[]
-): void {
-  const connectedMicrobit = findConnectedMicrobit(element, elements, wires);
-  
-  if (connectedMicrobit) {
-    console.log("🔗 Microbit Connection Debug:");
-    console.log("  Microbit ID:", connectedMicrobit.microbit.id);
-    console.log("  VCC Connected:", connectedMicrobit.connections.vcc);
-    console.log("  GND Connected:", connectedMicrobit.connections.gnd);
-    console.log("  TRIG Connected:", connectedMicrobit.connections.trig);
-    console.log("  ECHO Connected:", connectedMicrobit.connections.echo);
-    console.log("  TRIG Pin:", connectedMicrobit.connections.trigPin);
-    console.log("  ECHO Pin:", connectedMicrobit.connections.echoPin);
-    console.log("  All Connected:", connectedMicrobit.connections.allConnected);
-  } else {
-    console.log("❌ No microbit connected to ultrasonic sensor");
-  }
 }

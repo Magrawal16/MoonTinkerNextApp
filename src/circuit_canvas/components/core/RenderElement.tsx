@@ -5,7 +5,7 @@ import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 import { Rect, Group, Text, Label, Tag } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
-import { findConnectedMicrobit, debugMicrobitConnection } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
+import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
 import Lightbulb from "@/circuit_canvas/components/elements/Lightbulb";
 import Battery from "@/circuit_canvas/components/elements/Battery";
 import Led from "@/circuit_canvas/components/elements/Led";
@@ -46,13 +46,6 @@ export default function RenderElement({
     ? findConnectedMicrobit(element, elements, wires)
     : null;
 
-  // Debug logging for ultrasonic sensor connections
-  if (element.type === "ultrasonicsensor4p" && elements && wires && props.isSimulationOn) {
-    debugMicrobitConnection(element, elements, wires);
-  }
-
-  console.log("ELEMENT STATE : ", element);
-  console.log("CONNECTED MICROBIT DATA : ", connectedMicrobitData);
 
   return (
     <Group

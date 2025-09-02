@@ -98,15 +98,16 @@ class Simulator {
     this.microbit.reset();
   }
 
-  simulateInput(event: string) {
-    if (!this.microbit) {
-      throw new Error("Microbit controller not initialized.");
-    }
-    if (event !== "A" && event !== "B") {
-      throw new Error(`Unsupported input event: ${event}`);
-    }
-    this.microbit.pressButton(event);
+  async simulateInput(event: string) {
+  if (!this.microbit) {
+    throw new Error("Microbit controller not initialized.");
   }
+  if (event !== "A" && event !== "B") {
+    throw new Error(`Unsupported input event: ${event}`);
+  }
+  await this.microbit.pressButton(event); // <- await here
+}
+
 }
 
 Comlink.expose(Simulator);

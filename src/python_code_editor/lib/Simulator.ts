@@ -23,45 +23,30 @@ export class Simulator {
     }
   }
 
-  async initialize(onOutput?: (line: string) => void, onEvent?: (event: MicrobitEvent) => void) {
-  await this.interpreter.initialize();
+  async initialize() {
+    await this.interpreter.initialize();
 
-  const outputCallback = onOutput || this.options.onOutput;
-  const eventCallback = onEvent || this.options.onEvent;
+    if (this.options.onOutput) {
+      this.interpreter.setOutputCallback(this.options.onOutput);
+    }
 
-  if (outputCallback) {
-    this.interpreter.setOutputCallback(outputCallback);
-  }
+    if (
+      this.options.language === "python" &&
+      this.options.controller === "microbit"
+    ) {
+      this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
+      this.interpreter.registerHardwareModule(
+        "microbit",
+        this.microbit.getPythonModule()
+      );
 
-  if (
-    this.options.language === "python" &&
-    this.options.controller === "microbit"
-  ) {
-    this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
-    
-    const microbitModule = this.microbit.getPythonModule();
-    this.interpreter.registerHardwareModule("microbit", microbitModule);
-
-    // SAFE way to add timing and pin access to Python globals
-    try {
-      const pythonGlobals = this.interpreter.getPyodide()!.globals;
-      if (pythonGlobals && typeof pythonGlobals.set === 'function') {
-        pythonGlobals.set('time', microbitModule.time);
-        pythonGlobals.set('pin0', microbitModule.pin0);
-        pythonGlobals.set('pin1', microbitModule.pin1);
-        pythonGlobals.set('pin2', microbitModule.pin2);
+      if (this.options.onEvent) {
+        this.microbit.subscribe(this.options.onEvent);
       }
-    } catch (error) {
-      console.warn("Could not set Python globals, timing functions may not work:", error);
-    }
 
-    if (eventCallback) {
-      this.microbit.subscribe(eventCallback);
+      this.microbit.reset();
     }
-
-    this.microbit.reset();
   }
-}
 
   async run(code: string): Promise<string> {
     if (!this.interpreter.isInitialized()) {
@@ -80,41 +65,6 @@ export class Simulator {
 
   getMicrobitInstance(): MicrobitSimulator | null {
     return this.microbit;
-  }
-
-  // New methods for ultrasonic sensor support
-  registerUltrasonicSensor(sensorId: string, trigPin: string, echoPin: string) {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
-    
-    // Create a callback that will be called when trigger is detected
-    const onTrigger = (trigPin: string, echoPin: string) => {
-      // Post message back to main thread about ultrasonic trigger
-      if (typeof postMessage !== 'undefined') {
-        postMessage({
-          type: 'ultrasonic-trigger',
-          sensorId,
-          trigPin,
-          echoPin
-        });
-      }
-    };
-
-    this.microbit.registerUltrasonicSensor(sensorId, trigPin, echoPin, onTrigger);
-  }
-
-  unregisterUltrasonicSensor(sensorId: string) {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
-    this.microbit.unregisterUltrasonicSensor(sensorId);
-  }
-
-  setExternalPinValue(pin: string, value: number, type: 'digital' | 'analog' = 'digital') {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
-    this.microbit.setExternalPinValue(pin, value, type);
-  }
-
-  simulateInput(event: "A" | "B") {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
-    this.microbit.pressButton(event);
   }
 
   reset() {

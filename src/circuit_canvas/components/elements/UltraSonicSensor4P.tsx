@@ -1,11 +1,10 @@
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { Image, Group, Arc, Circle, Line, Text, Rect } from "react-konva";
 import {
   BaseElement,
   BaseElementProps,
 } from "@/circuit_canvas/components/core/BaseElement";
 import Konva from "konva";
-import { SimulatorProxy } from "@/python_code_editor/lib/SimulatorProxy";
 
 // Sensor and UI constants
 const SENSOR_IMG_WIDTH = 230;
@@ -15,13 +14,14 @@ const SENSOR_MIN_CM = 2;
 const SENSOR_MAX_CM = 400;
 
 // Scale factor (cm → px mapping)
-const CM_TO_PX = 0.38;
+const CM_TO_PX = 0.38; // adjust so that 400 cm ≈ your RANGE_RADIUS in canvas
 
-const SENSOR_X = SENSOR_IMG_WIDTH / 2.1;
-const SENSOR_Y = -25;
-const EYE_OFFSET_X = 37;
+const SENSOR_X = SENSOR_IMG_WIDTH / 2.1; // Horizontal center
+const SENSOR_Y = -25; // Sensor face Y (adjust for your image asset)
+const EYE_OFFSET_X = 37; // Offset from center for sensor eyes
+const EYE_RADIUS = 18;
 const RANGE_RADIUS = SENSOR_MAX_CM * CM_TO_PX;
-const RANGE_ANGLE = 45;
+const RANGE_ANGLE = 45; // 45° either side (90° spread)
 const BALL_RADIUS = 9;
 
 interface BallPosition {
@@ -49,24 +49,21 @@ interface UltraSonicSensor4PProps extends BaseElementProps {
       trig: boolean;
       echo: boolean;
       allConnected: boolean;
-      trigPin?: string;
-      echoPin?: string;
+      trigPin?: string; // Which microbit pin TRIG is connected to
+      echoPin?: string; // Which microbit pin ECHO is connected to
     };
   };
-  getSimulatorForMicrobit?: (microbitId: string) => SimulatorProxy | undefined;
 }
 
 export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [ball, setBall] = useState<BallPosition>({
     x: SENSOR_X,
-    y: SENSOR_Y - 30,
+    y: SENSOR_Y - 30, // Start ball above sensor
   });
   const [triggered, setTriggered] = useState(false);
+  //const [echoTime, setEchoTime] = useState<number | null>(null); // microseconds
   const [unit, setUnit] = useState<"cm" | "in">("cm");
-  const [measurementInProgress, setMeasurementInProgress] = useState(false);
-  const [lastMeasuredDistance, setLastMeasuredDistance] = useState<number | null>(null);
-  const [lastEchoTime, setLastEchoTime] = useState<number | null>(null); // New state for echo time
 
   // Load sensor image
   useEffect(() => {
@@ -76,146 +73,134 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     image.alt = "UltraSonicSensor4P";
   }, []);
 
-  // Calculate sensor eye positions
+  // Calculate sensor eye positions (bottom of eyes)
   const leftEye = { x: SENSOR_X - EYE_OFFSET_X - 10, y: SENSOR_Y + 40 };
   const rightEye = { x: SENSOR_X + EYE_OFFSET_X + 10, y: SENSOR_Y + 40 };
 
-  // Calculate distance
+  // Calculate dx, dy to ball, distance
   const dx = ball.x - SENSOR_X;
-  const dy = SENSOR_Y - ball.y;
+  const dy = SENSOR_Y - ball.y; // y reversed in Konva
   const distance = useMemo(() => Math.sqrt(dx * dx + dy * dy), [dx, dy]);
 
-  // Compute angle
+  // Compute angle between sensor direction (up) and ball
   const angleRad = useMemo(() => Math.atan2(dx, dy), [dx, dy]);
   const angleDeg = useMemo(() => (angleRad * 180) / Math.PI, [angleRad]);
 
-  // Check if ball is in valid range
+  // Check if ball is in valid range region (exclude inner radius)
   const ballInRange =
     distance >= SENSOR_MIN_CM * CM_TO_PX &&
     distance <= RANGE_RADIUS &&
     Math.abs(angleDeg) <= RANGE_ANGLE;
 
-  // Check connection status
-  const isProperlyConnected = props.connectedMicrobit?.connections?.allConnected ?? false;
+  // Check if properly connected to microbit
+  const isProperlyConnected =
+    props.connectedMicrobit?.connections?.allConnected ?? false;
+
+  // Get microbit pins state
+  const microbitPinsState = props.connectedMicrobit?.pins ?? {};
+
+  // Check if the TRIG pin is HIGH - use the actual connected pin
   const trigPin = props.connectedMicrobit?.connections?.trigPin;
-  const echoPin = props.connectedMicrobit?.connections?.echoPin;
-  const microbitId = props.connectedMicrobit?.microbitId;
+  const isTriggerHigh = useMemo(() => {
+    if (!trigPin) return false;
+    
+    // Check both the pin name (e.g., "P0") and its numeric equivalent (e.g., "0")
+    const pinVariants = [trigPin, trigPin.replace('P', '')];
+    return pinVariants.some(pin => microbitPinsState[pin]?.digital === 1);
+  }, [trigPin, microbitPinsState]);
 
-  // Get simulator instance
-  const simulator = useMemo(() => {
-    if (!microbitId || !props.getSimulatorForMicrobit) return null;
-    return props.getSimulatorForMicrobit(microbitId);
-  }, [microbitId, props.getSimulatorForMicrobit]);
+  const canMeasure = isProperlyConnected && isTriggerHigh;
 
-  // Calculate echo time for display
-  const calculateEchoTime = useCallback((distanceCm: number): number => {
-    // Time = Distance / Speed of Sound * 2 (round trip)
-    // Speed of sound ≈ 343 m/s = 34300 cm/s
-    return (distanceCm / 34300) * 2 * 1000000; // Convert to microseconds
-  }, []);
-
-  // Simulate ultrasonic measurement when triggered
-  const simulateMeasurement = useCallback(async () => {
-    if (!isProperlyConnected || !echoPin || !simulator || measurementInProgress) {
-      return;
-    }
-
-    console.log("Starting ultrasonic measurement simulation");
-    setMeasurementInProgress(true);
-    setTriggered(true);
-
-    try {
-      const distanceCm = distance / CM_TO_PX;
-      
-      if (!ballInRange) {
-        console.log("Ball out of range, no echo response");
-        setLastMeasuredDistance(null);
-        setLastEchoTime(null);
-        return;
-      }
-
-      // Calculate echo time
-      const echoTimeUs = calculateEchoTime(distanceCm);
-
-      // Set ECHO pin LOW initially
-      await simulator.setExternalPinValue(echoPin, 0, 'digital');
-      await new Promise(resolve => setTimeout(resolve, 2));
-      
-      // Set ECHO pin HIGH (start of return pulse)
-      await simulator.setExternalPinValue(echoPin, 1, 'digital');
-      
-      console.log(`Distance: ${distanceCm.toFixed(2)}cm, Echo time: ${echoTimeUs.toFixed(0)}μs`);
-      setLastMeasuredDistance(distanceCm);
-      setLastEchoTime(echoTimeUs);
-      
-      // Wait for the calculated echo time, then set ECHO pin LOW
-      await new Promise(resolve => setTimeout(resolve, echoTimeUs / 1000));
-      
-      // Set ECHO pin LOW (end of return pulse)
-      await simulator.setExternalPinValue(echoPin, 0, 'digital');
-      
-      console.log("Echo pulse completed");
-      
-    } catch (error) {
-      console.error("Error during ultrasonic measurement:", error);
-    } finally {
-      setTriggered(false);
-      setMeasurementInProgress(false);
-    }
-  }, [isProperlyConnected, echoPin, simulator, distance, ballInRange, measurementInProgress, calculateEchoTime]);
-
-  // Listen for ultrasonic trigger events
+  // Notify parent component of distance changes if callback provided
   useEffect(() => {
-    if (!props.isSimulation || !isProperlyConnected) return;
-
-    const handleTriggerEvent = (event: CustomEvent) => {
-      const { sensorId, trigPin: eventTrigPin, echoPin: eventEchoPin } = event.detail;
-      
-      if (sensorId === props.id && eventTrigPin === trigPin && eventEchoPin === echoPin) {
-        console.log(`Ultrasonic sensor ${props.id} received trigger event`);
-        simulateMeasurement();
-      }
-    };
-
-    window.addEventListener('ultrasonic-trigger', handleTriggerEvent as EventListener);
-
-    return () => {
-      window.removeEventListener('ultrasonic-trigger', handleTriggerEvent as EventListener);
-    };
-  }, [props.isSimulation, props.id, isProperlyConnected, trigPin, echoPin, simulateMeasurement]);
-
-  // Calculate current simulated values for display
-  const currentDistanceCm = distance / CM_TO_PX;
-  const currentEchoTime = ballInRange ? calculateEchoTime(currentDistanceCm) : null;
+    if (props.onDistanceChange && canMeasure) {
+      props.onDistanceChange(distance);
+    }
+  }, [distance, props, canMeasure]);
 
   // Displayed distance in selected unit
-  const displayedDistance = lastMeasuredDistance !== null
+  const distanceCm = distance / CM_TO_PX;
+
+  const displayedDistance = canMeasure
     ? unit === "cm"
-      ? lastMeasuredDistance.toFixed(2)
-      : (lastMeasuredDistance / 2.54).toFixed(2)
-    : ballInRange 
-      ? unit === "cm"
-        ? currentDistanceCm.toFixed(2)
-        : (currentDistanceCm / 2.54).toFixed(2)
-      : "Out of range";
+      ? distanceCm.toFixed(2)
+      : (distanceCm / 2.54).toFixed(2)
+    : "N/A";
 
-  const displayedUnit = lastMeasuredDistance !== null || ballInRange ? unit : "";
+  const displayedUnit = canMeasure ? unit : "";
 
-  // Ball movement handlers
+  // Simulate ultrasonic sensor trigger and echo pulses
+  // const startMeasurement = () => {
+  //   if (!canMeasure || triggered) return; // Don't measure if not properly connected
+  //   setTriggered(true);
+  //   setEchoTime(null);
+
+  //   const timeForEcho = (distanceCm / 34300) * 2 * 1e6; // microseconds
+  //   // Echo time update with delay simulation (10ms)
+  //   setTimeout(() => {
+  //     setEchoTime(timeForEcho);
+  //     setTriggered(false);
+  //   }, 10);
+  // };
+  const echoTime = useMemo(() => {
+  // If we can't measure or the ball is out of range, echo time is null (N/A)
+  if (!canMeasure || !ballInRange) {
+    return null;
+  }
+  // Calculate the time for the echo round trip in microseconds
+  return (distanceCm / 34300) * 2 * 1e6;
+}, [canMeasure, ballInRange, distanceCm]);
+
+  const startMeasurement = () => {
+  // Don't measure if not properly connected or already in a measurement cycle
+  if (!canMeasure || triggered) return;
+
+  // Visual Feedback: Start the pulse animation
+  setTriggered(true);
+
+  // Simulate the measurement delay (e.g., sensor processing time)
+  setTimeout(() => {
+    // Visual Feedback: Stop the pulse animation
+    setTriggered(false);
+  }, 10); // This 10ms is just for the visual effect, not the calculation
+};
+
+  // // Auto-start measurement on simulation + selected mode
+  // useEffect(() => {
+  //   if (props.isSimulation && props.selected && canMeasure) {
+  //     const interval = setInterval(() => {
+  //       startMeasurement();
+  //     }, 1000); // Simulate measurement every second
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [props.isSimulation, props.selected, distance, canMeasure]);
+
+  // Auto-start measurement ANIMATION on simulation + selected mode
+useEffect(() => {
+  if (props.isSimulation && props.selected && canMeasure) {
+    const interval = setInterval(() => {
+      startMeasurement(); // This now only triggers the visual pulse
+    }, 1000); // This interval controls how often the sensor "pings" visually
+    return () => clearInterval(interval);
+  }
+}, [props.isSimulation, props.selected, canMeasure, startMeasurement]); // Add startMeasurement to dependencies
+
+  // Constrain ball movement within sensor range circle
   const onDragMove = (e: Konva.KonvaEventObject<DragEvent>) => {
     const x = e.target.x();
     const y = e.target.y();
     setBall({ x, y });
   };
 
+  // While dragging the distance ball, temporarily disable stage dragging to avoid panning
   const onBallDragStart = () => {
     const stage = Konva.stages?.[0];
     if (stage) {
+      // store original draggable flag
       (stage as any)._prevDraggable = stage.draggable();
       stage.draggable(false);
     }
   };
-
   const onBallDragEnd = () => {
     const stage = Konva.stages?.[0];
     if (stage) {
@@ -224,17 +209,26 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     }
   };
 
-  // Keyboard controls for ball movement
+  // Keyboard controls for ball movement when selected
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!props.selected) return;
 
-      let dx = 0, dy = 0;
+      let dx = 0,
+        dy = 0;
       switch (e.key) {
-        case "ArrowUp": dy = -5; break;
-        case "ArrowDown": dy = 5; break;
-        case "ArrowLeft": dx = -5; break;
-        case "ArrowRight": dx = 5; break;
+        case "ArrowUp":
+          dy = -5;
+          break;
+        case "ArrowDown":
+          dy = 5;
+          break;
+        case "ArrowLeft":
+          dx = -5;
+          break;
+        case "ArrowRight":
+          dx = 5;
+          break;
       }
 
       setBall((prev) => {
@@ -243,7 +237,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
 
         const dist = Math.sqrt((newX - SENSOR_X) ** 2 + (newY - SENSOR_Y) ** 2);
         if (dist > RANGE_RADIUS) {
-          return prev;
+          return prev; // prevent out of range
         }
         return { x: newX, y: newY };
       });
@@ -253,28 +247,28 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [props.selected]);
 
-  // Debug logging
+  // Enhanced debug logging
   useEffect(() => {
     if (props.connectedMicrobit && props.isSimulation) {
-      console.log("UltraSonic Sensor Debug:", {
-        microbitId: props.connectedMicrobit.microbitId,
-        allConnected: props.connectedMicrobit.connections.allConnected,
-        trigPin: props.connectedMicrobit.connections.trigPin,
-        echoPin: props.connectedMicrobit.connections.echoPin,
-        simulatorAvailable: !!simulator,
-        lastDistance: lastMeasuredDistance,
-        lastEchoTime: lastEchoTime,
-      });
+      console.log("🔗 UltraSonic Sensor Debug:");
+      console.log("  Microbit ID:", props.connectedMicrobit.microbitId);
+      console.log("  All Connected:", props.connectedMicrobit.connections.allConnected);
+      console.log("  TRIG Pin:", props.connectedMicrobit.connections.trigPin);
+      console.log("  ECHO Pin:", props.connectedMicrobit.connections.echoPin);
+      console.log("  TRIG Pin State:", microbitPinsState[trigPin || ""]?.digital);
+      console.log("  Is Trigger High:", isTriggerHigh);
+      console.log("  Can Measure:", canMeasure);
+      console.log("  Pin States:", microbitPinsState);
     }
-  }, [props.connectedMicrobit, simulator, lastMeasuredDistance, lastEchoTime, props.isSimulation]);
+  }, [props.connectedMicrobit, trigPin, isTriggerHigh, canMeasure, microbitPinsState, props.isSimulation]);
 
-  // Animate echo pulse
+  // Animate echo pulse radius visualization
   const [pulseRadius, setPulseRadius] = useState(0);
   useEffect(() => {
     let animationFrameId: number;
     let start: number | null = null;
 
-    if (triggered && isProperlyConnected) {
+    if (triggered && canMeasure) {
       const animate = (time: number) => {
         if (!start) start = time;
         const elapsed = time - start;
@@ -288,26 +282,17 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
     }
 
     return () => cancelAnimationFrame(animationFrameId);
-  }, [triggered, isProperlyConnected]);
+  }, [triggered, canMeasure]);
 
-  // Status helpers
+  // Get connection status color with more detailed states
   const getConnectionStatusColor = () => {
-    if (!props.connectedMicrobit) return "gray";
-    if (measurementInProgress) return "blue";
-    if (isProperlyConnected && simulator) return "green";
-    if (!isProperlyConnected) return "red";
-    if (!simulator) return "orange";
+    if (!props.connectedMicrobit) return "gray"; // No connection
+    if (canMeasure) return "green"; // Fully operational
+    if (isProperlyConnected && !isTriggerHigh) return "orange"; // Connected but not triggered
+    if (!isProperlyConnected) return "red"; // Incomplete connection
     return "gray";
   };
 
-  const getStatusText = () => {
-    if (!props.connectedMicrobit) return "No connection";
-    if (measurementInProgress) return "Measuring...";
-    if (isProperlyConnected && simulator) return "Ready";
-    if (!simulator) return "Simulator N/A";
-    if (!isProperlyConnected) return "Check wiring";
-    return "Unknown";
-  };
 
   return (
     <BaseElement {...props}>
@@ -335,13 +320,6 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 stroke="black"
                 strokeWidth={1}
               />
-              <Text
-                x={SENSOR_IMG_WIDTH - 80}
-                y={35}
-                fontSize={10}
-                fill="black"
-                text={getStatusText()}
-              />
             </Group>
           )}
 
@@ -356,11 +334,11 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 angle={RANGE_ANGLE * 2}
                 rotation={225}
                 fill={
-                  ballInRange && isProperlyConnected && simulator
+                  ballInRange && canMeasure
                     ? "rgba(0,255,0,0.3)"
                     : "rgba(255,0,0,0.3)"
                 }
-                stroke={ballInRange && isProperlyConnected && simulator ? "green" : "red"}
+                stroke={ballInRange && canMeasure ? "green" : "red"}
                 strokeWidth={2}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
@@ -370,7 +348,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
               {/* Dashed lines from sensor eyes to ball */}
               <Line
                 points={[leftEye.x, leftEye.y, ball.x, ball.y]}
-                stroke={isProperlyConnected && simulator ? "#888" : "#ccc"}
+                stroke={canMeasure ? "#888" : "#ccc"}
                 strokeWidth={2}
                 dash={[8, 8]}
                 shadowBlur={props.selected ? 6 : 0}
@@ -379,7 +357,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
               />
               <Line
                 points={[rightEye.x, rightEye.y, ball.x, ball.y]}
-                stroke={isProperlyConnected && simulator ? "#888" : "#ccc"}
+                stroke={canMeasure ? "#888" : "#ccc"}
                 strokeWidth={2}
                 dash={[8, 8]}
                 shadowBlur={props.selected ? 6 : 0}
@@ -393,7 +371,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 y={ball.y - BALL_RADIUS - 28}
                 text={`${displayedDistance} ${displayedUnit}`}
                 fontSize={18}
-                fill={lastMeasuredDistance !== null ? "#0684aa" : ballInRange ? "#0684aa" : "#999"}
+                fill={canMeasure ? "#0684aa" : "#999"}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
                 shadowOpacity={props.selected ? 2 : 0}
@@ -404,7 +382,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 x={ball.x}
                 y={ball.y}
                 radius={BALL_RADIUS}
-                fill={lastMeasuredDistance !== null ? "darkblue" : ballInRange ? "blue" : "gray"}
+                fill={canMeasure ? "blue" : "gray"}
                 draggable
                 onDragStart={onBallDragStart}
                 onDragMove={onDragMove}
@@ -412,7 +390,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
               />
 
               {/* Echo pulse circle animation */}
-              {triggered && isProperlyConnected && (
+              {triggered && canMeasure && (
                 <Circle
                   x={SENSOR_X}
                   y={SENSOR_Y}
@@ -425,43 +403,23 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                 />
               )}
 
-              {/* Distance output */}
-              <Text
-                x={-100}
-                y={SENSOR_IMG_HEIGHT - 180}
-                fontSize={14}
-                fill={measurementInProgress ? "blue" : "green"}
-                text={
-                  measurementInProgress 
-                    ? "Measuring..." 
-                    : lastMeasuredDistance !== null
-                    ? `Last: ${lastMeasuredDistance.toFixed(2)}cm`
-                    : ballInRange && isProperlyConnected && simulator
-                    ? `Simulated: ${currentDistanceCm.toFixed(2)}cm`
-                    : "No measurement"
-                }
-              />
-
-              {/* Echo Time Display - NEW */}
+              {/* Sensor output data */}
               <Text
                 x={-100}
                 y={SENSOR_IMG_HEIGHT - 160}
                 fontSize={14}
-                fill={measurementInProgress ? "blue" : lastEchoTime !== null ? "purple" : "green"}
-                text={
-                  measurementInProgress 
-                    ? "Echo calculating..." 
-                    : lastEchoTime !== null
-                    ? `Echo time: ${lastEchoTime.toFixed(0)}μs`
-                    : currentEchoTime !== null && ballInRange && isProperlyConnected && simulator
-                    ? `Echo time: ${currentEchoTime.toFixed(0)}μs (sim)`
-                    : "No echo"
-                }
+                fill="green"
+                text={`Echo time: ${
+                  canMeasure && ballInRange && echoTime !== null
+                    ? echoTime.toFixed(0) + " μs"
+                    : "N/A"
+                }`}
               />
 
-              {/* Unit toggle button */}
-              {(lastMeasuredDistance !== null || ballInRange) && isProperlyConnected && simulator && (
+              {/* Unit toggle button (only enabled when measuring) */}
+              {canMeasure && (
                 <Group>
+                  {/* Toggle button background */}
                   <Rect
                     x={-50}
                     y={SENSOR_IMG_HEIGHT - 70}
@@ -475,6 +433,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                     style={{ cursor: "pointer" }}
                   />
                   
+                  {/* Toggle slider */}
                   <Circle
                     x={unit === "cm" ? -34.5 : -5.5}
                     y={SENSOR_IMG_HEIGHT - 55}
@@ -486,6 +445,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                     style={{ cursor: "pointer" }}
                   />
                   
+                  {/* Toggle labels */}
                   <Text
                     x={-44}
                     y={SENSOR_IMG_HEIGHT - 60}
@@ -511,7 +471,7 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
               )}
 
               {/* Out of range warning */}
-              {!ballInRange && isProperlyConnected && !measurementInProgress && (
+              {!ballInRange && canMeasure && (
                 <Text
                   x={SENSOR_X - 50}
                   y={SENSOR_Y + SENSOR_IMG_HEIGHT + -320}
@@ -520,6 +480,21 @@ export default function UltraSonicSensor4P(props: UltraSonicSensor4PProps) {
                   text="Out of range"
                 />
               )}
+
+              {/* Connection warnings */}
+              {/* {!canMeasure && props.connectedMicrobit && (
+                <Text
+                  x={SENSOR_X - 80}
+                  y={SENSOR_Y + SENSOR_IMG_HEIGHT + -300}
+                  fontSize={14}
+                  fill="orange"
+                  text={
+                    !isProperlyConnected 
+                      ? "Check connections" 
+                      : `Set ${trigPin} HIGH to measure`
+                  }
+                />
+              )} */}
             </>
           )}
         </Group>

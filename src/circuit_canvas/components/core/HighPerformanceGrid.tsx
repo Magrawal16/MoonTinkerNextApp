@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useMemo } from "react";
-import { Layer, Rect, Shape } from "react-konva";
+import { Layer, Shape } from "react-konva";
 
 type HighPerformanceGridProps = {
-  virtualSize?: number;
   gridSize?: number;
   viewport?: {
     x: number;
@@ -13,102 +12,79 @@ type HighPerformanceGridProps = {
     height: number;
     scale: number;
   };
-  adaptive?: boolean; // Automatically adjust grid density based on zoom
 };
 
 const HighPerformanceGrid: React.FC<HighPerformanceGridProps> = ({
-  virtualSize = 10000,
   gridSize = 25,
   viewport,
-  adaptive = true,
 }) => {
   const gridShape = useMemo(() => {
     return (
       <Shape
         sceneFunc={(context, shape) => {
+          // 1. DON'T DRAW IF NO VIEWPORT
           if (!viewport) return;
 
           const { x, y, width, height, scale } = viewport;
 
-          // Adaptive grid density based on zoom level
+          // 2. ADAPTIVE GRID: Make grid lines larger when zoomed out
           let effectiveGridSize = gridSize;
-          if (adaptive) {
-            // When zoomed in (scale > 1), use larger grid spacing for less clutter
-            if (scale > 2) effectiveGridSize = gridSize * 4;
-            else if (scale > 1.5) effectiveGridSize = gridSize * 2;
-            // When zoomed out (scale < 1), use smaller grid spacing for more reference points
-            else if (scale < 0.5) effectiveGridSize = gridSize / 4;
-            else if (scale < 0.8) effectiveGridSize = gridSize / 2;
-          }
+          if (scale < 0.8) effectiveGridSize = gridSize * 2;
+          if (scale < 0.4) effectiveGridSize = gridSize * 4;
+          if (scale < 0.2) effectiveGridSize = gridSize * 8;
 
-          // Calculate visible bounds with minimal padding
-          const padding = effectiveGridSize * 2;
-          const minX = x - padding;
-          const maxX = x + width + padding;
-          const minY = y - padding;
-          const maxY = y + height + padding;
+          // 3. CALCULATE the VISIBLE RECTANGLE (what the user can see)
+          const visibleLeft = x;
+          const visibleRight = x + width;
+          const visibleTop = y;
+          const visibleBottom = y + height;
 
-          // Snap to grid boundaries
-          const startX =
-            Math.floor(minX / effectiveGridSize) * effectiveGridSize;
-          const endX = Math.ceil(maxX / effectiveGridSize) * effectiveGridSize;
-          const startY =
-            Math.floor(minY / effectiveGridSize) * effectiveGridSize;
-          const endY = Math.ceil(maxY / effectiveGridSize) * effectiveGridSize;
+          // 4. Find the first grid line inside/just outside the visible area
+          const startX = Math.floor(visibleLeft / effectiveGridSize) * effectiveGridSize;
+          const startY = Math.floor(visibleTop / effectiveGridSize) * effectiveGridSize;
 
-          // Limit max number of lines for extreme performance
-          const maxLines = 100;
-          const xLines = Math.min(
-            maxLines,
-            (endX - startX) / effectiveGridSize
-          );
-          const yLines = Math.min(
-            maxLines,
-            (endY - startY) / effectiveGridSize
-          );
+          // 5. HARD LIMIT: Calculate how many lines we NEED to draw to cover the screen
+          const neededXLines = Math.ceil(width / effectiveGridSize) + 2; // +2 for padding
+          const neededYLines = Math.ceil(height / effectiveGridSize) + 2;
 
-          if (xLines <= 0 || yLines <= 0) return;
+          // 6. HARD LIMIT: Set an ABSOLUTE MAXIMUM number of lines to draw
+          const maxLines = 150; // <- This is the magic number! Prevents thousands of lines.
+          const totalLinesToDrawX = Math.min(neededXLines, maxLines);
+          const totalLinesToDrawY = Math.min(neededYLines, maxLines);
 
-          // Set line style with opacity based on zoom
-          const opacity = Math.max(0.3, Math.min(1, scale));
-          context.strokeStyle = `rgba(229, 231, 235, ${opacity})`;
-          context.lineWidth = Math.max(0.5, 1.3 / scale);
-
-          // Use dashed lines when zoomed out, solid lines when zoomed in
-          if (scale < 1) {
-            context.setLineDash([2 / scale, 2 / scale]);
-          } else {
-            context.setLineDash([]);
-          }
+          // If we hit the limit, don't draw a grid. It's better to have no grid than a laggy app.
+          if (totalLinesToDrawX <= 0 || totalLinesToDrawY <= 0) return;
 
           context.beginPath();
+          context.strokeStyle = `rgba(180, 180, 180, ${0.2 + 0.4 * Math.min(1, scale)})`; // Lighter, more transparent lines
+          context.lineWidth = 1 / scale; // Thinner lines when zoomed out
 
+          // 7. ONLY DRAW THE LINES WE ABSOLUTELY NEED
           // Draw vertical lines
-          const xStep = (endX - startX) / xLines;
-          for (let i = 0; i <= xLines; i++) {
-            const gridX = startX + i * xStep;
-            context.moveTo(gridX, startY);
-            context.lineTo(gridX, endY);
+          for (let i = 0; i < totalLinesToDrawX; i++) {
+            const lineX = startX + i * effectiveGridSize;
+            // Check if the line is even visible before drawing it
+            if (lineX > visibleRight) break; // Stop if we're past the visible area
+            context.moveTo(lineX, visibleTop);
+            context.lineTo(lineX, visibleBottom);
           }
 
           // Draw horizontal lines
-          const yStep = (endY - startY) / yLines;
-          for (let i = 0; i <= yLines; i++) {
-            const gridY = startY + i * yStep;
-            context.moveTo(startX, gridY);
-            context.lineTo(endX, gridY);
+          for (let i = 0; i < totalLinesToDrawY; i++) {
+            const lineY = startY + i * effectiveGridSize;
+            if (lineY > visibleBottom) break;
+            context.moveTo(visibleLeft, lineY);
+            context.lineTo(visibleRight, lineY);
           }
 
           context.stroke();
+          context.setLineDash([]); // Ensure solid lines
         }}
-        perfectDrawEnabled={false}
-        listening={false}
-        hitStrokeWidth={0}
+        perfectDrawEnabled={false} // Good for performance
+        listening={false} // Cannot be clicked/dragged
       />
     );
-  }, [viewport, gridSize, adaptive]);
-
-  if (!viewport) return null;
+  }, [viewport, gridSize]); // Only re-calculate when viewport or gridSize changes
 
   return (
     <Layer listening={false} perfectDrawEnabled={false}>

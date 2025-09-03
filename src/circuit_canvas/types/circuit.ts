@@ -14,6 +14,8 @@ export type CircuitElement = {
     ratio?: number; // for potentiometers, the ratio of resistance
     mode?: "voltage" | "current"; // for multimeters, can be voltage or current mode
     distance?: number; // cm
+    temperature?: number; 
+    brightness?: number;
   };
   computed?: {
     current?: number; // computed current through the element
@@ -23,6 +25,10 @@ export type CircuitElement = {
   };
   controller?: {
     [key: string]: unknown;
+    leds?: boolean[][];
+    pins?: Record<string, { digital?: number }>;
+    temperature?: number;
+    brightness?: number;
   };
   wires?: Wire[];
 };
@@ -72,6 +78,8 @@ export type CircuitElementProps = {
     resistance?: number;
     voltage?: number;
     ratio?: number;
+    temperature?: number;
+    brightness?: number;
   };
 };
 
@@ -98,3 +106,22 @@ export type PropertiesPanelProps = {
   setOpenCodeEditor: (open: boolean) => void;
   wireColor?: string;
 };
+
+// Microbit-specific types
+export interface MicrobitProps {
+  id: string;
+  x: number;
+  y: number;
+  selected?: boolean;
+  onControllerInput?: (input: "A" | "B") => void;
+  leds: boolean[][];
+  pins: Record<string, { digital?: number }>;
+  isSimulationOn?: boolean;
+}
+
+export interface BaseElementProps {
+  id: string;
+  x: number;
+  y: number;
+  selected?: boolean;
+}

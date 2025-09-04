@@ -115,6 +115,9 @@ export default function CircuitCanvas() {
     {}
   );
   const [loadingSavedCircuit, setLoadingSavedCircuit] = useState(false);
+  const [stopDisabled, setStopDisabled] = useState(false);
+  const [stopTimeout, setStopTimeout] = useState(0);
+  const [maxStopTimeout, setMaxStopTimeout] = useState(0);
 
   useEffect(() => {
     elementsRef.current = elements;
@@ -246,9 +249,24 @@ export default function CircuitCanvas() {
   }
 
   function startSimulation() {
-    debugger;
     setSimulationRunning(true);
     computeCircuit(wires);
+
+    const timeoutDuration = 3000;
+    setMaxStopTimeout(timeoutDuration);
+    setStopTimeout(timeoutDuration);
+    setStopDisabled(true);
+
+    const interval = setInterval(() => {
+      setStopTimeout((prev) => {
+        if (prev <= 0) {
+          clearInterval(interval);
+          setStopDisabled(false);
+          return 0;
+        }
+        return prev - 50;
+      });
+    }, 50);
 
     // Run user code for all controllers
     elements.forEach((el) => {
@@ -984,26 +1002,44 @@ export default function CircuitCanvas() {
           </div>
 
           <div className="flex flex-row items-center gap-2">
-            <button
-              className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${
-                simulationRunning ? "bg-red-300" : "bg-emerald-300"
-              } flex items-center space-x-2 hover:shadow-emerald-600 hover:scale-105`}
-              onClick={() =>
-                simulationRunning ? stopSimulation() : startSimulation()
-              }
-            >
-              {simulationRunning ? (
-                <>
-                  <FaStop />
-                  <span>Stop Simulation</span>
-                </>
-              ) : (
-                <>
-                  <FaPlay />
-                  <span>Start Simulation</span>
-                </>
+            <div className="relative">
+              <button
+                className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${
+                  simulationRunning
+                    ? "bg-red-300 hover:shadow-red-600"
+                    : "bg-emerald-300 hover:shadow-emerald-600"
+                } flex items-center space-x-2 hover:scale-105 ${
+                  stopDisabled ? "opacity-50 cursor-not-allowed" : ""
+                } relative z-10`}
+                onClick={() =>
+                  simulationRunning ? stopSimulation() : startSimulation()
+                }
+                disabled={stopDisabled && simulationRunning}
+              >
+                {simulationRunning ? (
+                  <>
+                    <FaStop />
+                    <span>Stop Simulation</span>
+                  </>
+                ) : (
+                  <>
+                    <FaPlay />
+                    <span>Start Simulation</span>
+                  </>
+                )}
+              </button>
+
+              {/* Progress bar overlay */}
+              {simulationRunning && stopDisabled && (
+                <div
+                  className="absolute top-0 left-0 h-full bg-red-400 opacity-50 rounded-sm transition-all duration-50 z-0"
+                  style={{
+                    width: `${(stopTimeout / maxStopTimeout) * 100}%`,
+                    transition: "width 50ms linear",
+                  }}
+                />
               )}
-            </button>
+            </div>
 
             <button
               onClick={() => setOpenCodeEditor((prev) => !prev)}

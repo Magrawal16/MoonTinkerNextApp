@@ -1,6 +1,6 @@
 "use client";
 import Editor from "@monaco-editor/react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface StandaloneEditorProps {
   code: string;
@@ -9,6 +9,65 @@ interface StandaloneEditorProps {
 
 export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
   const [fontSize, setFontSize] = useState(14);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const editorRef = useRef<any>(null);
+
+  const handleEditorDidMount = (editor: any) => {
+    editorRef.current = editor;
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+
+    const codeSnippet = e.dataTransfer.getData("text/plain");
+    if (codeSnippet && editorRef.current) {
+      const editor = editorRef.current;
+      const position = editor.getPosition();
+      
+      if (position) {
+        // Insert the code at the current cursor position
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: position.column,
+          endColumn: position.column,
+        };
+
+        const operation = {
+          range: range,
+          text: codeSnippet + "\n",
+          forceMoveMarkers: true,
+        };
+
+        editor.executeEdits("drag-drop", [operation]);
+        
+        // Update the external state
+        const newValue = editor.getValue();
+        onChange(newValue);
+
+        // Focus the editor and position cursor after inserted text
+        editor.focus();
+        const lines = codeSnippet.split('\n');
+        const newPosition = {
+          lineNumber: position.lineNumber + lines.length - 1,
+          column: lines[lines.length - 1].length + 1,
+        };
+        editor.setPosition(newPosition);
+      }
+    }
+  };
 
   return (
     <div
@@ -17,12 +76,26 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
         flex flex-col rounded-xl overflow-hidden shadow-2xl border border-white/20
         monaco-transparent
         bg-gradient-to-br from-slate-900/80 via-blue-950/70 to-slate-700/70
-        backdrop-blur-2xl m-1 mt-0.5
+        backdrop-blur-2xl m-1 mt-0.5 ${isDragOver ? 'ring-2 ring-indigo-400 ring-opacity-60' : ''}
       `}
       style={{
         boxShadow: "0 8px 40px rgba(0, 41, 100, 0.28)",
       }}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
+      {isDragOver && (
+        <div className="absolute inset-0 bg-indigo-500 bg-opacity-10 backdrop-blur-sm z-10 flex items-center justify-center">
+          <div className="bg-indigo-600 text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2">
+            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z" />
+            </svg>
+            Drop code snippet here
+          </div>
+        </div>
+      )}
+      
       {/* Toolbar */}
       <div
         className="
@@ -60,6 +133,7 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
           language="python"
           value={code}
           onChange={(val) => onChange(val ?? "")}
+          onMount={handleEditorDidMount}
           theme="vs-dark"
           options={{
             minimap: { enabled: false },

@@ -8,6 +8,16 @@ interface CodeSnippet {
   description: string;
   code: string;
   category: string;
+  parameters?: Parameter[];
+}
+
+interface Parameter {
+  id: string;
+  name: string;
+  type: 'dropdown' | 'number' | 'text';
+  options?: string[];
+  defaultValue: string;
+  placeholder: string;
 }
 
 interface CommandPaletteProps {
@@ -22,29 +32,100 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "led_plot",
     name: "LED Plot",
     description: "Turn on LED at position",
-    code: "led.plot(0, 0)",
-    category: "Display"
+    code: "led.plot({x}, {y})",
+    category: "Display",
+    parameters: [
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "X"
+      },
+      {
+        id: "y", 
+        name: "Y coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "Y"
+      }
+    ]
   },
   {
     id: "led_unplot", 
     name: "LED Unplot",
     description: "Turn off LED at position",
-    code: "led.unplot(0, 0)",
-    category: "Display"
+    code: "led.unplot({x}, {y})",
+    category: "Display",
+    parameters: [
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "X"
+      },
+      {
+        id: "y",
+        name: "Y coordinate", 
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "Y"
+      }
+    ]
   },
   {
     id: "show_string",
     name: "Show String",
     description: "Display scrolling text",
-    code: 'basic.show_string("Hello")',
-    category: "Display"
+    code: 'basic.show_string("{text}")',
+    category: "Display",
+    parameters: [
+      {
+        id: "text",
+        name: "Text to display",
+        type: "text",
+        defaultValue: "Hello",
+        placeholder: "Enter text"
+      }
+    ]
   },
   {
     id: "show_number",
     name: "Show Number", 
     description: "Display a number",
-    code: "basic.show_number(42)",
-    category: "Display"
+    code: "basic.show_number({number})",
+    category: "Display",
+    parameters: [
+      {
+        id: "number",
+        name: "Number to display",
+        type: "number",
+        defaultValue: "42",
+        placeholder: "Enter number"
+      }
+    ]
+  },
+  {
+    id: "show_image",
+    name: "Show Image",
+    description: "Display built-in image",
+    code: "display.show(Image.{image})",
+    category: "Display",
+    parameters: [
+      {
+        id: "image",
+        name: "Image",
+        type: "dropdown",
+        options: ["HEART", "HEART_SMALL", "HAPPY", "SMILE", "SAD", "CONFUSED", "ANGRY", "ASLEEP", "SURPRISED", "SILLY", "FABULOUS", "MEH"],
+        defaultValue: "HEART",
+        placeholder: "Select image"
+      }
+    ]
   },
   {
     id: "clear_screen",
@@ -59,29 +140,84 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "digital_write",
     name: "Digital Write",
     description: "Set pin to HIGH or LOW",
-    code: "pins.digital_write_pin(DigitalPin.P0, 1)",
-    category: "Pins"
+    code: "pins.digital_write_pin(DigitalPin.{pin}, {value})",
+    category: "Pins",
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin"
+      },
+      {
+        id: "value",
+        name: "Value",
+        type: "dropdown", 
+        options: ["0", "1"],
+        defaultValue: "1",
+        placeholder: "Value"
+      }
+    ]
   },
   {
     id: "digital_read",
     name: "Digital Read", 
     description: "Read digital value from pin",
-    code: "pins.digital_read_pin(DigitalPin.P0)",
-    category: "Pins"
+    code: "pins.digital_read_pin(DigitalPin.{pin})",
+    category: "Pins",
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin"
+      }
+    ]
   },
   {
     id: "analog_write",
     name: "Analog Write",
     description: "Write analog value to pin",
-    code: "pins.analog_write_pin(AnalogPin.P0, 512)",
-    category: "Pins"
+    code: "pins.analog_write_pin(AnalogPin.{pin}, {value})",
+    category: "Pins",
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin"
+      },
+      {
+        id: "value",
+        name: "Value (0-1023)",
+        type: "number",
+        defaultValue: "512",
+        placeholder: "0-1023"
+      }
+    ]
   },
   {
     id: "analog_read",
     name: "Analog Read",
     description: "Read analog value from pin", 
-    code: "pins.analog_read_pin(AnalogPin.P0)",
-    category: "Pins"
+    code: "pins.analog_read_pin(AnalogPin.{pin})",
+    category: "Pins",
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin"
+      }
+    ]
   },
 
   // Buttons Section  
@@ -90,30 +226,86 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     name: "Button A Handler",
     description: "Function for button A press",
     code: `def on_button_a_pressed():
-    led.plot(1, 1)`,
-    category: "Buttons"
+    led.plot({x}, {y})`,
+    category: "Buttons",
+    parameters: [
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "1",
+        placeholder: "X"
+      },
+      {
+        id: "y",
+        name: "Y coordinate",
+        type: "dropdown", 
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "1",
+        placeholder: "Y"
+      }
+    ]
   },
   {
     id: "button_b_handler", 
     name: "Button B Handler",
     description: "Function for button B press",
     code: `def on_button_b_pressed():
-    led.plot(0, 0)`,
-    category: "Buttons"
+    led.plot({x}, {y})`,
+    category: "Buttons",
+    parameters: [
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "X"
+      },
+      {
+        id: "y",
+        name: "Y coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "Y"
+      }
+    ]
   },
   {
     id: "button_a_listener",
     name: "Button A Listener",
     description: "Listen for button A press",
-    code: "input.on_button_pressed(Button.A, on_button_a_pressed)",
-    category: "Buttons"
+    code: "input.on_button_pressed(Button.{button}, on_button_a_pressed)",
+    category: "Buttons",
+    parameters: [
+      {
+        id: "button",
+        name: "Button",
+        type: "dropdown",
+        options: ["A", "B", "AB"],
+        defaultValue: "A",
+        placeholder: "Button"
+      }
+    ]
   },
   {
     id: "button_b_listener",
     name: "Button B Listener", 
     description: "Listen for button B press",
-    code: "input.on_button_pressed(Button.B, on_button_b_pressed)",
-    category: "Buttons"
+    code: "input.on_button_pressed(Button.{button}, on_button_b_pressed)",
+    category: "Buttons",
+    parameters: [
+      {
+        id: "button",
+        name: "Button",
+        type: "dropdown",
+        options: ["A", "B", "AB"],
+        defaultValue: "B",
+        placeholder: "Button"
+      }
+    ]
   },
   {
     id: "button_ab_listener",
@@ -144,10 +336,19 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "for_range",
     name: "For Range Loop",
     description: "Loop with range",
-    code: `for i in range(10):
+    code: `for i in range({count}):
     # Your code here
     pass`,
-    category: "Loops"
+    category: "Loops",
+    parameters: [
+      {
+        id: "count",
+        name: "Loop count",
+        type: "number",
+        defaultValue: "10",
+        placeholder: "Enter count"
+      }
+    ]
   },
 
   // Timing Section
@@ -155,15 +356,33 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "pause",
     name: "Pause",
     description: "Pause execution in milliseconds", 
-    code: "basic.pause(1000)",
-    category: "Timing"
+    code: "basic.pause({ms})",
+    category: "Timing",
+    parameters: [
+      {
+        id: "ms",
+        name: "Milliseconds",
+        type: "number",
+        defaultValue: "1000",
+        placeholder: "Enter ms"
+      }
+    ]
   },
   {
     id: "sleep_ms",
     name: "Sleep (ms)",
     description: "Sleep for milliseconds",
-    code: "sleep(1000)",
-    category: "Timing"
+    code: "sleep({ms})",
+    category: "Timing",
+    parameters: [
+      {
+        id: "ms",
+        name: "Milliseconds",
+        type: "number",
+        defaultValue: "1000",
+        placeholder: "Enter ms"
+      }
+    ]
   },
   {
     id: "ticks_ms",
@@ -205,6 +424,7 @@ export default function CommandPalette({
   onCodeInsert,
 }: CommandPaletteProps) {
   const [currentView, setCurrentView] = useState<string | null>(null); // null = main view, string = category view
+  const [parameterValues, setParameterValues] = useState<Record<string, Record<string, string>>>({});
   
   const navigateToCategory = (category: string) => {
     setCurrentView(category);
@@ -221,9 +441,51 @@ export default function CommandPalette({
     }
   }, [showCodePalette]);
 
+  // Initialize parameter values for snippets
+  React.useEffect(() => {
+    const initialValues: Record<string, Record<string, string>> = {};
+    CODE_SNIPPETS.forEach(snippet => {
+      if (snippet.parameters) {
+        initialValues[snippet.id] = {};
+        snippet.parameters.forEach(param => {
+          initialValues[snippet.id][param.id] = param.defaultValue;
+        });
+      }
+    });
+    setParameterValues(initialValues);
+  }, []);
+
+  const updateParameterValue = (snippetId: string, parameterId: string, value: string) => {
+    setParameterValues(prev => ({
+      ...prev,
+      [snippetId]: {
+        ...prev[snippetId],
+        [parameterId]: value
+      }
+    }));
+  };
+
+  const generateCode = (snippet: CodeSnippet): string => {
+    if (!snippet.parameters) {
+      return snippet.code;
+    }
+
+    let code = snippet.code;
+    snippet.parameters.forEach(param => {
+      const value = parameterValues[snippet.id]?.[param.id] || param.defaultValue;
+      code = code.replace(new RegExp(`\\{${param.id}\\}`, 'g'), value);
+    });
+    
+    return code;
+  };
+
   const handleDragStart = (e: React.DragEvent, snippet: CodeSnippet) => {
-    e.dataTransfer.setData("text/plain", snippet.code);
-    e.dataTransfer.setData("application/code-snippet", JSON.stringify(snippet));
+    const actualCode = generateCode(snippet);
+    e.dataTransfer.setData("text/plain", actualCode);
+    e.dataTransfer.setData("application/code-snippet", JSON.stringify({
+      ...snippet,
+      code: actualCode
+    }));
     e.dataTransfer.effectAllowed = "copy";
   };
 
@@ -268,35 +530,18 @@ export default function CommandPalette({
   return (
     <div
       className={`absolute left-0 top-0 bottom-0 z-40 transition-all duration-300 overflow-visible ${
-        showCodePalette ? "w-80" : "w-10"
+        showCodePalette ? "w-80" : "w-0"
       }`}
       style={{
-        pointerEvents: "auto",
-        background: "rgba(255, 255, 255, 0.95)",
-        backdropFilter: "blur(15px)",
-        WebkitBackdropFilter: "blur(15px)",
-        border: "1px solid rgba(255, 255, 255, 0.3)",
-        boxShadow: "0 8px 32px 0 rgba(31, 38, 135, 0.37)",
-        borderRadius: "15px",
+        pointerEvents: showCodePalette ? "auto" : "none",
+        background: showCodePalette ? "rgba(255, 255, 255, 0.95)" : "transparent",
+        backdropFilter: showCodePalette ? "blur(15px)" : "none",
+        WebkitBackdropFilter: showCodePalette ? "blur(15px)" : "none",
+        border: showCodePalette ? "1px solid rgba(255, 255, 255, 0.3)" : "none",
+        boxShadow: showCodePalette ? "0 8px 32px 0 rgba(31, 38, 135, 0.37)" : "none",
+        borderRadius: showCodePalette ? "15px" : "0px",
       }}
     >
-      {/* Toggle Button */}
-      <button
-        className="absolute right-[-0.5rem] top-1/2 transform -translate-y-1/2 w-8 h-8 bg-indigo-500 hover:bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg transition-colors duration-200 z-50"
-        onClick={() => setShowCodePalette((prev) => !prev)}
-        title={showCodePalette ? "Hide Code Palette" : "Show Code Palette"}
-      >
-        {showCodePalette ? (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        ) : (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        )}
-      </button>
-      
       {showCodePalette && (
         <div className="h-full flex flex-col">
           {/* Header */}
@@ -336,6 +581,9 @@ export default function CommandPalette({
                 onDragStart={handleDragStart}
                 getCategoryIcon={getCategoryIcon}
                 getCategoryColor={getCategoryColor}
+                parameterValues={parameterValues}
+                onParameterChange={updateParameterValue}
+                generateCode={generateCode}
               />
             ) : (
               // Main categories view
@@ -352,7 +600,7 @@ export default function CommandPalette({
           {/* Footer */}
           <div className="p-3 border-t border-gray-200 bg-gray-50">
             <p className="text-xs text-gray-500 text-center">
-              💡 Use drag handle to drop code snippets into editor
+              💡 Drag code snippets into your editor
             </p>
           </div>
         </div>
@@ -430,6 +678,9 @@ interface CategoryViewProps {
   onDragStart: (e: React.DragEvent, snippet: CodeSnippet) => void;
   getCategoryIcon: (category: string) => string;
   getCategoryColor: (category: string) => string;
+  parameterValues: Record<string, Record<string, string>>;
+  onParameterChange: (snippetId: string, parameterId: string, value: string) => void;
+  generateCode: (snippet: CodeSnippet) => string;
 }
 
 function CategoryView({
@@ -438,6 +689,9 @@ function CategoryView({
   onDragStart,
   getCategoryIcon,
   getCategoryColor,
+  parameterValues,
+  onParameterChange,
+  generateCode,
 }: CategoryViewProps) {
   return (
     <div className="space-y-4">
@@ -471,44 +725,70 @@ function CategoryView({
                 <h5 className="font-semibold text-gray-800 text-base mb-2">{snippet.name}</h5>
                 <p className="text-sm text-gray-600 mb-3">{snippet.description}</p>
                 
+                {/* Parameter Controls */}
+                {snippet.parameters && snippet.parameters.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {snippet.parameters.map((param) => (
+                      <div key={param.id} className="flex items-center gap-3">
+                        <label className="text-sm font-medium text-gray-700 min-w-[80px]">
+                          {param.name}:
+                        </label>
+                        {param.type === 'dropdown' ? (
+                          <select
+                            value={parameterValues[snippet.id]?.[param.id] || param.defaultValue}
+                            onChange={(e) => onParameterChange(snippet.id, param.id, e.target.value)}
+                            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white min-w-[120px]"
+                          >
+                            {param.options?.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        ) : param.type === 'number' ? (
+                          <input
+                            type="number"
+                            value={parameterValues[snippet.id]?.[param.id] || param.defaultValue}
+                            onChange={(e) => onParameterChange(snippet.id, param.id, e.target.value)}
+                            placeholder={param.placeholder}
+                            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[120px]"
+                          />
+                        ) : (
+                          <input
+                            type="text"
+                            value={parameterValues[snippet.id]?.[param.id] || param.defaultValue}
+                            onChange={(e) => onParameterChange(snippet.id, param.id, e.target.value)}
+                            placeholder={param.placeholder}
+                            className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[120px]"
+                          />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
                 {/* Code Block with Drag Handle */}
                 <div className="relative group">
-                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 group-hover:border-indigo-300 group-hover:bg-indigo-50/30 transition-all duration-200">
-                    <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto">
-                      {snippet.code}
-                    </pre>
-                  </div>
-                  
-                  {/* Drag Handle */}
-                  <div
+                  <div 
+                    className="relative p-3 bg-teal-50 rounded-lg border border-teal-200 group-hover:border-teal-300 group-hover:bg-teal-100/50 transition-all duration-200 cursor-grab active:cursor-grabbing"
                     draggable
                     onDragStart={(e) => onDragStart(e, snippet)}
-                    onDragEnd={(e) => {
-                      // Reset any visual feedback
-                      e.currentTarget.style.transform = '';
-                    }}
-                    onMouseDown={(e) => {
-                      // Visual feedback on drag start
-                      e.currentTarget.style.transform = 'scale(0.95)';
-                    }}
-                    onMouseUp={(e) => {
-                      // Reset visual feedback
-                      e.currentTarget.style.transform = '';
-                    }}
-                    className="absolute top-3 right-3 w-8 h-8 bg-indigo-500 hover:bg-indigo-600 rounded-lg cursor-grab active:cursor-grabbing flex items-center justify-center text-white opacity-80 hover:opacity-100 transition-all duration-200 shadow-lg hover:shadow-xl"
-                    title="Drag and drop"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h.01M12 10h.01M12 14h.01M12 18h.01M16 6h.01M16 10h.01M16 14h.01M16 18h.01" />
-                    </svg>
-                  </div>
-                  
-                  {/* Drag instruction */}
-                  <div className="mt-2 flex items-center gap-1 text-xs text-gray-500 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h.01M8 10h.01M8 14h.01M8 18h.01M12 6h.01M12 10h.01M12 14h.01M12 18h.01M16 6h.01M16 10h.01M16 14h.01M16 18h.01" />
-                    </svg>
-                    Drag and drop
+                    {/* Drag dots - appears on hover */}
+                    <div className="absolute left-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-50 transition-opacity duration-200">
+                      <svg className="w-2 h-4 text-gray-500" fill="currentColor" viewBox="0 0 8 16">
+                        <circle cx="2" cy="4" r="1"/>
+                        <circle cx="6" cy="4" r="1"/>
+                        <circle cx="2" cy="8" r="1"/>
+                        <circle cx="6" cy="8" r="1"/>
+                        <circle cx="2" cy="12" r="1"/>
+                        <circle cx="6" cy="12" r="1"/>
+                      </svg>
+                    </div>
+                    
+                    <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto pl-6">
+                      {generateCode(snippet)}
+                    </pre>
                   </div>
                 </div>
               </div>

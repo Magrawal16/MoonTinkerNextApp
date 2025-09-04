@@ -451,6 +451,7 @@ export default function CircuitCanvas() {
         },
       }),
     disableShortcut: openCodeEditor,
+    disabledSimulationOnnOff: stopDisabled,
   });
 
   function handleStageMouseMove(e: KonvaEventObject<PointerEvent>) {

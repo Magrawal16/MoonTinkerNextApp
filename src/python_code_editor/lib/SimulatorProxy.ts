@@ -93,7 +93,7 @@ export class SimulatorProxy {
     await this.initialize();
   }
 
-  async simulateInput(event: "A" | "B") {
+  async simulateInput(event: "A" | "B" | "AB") {
     if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
     return this.simulatorRemoteInstance.simulateInput(event);
   }

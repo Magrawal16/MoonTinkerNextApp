@@ -363,6 +363,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
           options: [
             ["A", "A"],
             ["B", "B"],
+            ["AB", "AB"],
           ],
         },
       ],

@@ -1342,7 +1342,7 @@ export default function CircuitCanvas() {
                     // @ts-ignore
                     onControllerInput={(elementId, input) => {
                       const sim = controllerMap[elementId];
-                      if (sim && (input === "A" || input === "B")) {
+                      if (sim && (input === "A" || input === "B" || input === "AB")) {
                         sim.simulateInput(input);
                       }
                     }}

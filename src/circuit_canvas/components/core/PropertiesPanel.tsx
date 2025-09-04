@@ -22,6 +22,8 @@ export default function PropertiesPanel({
   const [resistance, setResistance] = useState<number | null>(null);
   const [voltage, setVoltage] = useState<number | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
+  const [temperature, setTemperature] = useState<number | null>(null);
+  const [brightness, setBrightness] = useState<number | null>(null);
   const [selectedWireColor, setSelectedWireColor] = useState<string>(
     wireColor || defaultColors[0].hex
   );
@@ -31,6 +33,8 @@ export default function PropertiesPanel({
     setResistance(selectedElement?.properties?.resistance ?? null);
     setVoltage(selectedElement?.properties?.voltage ?? null);
     setRatio(selectedElement?.properties?.ratio ?? null);
+    setTemperature(selectedElement?.properties?.temperature ?? null);
+    setBrightness(selectedElement?.properties?.brightness ?? null);
     setSelectedWireColor(wireColor || defaultColors[0].hex);
   }, [selectedElement]);
 
@@ -51,6 +55,8 @@ export default function PropertiesPanel({
           resistance: resistance ?? undefined,
           voltage: voltage ?? undefined,
           ratio: ratio ?? undefined,
+          temperature: temperature ?? undefined,
+          brightness: brightness ?? undefined,
         },
       };
       onElementEdit(updatedElement, false);
@@ -136,6 +142,45 @@ export default function PropertiesPanel({
             Eff. Resistance: {(ratio * (resistance ?? 0)).toFixed(2)} Ω
           </span>
         </div>
+      )}
+
+      {/* Microbit-specific controls */}
+      {selectedElement.type === "microbit" && (
+        <>
+          {temperature != null && (
+            <div className="flex flex-col text-xs">
+              <label>Temperature (°C):</label>
+              <input
+                type="range"
+                min="0"
+                max="50"
+                value={temperature}
+                onChange={(e) => setTemperature(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                {temperature}°C
+              </div>
+            </div>
+          )}
+
+          {brightness != null && (
+            <div className="flex flex-col text-xs">
+              <label>Brightness (0–255):</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                value={brightness}
+                onChange={(e) => setBrightness(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                {brightness}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {selectedElement.type === "wire" && (

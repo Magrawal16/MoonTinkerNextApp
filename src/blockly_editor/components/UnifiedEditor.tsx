@@ -17,6 +17,7 @@ import {
 } from "@/blockly_editor/utils/blocklyPythonConvertor";
 import CodeEditor from "@/python_code_editor/components/CodeEditor";
 import { createToolboxXmlFromBlocks } from "../utils/sharedBlockDefinitions";
+import CodePalette from "./CodePalette";
 
 type EditorMode = "block" | "text";
 
@@ -48,6 +49,9 @@ export default function UnifiedEditor({
   const [conversionType, setConversionType] = useState<
     "toBlocks" | "toText" | null
   >(null); // Type of conversion happening
+  
+  // State for blocks palette
+  const [showCodePalette, setShowCodePalette] = useState(false);
 
   // Refs
   const blocklyRef = useRef<HTMLDivElement>(null);
@@ -653,7 +657,13 @@ export default function UnifiedEditor({
   }, [editorMode, workspaceReady]);
 
   return (
-    <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm overflow-hidden relative">
+      {/* Blocks Palette Panel */}
+      <CodePalette
+        showCodePalette={showCodePalette}
+        setShowCodePalette={setShowCodePalette}
+      />
+
       {!activeControllerId ? (
         <div className="flex flex-1 items-center justify-center text-gray-500 text-lg font-medium bg-gray-50">
           Please select a controller.
@@ -661,7 +671,13 @@ export default function UnifiedEditor({
       ) : (
         <>
           {/* Mode Selector Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-100">
+          <div 
+            className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-100"
+            style={{ 
+              marginLeft: showCodePalette ? "288px" : "40px",
+              transition: "margin-left 300ms"
+            }}
+          >
             <span className="text-sm text-gray-700 font-medium">
               Editor Mode
             </span>
@@ -717,7 +733,14 @@ export default function UnifiedEditor({
 
           {/* Validation Error Display */}
           {validationError && (
-            <div className="mx-4 mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div 
+              className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg"
+              style={{ 
+                marginLeft: showCodePalette ? "292px" : "44px",
+                marginRight: "16px",
+                transition: "margin-left 300ms"
+              }}
+            >
               <div className="flex items-start gap-2">
                 <svg
                   className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0"
@@ -763,7 +786,13 @@ export default function UnifiedEditor({
           )}
 
           {/* Editor Content */}
-          <div className="flex-1 overflow-hidden bg-white relative">
+          <div 
+            className="flex-1 overflow-hidden bg-white relative"
+            style={{ 
+              marginLeft: showCodePalette ? "288px" : "40px",
+              transition: "margin-left 300ms"
+            }}
+          >
             {/* Loading Overlay */}
             {isConverting && (
               <div className="absolute inset-0 bg-white bg-opacity-80 backdrop-blur-sm z-50 flex items-center justify-center">

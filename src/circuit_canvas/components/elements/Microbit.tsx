@@ -1,25 +1,21 @@
 "use client";
 
 import {
-  BaseElement,
   BaseElementProps,
+  MicrobitProps,
+} from "@/circuit_canvas/types/circuit";
+import {
+  BaseElement,
 } from "@/circuit_canvas/components/core/BaseElement";
 import { useEffect, useState } from "react";
 import { Group, Image, Rect, Text } from "react-konva";
-
-interface MicrobitProps extends BaseElementProps {
-  onControllerInput?: (input: "A" | "B") => void;
-  leds: boolean[][];
-  pins: Record<string, { digital?: number }>;
-  isSimulationOn?: boolean;
-}
 
 export default function Microbit({
   leds,
   onControllerInput,
   isSimulationOn,
   ...props
-}: MicrobitProps) {
+}: MicrobitProps & BaseElementProps) {
   const [imgMicrobit, setImgMicrobit] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);

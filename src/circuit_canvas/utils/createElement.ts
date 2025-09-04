@@ -265,18 +265,11 @@ export default function createElement(
         fillColor: "red",
       },
     ],
-    connecters: [
-      {
-        id: id + "-usb-connector-1",
-        parentId: id,
-        x: 150,
-        y: 227,
-        state: "off",
-      },
-    ],
     properties: {
       voltage: props.properties?.voltage ?? 3.3,
       resistance: props.properties?.resistance ?? 0,
+      temperature: props.properties?.temperature ?? 25, 
+      brightness: props.properties?.brightness ?? 128, 
       ...props.properties,
     },
   };

@@ -72,14 +72,16 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
   return (
     <div
       className={`ms-3.5
-        w-[940px] max-w-2xl min-w-[200px] h-full  min-h-[260px] max-h-[84vh]
-        flex flex-col rounded-xl overflow-hidden shadow-2xl border border-white/20
+  w-full min-w-[200px] h-full min-h-[260px] max-h-[84vh]
+  flex flex-col rounded-xl shadow-2xl border border-white/20
         monaco-transparent
         bg-gradient-to-br from-slate-900/80 via-blue-950/70 to-slate-700/70
         backdrop-blur-2xl m-1 mt-0.5 ${isDragOver ? 'ring-2 ring-indigo-400 ring-opacity-60' : ''}
       `}
       style={{
-        boxShadow: "0 8px 40px rgba(0, 41, 100, 0.28)",
+  boxShadow: "0 8px 40px rgba(0, 41, 100, 0.28)",
+  // Allow horizontal scrollbar from Monaco to be visible
+  overflow: "hidden", // keep rounded corners for content, Monaco manages its own scrollbars
       }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -146,11 +148,17 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
             fontLigatures: true,
             renderLineHighlight: "all",
             lineDecorationsWidth: 0,
+            wordWrap: "off", // ensure long single lines do not wrap
+            wordWrapColumn: 0,
+            wrappingStrategy: "advanced",
             scrollbar: {
               vertical: "auto",
-              horizontal: "auto",
+              horizontal: "visible", // always show horizontal bar so users discover scrolling
               useShadows: false,
+              horizontalScrollbarSize: 14,
+              verticalScrollbarSize: 12,
             },
+            scrollBeyondLastColumn: 5,
           }}
           height="100%"
           width="100%"

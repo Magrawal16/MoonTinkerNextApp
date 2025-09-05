@@ -206,7 +206,7 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "analog_read",
     name: "Analog Read",
     description: "Read analog value from pin", 
-    code: "pins.analog_read_pin(AnalogPin.{pin})",
+    code: "pins.read_analog_pin(AnalogPin.{pin})",
     category: "Pins",
     parameters: [
       {
@@ -222,62 +222,10 @@ const CODE_SNIPPETS: CodeSnippet[] = [
 
   // Buttons Section  
   {
-    id: "button_a_handler",
-    name: "Button A Handler",
-    description: "Function for button A press",
-    code: `def on_button_a_pressed():
-    led.plot({x}, {y})`,
-    category: "Buttons",
-    parameters: [
-      {
-        id: "x",
-        name: "X coordinate",
-        type: "dropdown",
-        options: ["0", "1", "2", "3", "4"],
-        defaultValue: "1",
-        placeholder: "X"
-      },
-      {
-        id: "y",
-        name: "Y coordinate",
-        type: "dropdown", 
-        options: ["0", "1", "2", "3", "4"],
-        defaultValue: "1",
-        placeholder: "Y"
-      }
-    ]
-  },
-  {
-    id: "button_b_handler", 
-    name: "Button B Handler",
-    description: "Function for button B press",
-    code: `def on_button_b_pressed():
-    led.plot({x}, {y})`,
-    category: "Buttons",
-    parameters: [
-      {
-        id: "x",
-        name: "X coordinate",
-        type: "dropdown",
-        options: ["0", "1", "2", "3", "4"],
-        defaultValue: "0",
-        placeholder: "X"
-      },
-      {
-        id: "y",
-        name: "Y coordinate",
-        type: "dropdown",
-        options: ["0", "1", "2", "3", "4"],
-        defaultValue: "0",
-        placeholder: "Y"
-      }
-    ]
-  },
-  {
-    id: "button_a_listener",
-    name: "Button A Listener",
-    description: "Listen for button A press",
-    code: "input.on_button_pressed(Button.{button}, on_button_a_pressed)",
+    id: "button_handler",
+    name: "Button Handler",
+    description: "Function for button press",
+    code: `def on_button_{button_lower}_pressed():`,
     category: "Buttons",
     parameters: [
       {
@@ -291,10 +239,10 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     ]
   },
   {
-    id: "button_b_listener",
-    name: "Button B Listener", 
-    description: "Listen for button B press",
-    code: "input.on_button_pressed(Button.{button}, on_button_b_pressed)",
+    id: "button_listener",
+    name: "Button Listener",
+    description: "Listen for button press",
+    code: "input.on_button_pressed(Button.{button}, on_button_{button_lower}_pressed)",
     category: "Buttons",
     parameters: [
       {
@@ -302,17 +250,10 @@ const CODE_SNIPPETS: CodeSnippet[] = [
         name: "Button",
         type: "dropdown",
         options: ["A", "B", "AB"],
-        defaultValue: "B",
+        defaultValue: "A",
         placeholder: "Button"
       }
     ]
-  },
-  {
-    id: "button_ab_listener",
-    name: "Button A+B Listener",
-    description: "Listen for both buttons pressed",
-    code: "input.on_button_pressed(Button.AB, on_button_ab_pressed)",
-    category: "Buttons"
   },
 
   // Loops Section
@@ -328,8 +269,7 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     name: "While True Loop",
     description: "Infinite loop structure",
     code: `while True:
-    # Your code here
-    pass`,
+    # Your code here`,
     category: "Loops"
   },
   {
@@ -337,8 +277,7 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     name: "For Range Loop",
     description: "Loop with range",
     code: `for i in range({count}):
-    # Your code here
-    pass`,
+    # Your code here`,
     category: "Loops",
     parameters: [
       {
@@ -418,26 +357,60 @@ const CODE_SNIPPETS: CodeSnippet[] = [
 
 const CATEGORIES = ["Display", "Pins", "Buttons", "Loops", "Timing", "Imports"];
 
-export default function CommandPalette({
+export default function PythonCodePalette({
   showCodePalette,
   setShowCodePalette,
   onCodeInsert,
 }: CommandPaletteProps) {
   const [currentView, setCurrentView] = useState<string | null>(null); // null = main view, string = category view
   const [parameterValues, setParameterValues] = useState<Record<string, Record<string, string>>>({});
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward'>('forward');
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   
   const navigateToCategory = (category: string) => {
-    setCurrentView(category);
+    setIsAnimating(true);
+    setAnimationDirection('forward');
+    
+    setTimeout(() => {
+      setCurrentView(category);
+      // Reset scroll position when navigating to category
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+        setIsAnimating(false);
+      }, 50);
+    }, 150);
   };
 
   const navigateBack = () => {
-    setCurrentView(null);
+    setIsAnimating(true);
+    setAnimationDirection('backward');
+    
+    setTimeout(() => {
+      setCurrentView(null);
+      // Reset scroll position when navigating back to main view
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+        setIsAnimating(false);
+      }, 50);
+    }, 150);
   };
 
   // Reset to main view when palette is closed
   React.useEffect(() => {
     if (!showCodePalette) {
       setCurrentView(null);
+    } else {
+      // Reset scroll position when palette is opened
+      setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
+        }
+      }, 0);
     }
   }, [showCodePalette]);
 
@@ -475,6 +448,14 @@ export default function CommandPalette({
       const value = parameterValues[snippet.id]?.[param.id] || param.defaultValue;
       code = code.replace(new RegExp(`\\{${param.id}\\}`, 'g'), value);
     });
+    
+    // Handle special transformations
+    // For button_lower: convert button value to lowercase
+    if (code.includes('{button_lower}')) {
+      const buttonValue = parameterValues[snippet.id]?.['button'] || 'A';
+      const buttonLower = buttonValue.toLowerCase();
+      code = code.replace(new RegExp(`\\{button_lower\\}`, 'g'), buttonLower);
+    }
     
     return code;
   };
@@ -546,55 +527,73 @@ export default function CommandPalette({
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="p-4 border-b border-gray-200">
-            {currentView ? (
-              // Category view header with back button
-              <div className="flex items-center gap-3">
-                <button
-                  onClick={navigateBack}
-                  className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors duration-200 font-medium"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Categories
-                </button>
-              </div>
-            ) : (
-              // Main view header
-              <>
-                <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                  <span className="text-xl">🧩</span>
-                  Code Snippets
-                </h3>
-                <p className="text-sm text-gray-600 mt-1">Drag snippets into your code</p>
-              </>
-            )}
+            <div 
+              className={`transition-all duration-300 ease-in-out ${
+                isAnimating ? 'opacity-50' : 'opacity-100'
+              }`}
+            >
+              {currentView ? (
+                // Category view header with back button
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={navigateBack}
+                    disabled={isAnimating}
+                    className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors duration-200 font-medium disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Categories
+                  </button>
+                </div>
+              ) : (
+                // Main view header
+                <>
+                  <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                    <span className="text-xl">🧩</span>
+                    Code Snippets
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">Drag snippets into your code</p>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Scrollable Content */}
-          <div className="flex-1 overflow-y-auto p-2">
-            {currentView ? (
-              // Category-specific view
-              <CategoryView 
-                category={currentView}
-                snippets={CODE_SNIPPETS.filter(snippet => snippet.category === currentView)}
-                onDragStart={handleDragStart}
-                getCategoryIcon={getCategoryIcon}
-                getCategoryColor={getCategoryColor}
-                parameterValues={parameterValues}
-                onParameterChange={updateParameterValue}
-                generateCode={generateCode}
-              />
-            ) : (
-              // Main categories view
-              <CategoriesListView 
-                categories={CATEGORIES}
-                snippets={CODE_SNIPPETS}
-                onCategoryClick={navigateToCategory}
-                getCategoryIcon={getCategoryIcon}
-                getCategoryColor={getCategoryColor}
-              />
-            )}
+          <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-2">
+            <div 
+              className={`transition-all duration-300 ease-in-out ${
+                isAnimating 
+                  ? animationDirection === 'forward' 
+                    ? 'transform translate-x-full opacity-0 scale-95' 
+                    : 'transform -translate-x-full opacity-0 scale-95'
+                  : 'transform translate-x-0 opacity-100 scale-100'
+              }`}
+            >
+              {currentView ? (
+                // Category-specific view
+                <CategoryView 
+                  category={currentView}
+                  snippets={CODE_SNIPPETS.filter(snippet => snippet.category === currentView)}
+                  onDragStart={handleDragStart}
+                  getCategoryIcon={getCategoryIcon}
+                  getCategoryColor={getCategoryColor}
+                  parameterValues={parameterValues}
+                  onParameterChange={updateParameterValue}
+                  generateCode={generateCode}
+                />
+              ) : (
+                // Main categories view
+                <CategoriesListView 
+                  categories={CATEGORIES}
+                  snippets={CODE_SNIPPETS}
+                  onCategoryClick={navigateToCategory}
+                  getCategoryIcon={getCategoryIcon}
+                  getCategoryColor={getCategoryColor}
+                  isAnimating={isAnimating}
+                />
+              )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -616,6 +615,7 @@ interface CategoriesListViewProps {
   onCategoryClick: (category: string) => void;
   getCategoryIcon: (category: string) => string;
   getCategoryColor: (category: string) => string;
+  isAnimating?: boolean;
 }
 
 function CategoriesListView({
@@ -624,6 +624,7 @@ function CategoriesListView({
   onCategoryClick,
   getCategoryIcon,
   getCategoryColor,
+  isAnimating,
 }: CategoriesListViewProps) {
   return (
     <div className="space-y-3">
@@ -638,7 +639,8 @@ function CategoriesListView({
           <button
             key={category}
             onClick={() => onCategoryClick(category)}
-            className="w-full flex items-center justify-between p-5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group border border-gray-100 hover:border-gray-200 hover:shadow-lg text-left"
+            disabled={isAnimating}
+            className="w-full flex items-center justify-between p-5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group border border-gray-100 hover:border-gray-200 hover:shadow-lg text-left disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <div className="flex items-center gap-4">
               <div className={`w-14 h-14 rounded-2xl ${getCategoryColor(category)} flex items-center justify-center text-white text-xl font-semibold shadow-lg`}>

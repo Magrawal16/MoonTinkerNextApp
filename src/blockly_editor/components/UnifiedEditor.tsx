@@ -18,7 +18,7 @@ import {
 } from "@/blockly_editor/utils/blocklyPythonConvertor";
 import CodeEditor from "@/python_code_editor/components/CodeEditor";
 import { createToolboxXmlFromBlocks } from "../utils/sharedBlockDefinitions";
-import CodePalette from "./CodePalette";
+import PythonCodePalette from "./PythonCodeBlockSnippetPalette";
 
 type EditorMode = "block" | "text";
 
@@ -53,6 +53,13 @@ export default function UnifiedEditor({
   
   // State for blocks palette
   const [showCodePalette, setShowCodePalette] = useState(false);
+
+  // Hide code palette when no controller is selected
+  useEffect(() => {
+    if (!activeControllerId) {
+      setShowCodePalette(false);
+    }
+  }, [activeControllerId]);
 
   // Refs
   const blocklyRef = useRef<HTMLDivElement>(null);
@@ -660,7 +667,7 @@ export default function UnifiedEditor({
   return (
     <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm overflow-hidden relative">
       {/* Blocks Palette Panel */}
-      <CodePalette
+      <PythonCodePalette
         showCodePalette={showCodePalette}
         setShowCodePalette={setShowCodePalette}
       />

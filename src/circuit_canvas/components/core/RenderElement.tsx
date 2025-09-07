@@ -15,16 +15,9 @@ import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 
-// ✅ add simulator to props type
-export default function RenderElement({
-  element,
-  simulator, // ← Make sure this is here
-  elements,
-  wires,
-  ...props
-}: {
+interface RenderElementProps {
   element: CircuitElement;
-  simulator?: any; // ← Make sure this is in the interface
+  simulator?: any;
   onDragMove: (e: KonvaEventObject<DragEvent>) => void;
   handleNodeClick: (nodeId: string) => void;
   handleRatioChange?: (elementId: string, ratio: number) => void;
@@ -35,9 +28,17 @@ export default function RenderElement({
   onDragEnd: (e: KonvaEventObject<DragEvent>) => void;
   onControllerInput: (elementId: string, input: string) => void;
   isSimulationOn?: boolean;
-  elements?: CircuitElement[]; // Add this type
+  elements?: CircuitElement[];
   wires?: Wire[];
-}) {
+}
+
+export default function RenderElement({
+  element,
+  simulator,
+  elements,
+  wires,
+  ...props
+}: RenderElementProps) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const center = getElementCenter(element);
 
@@ -45,7 +46,6 @@ export default function RenderElement({
   const connectedMicrobitData = element.type === "ultrasonicsensor4p" && elements && wires
     ? findConnectedMicrobit(element, elements, wires)
     : null;
-
 
   return (
     <Group
@@ -58,9 +58,9 @@ export default function RenderElement({
       onDragStart={props.onDragStart}
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
-  id={element.id}
-  // Elements are not draggable while simulation is running
-  draggable={!props.isSimulationOn}
+      id={element.id}
+      // Elements are not draggable while simulation is running
+      draggable={!props.isSimulationOn}
     >
       {/* Render circuit elements */}
       {element.type === "lightbulb" && (
@@ -126,7 +126,7 @@ export default function RenderElement({
           id={element.id}
           x={1}
           y={22}
-          onControllerInput={(input) => {
+          onControllerInput={(input: "A" | "B" | "AB") => {
             props.onControllerInput(element.id, input);
           }}
           leds={

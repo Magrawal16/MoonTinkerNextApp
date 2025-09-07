@@ -20,6 +20,7 @@ type ShortcutArgs = {
   resetState: () => void;
   getNodeParent: (nodeId: string) => CircuitElement | null | undefined;
   undo: () => void;
+  redo: () => void;
   toggleSimulation: () => void;
   updateWiresDirect?: () => void; // Add wire update function
   setActiveControllerId: React.Dispatch<React.SetStateAction<string | null>>;

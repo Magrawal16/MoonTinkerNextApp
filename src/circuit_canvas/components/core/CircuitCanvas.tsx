@@ -128,7 +128,7 @@ export default function CircuitCanvas() {
   );
 
   // Use the history hook
-  const { history, pushToHistory, undo, redo, clearHistory, canUndo, canRedo } =
+  const { history, pushToHistory, initializeHistory, undo, redo, clearHistory, canUndo, canRedo } =
     useCircuitHistory();
 
   // Initialize wire management hook
@@ -182,10 +182,11 @@ export default function CircuitCanvas() {
   }, [updateViewport]);
 
   function resetState() {
-    pushToHistory(elements, wires);
-    setElements([]);
-    resetWireState();
-    clearHistory();
+  // Reset canvas and seed history with an initial empty state
+  setElements([]);
+  resetWireState();
+  clearHistory();
+  initializeHistory([], []);
   }
 
   //changing the element state on element position change
@@ -402,7 +403,6 @@ export default function CircuitCanvas() {
     if (simulationRunning) {
       stopSimulation();
     }
-    pushToHistory(elements, wires);
 
     const elementData = e.dataTransfer.getData("application/element-type");
     if (!elementData) return;
@@ -439,8 +439,20 @@ export default function CircuitCanvas() {
 
     if (!newElement) return;
 
-    // Immediately add to canvas
-    setElements((prev) => [...prev, newElement]);
+    // Immediately add to canvas and record history AFTER the change
+    setElements((prev) => {
+      const next = [...prev, newElement];
+      pushToHistory(next, wires);
+      return next;
+    });
+
+    // Select the newly dropped element (Tinkercad-like behavior)
+    setSelectedElement(newElement);
+    setShowPropertiesPannel(true);
+    setActiveControllerId(null);
+    if (newElement.type === "microbit") {
+      setActiveControllerId(newElement.id);
+    }
 
     if (newElement.type === "microbit") {
       // Init simulator in the background (non-blocking)
@@ -1056,6 +1068,16 @@ export default function CircuitCanvas() {
                       pushToHistory(elements, wires);
                       setDraggingElement(element.id);
                       stageRef.current?.draggable(false);
+                      // Select element on drag start (Tinkercad-like behavior)
+                      if (!creatingWireStartNode) {
+                        const current = getElementById(element.id) || element;
+                        setSelectedElement(current);
+                        setShowPropertiesPannel(true);
+                        setActiveControllerId(null);
+                        if (element.type === "microbit") {
+                          setActiveControllerId(element.id);
+                        }
+                      }
                     }}
                     onDragEnd={(e) => {
                       setDraggingElement(null);
@@ -1063,9 +1085,14 @@ export default function CircuitCanvas() {
                       const id = e.target.id();
                       const x = e.target.x();
                       const y = e.target.y();
-                      setElements((prev) =>
-                        prev.map((el) => (el.id === id ? { ...el, x, y } : el))
-                      );
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
+                          el.id === id ? { ...el, x, y } : el
+                        );
+                        // Push snapshot AFTER move so undo returns to the prior position
+                        pushToHistory(next, wires);
+                        return next;
+                      });
                     }}
                     onSelect={(id) => {
                       if (creatingWireStartNode) return;

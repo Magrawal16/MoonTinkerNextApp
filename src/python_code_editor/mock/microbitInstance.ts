@@ -68,6 +68,14 @@ export class MicrobitSimulator {
     },
   };
 
+  public readonly TRIGG = {
+    digital_write_pin: this.digitalWritePin.bind(this),
+  };
+
+  public readonly ECHO = {
+    digital_read_pin: this.readDigitalPin.bind(this),
+  };
+
   // NEW: Allow external components to set pin values (for sensor simulation)
   private externalPinValues: Record<
     string,
@@ -160,12 +168,19 @@ export class MicrobitSimulator {
     point: this.point.bind(this),
     toggle: this.toggle.bind(this),
   };
+
   public readonly input = {
     on_button_pressed: this.onButtonPressed.bind(this),
     _clear: this.clearInputs.bind(this),
   };
   public readonly basic = {
     show_string: this.showString.bind(this),
+    forever: this.forever.bind(this),
+    pause: this.pause.bind(this),
+  };
+
+  public readonly microbit = {
+    get_distance: this.showString.bind(this),
     forever: this.forever.bind(this),
     pause: this.pause.bind(this),
   };

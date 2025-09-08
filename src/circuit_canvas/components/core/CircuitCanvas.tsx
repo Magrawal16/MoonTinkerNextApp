@@ -289,6 +289,7 @@ export default function CircuitCanvas() {
         },
         undo: () => undo(setElements, setWires, stopSimulation),
         redo: () => redo(setElements, setWires, stopSimulation),
+        isSimulationOn: simulationRunning,
       }),
     disableShortcut: openCodeEditor,
     disabledSimulationOnnOff: stopDisabled,
@@ -696,26 +697,6 @@ export default function CircuitCanvas() {
                 title="Rotate Right"
               >
                 <FaRotateRight size={14} />
-              </button>
-            </div>
-
-            {/* Undo/Redo Buttons */}
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => undo(setElements, setWires, stopSimulation)}
-                disabled={!canUndo}
-                className="p-1 bg-blue-100 text-blue-700 rounded disabled:opacity-50 hover:bg-blue-200 transition-colors"
-                title="Undo"
-              >
-                <FaUndo size={14} />
-              </button>
-              <button
-                onClick={() => redo(setElements, setWires, stopSimulation)}
-                disabled={!canRedo}
-                className="p-1 bg-blue-100 text-blue-700 rounded disabled:opacity-50 hover:bg-blue-200 transition-colors"
-                title="Redo"
-              >
-                <FaRedo size={14} />
               </button>
             </div>
 

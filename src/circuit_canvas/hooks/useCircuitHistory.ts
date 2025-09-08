@@ -2,83 +2,97 @@
 import { useState, useCallback } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 
+type Snapshot = { elements: CircuitElement[]; wires: Wire[] };
+
 export const useCircuitHistory = () => {
-  const [history, setHistory] = useState<
-    { elements: CircuitElement[]; wires: Wire[] }[]
-  >([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
   const MAX_HISTORY_LENGTH = 50;
 
-  const pushToHistory = useCallback((elements: CircuitElement[], wires: Wire[]) => {
-    setHistory(prev => {
-      // If we're not at the end of history, remove future states
-      const newHistory = historyIndex < prev.length - 1 
-        ? prev.slice(0, historyIndex + 1)
-        : prev;
-      
-      const next = [
-        ...newHistory,
-        {
-          elements: JSON.parse(JSON.stringify(elements)),
-          wires: JSON.parse(JSON.stringify(wires)),
-        },
-      ];
+  const [state, setState] = useState<{ entries: Snapshot[]; index: number }>(
+    { entries: [], index: -1 }
+  );
 
+  const deepClone = (v: any) => JSON.parse(JSON.stringify(v));
+
+  // Optional explicit initializer for when your canvas starts non-empty
+  const initializeHistory = useCallback((elements: CircuitElement[], wires: Wire[]) => {
+    setState({ entries: [{ elements: deepClone(elements), wires: deepClone(wires) }], index: 0 });
+  }, []);
+
+  const pushToHistory = useCallback((elements: CircuitElement[], wires: Wire[]) => {
+    setState(prev => {
+      let entries = prev.entries;
+      let index = prev.index;
+
+      // If first push and nothing initialized, seed an initial empty canvas
+      if (entries.length === 0 && index === -1) {
+        entries = [{ elements: [], wires: [] }];
+        index = 0;
+      }
+
+      // If we're not at the end of history, remove future states
+      if (index < entries.length - 1) {
+        entries = entries.slice(0, index + 1);
+      }
+
+      const last = entries[entries.length - 1];
+      const nextSnap: Snapshot = { elements: deepClone(elements), wires: deepClone(wires) };
+
+      // Skip push if identical to last (prevents accidental double-push)
+      const same = JSON.stringify(last) === JSON.stringify(nextSnap);
+      if (same) {
+        return { entries, index };
+      }
+
+      let nextEntries = [...entries, nextSnap];
       // Trim history if it exceeds max length
-      const trimmedHistory = next.length > MAX_HISTORY_LENGTH 
-        ? next.slice(next.length - MAX_HISTORY_LENGTH)
-        : next;
-      
-      // Update index to point to the new state
-      setHistoryIndex(trimmedHistory.length - 1);
-      
-      return trimmedHistory;
+      if (nextEntries.length > MAX_HISTORY_LENGTH) {
+        nextEntries = nextEntries.slice(nextEntries.length - MAX_HISTORY_LENGTH);
+      }
+      const nextIndex = nextEntries.length - 1;
+
+      return { entries: nextEntries, index: nextIndex };
     });
-  }, [historyIndex]);
+  }, []);
 
   const undo = useCallback((
     setElements: (elements: CircuitElement[]) => void,
     setWires: (wires: Wire[]) => void,
     stopSimulation: () => void
   ) => {
-    if (historyIndex <= 0) return; // Cannot undo beyond initial state
-
-    const newIndex = historyIndex - 1;
-    const state = history[newIndex];
-    
-    setElements(state.elements);
-    setWires(state.wires);
-    setHistoryIndex(newIndex);
+    if (state.index <= 0) return; // Cannot undo beyond initial state
+    const newIndex = state.index - 1;
+    const snap = state.entries[newIndex];
+    setElements(deepClone(snap.elements));
+    setWires(deepClone(snap.wires));
+    setState(prev => ({ ...prev, index: newIndex }));
     stopSimulation();
-  }, [history, historyIndex]);
+  }, [state]);
 
   const redo = useCallback((
     setElements: (elements: CircuitElement[]) => void,
     setWires: (wires: Wire[]) => void,
     stopSimulation: () => void
   ) => {
-    if (historyIndex >= history.length - 1) return; // Cannot redo beyond latest state
-
-    const newIndex = historyIndex + 1;
-    const state = history[newIndex];
-    
-    setElements(state.elements);
-    setWires(state.wires);
-    setHistoryIndex(newIndex);
+    if (state.index >= state.entries.length - 1) return; // Cannot redo beyond latest state
+    const newIndex = state.index + 1;
+    const snap = state.entries[newIndex];
+    setElements(deepClone(snap.elements));
+    setWires(deepClone(snap.wires));
+    setState(prev => ({ ...prev, index: newIndex }));
     stopSimulation();
-  }, [history, historyIndex]);
+  }, [state]);
 
   const clearHistory = useCallback(() => {
-    setHistory([]);
-    setHistoryIndex(-1);
+    setState({ entries: [], index: -1 });
   }, []);
 
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
+  const canUndo = state.index > 0;
+  const canRedo = state.index < state.entries.length - 1;
 
   return {
-    history,
-    historyIndex,
+    history: state.entries,
+    historyIndex: state.index,
+    initializeHistory,
     pushToHistory,
     undo,
     redo,

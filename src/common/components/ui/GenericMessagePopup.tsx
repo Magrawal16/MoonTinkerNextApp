@@ -71,20 +71,18 @@ export const MessageProvider: React.FC<{ children: ReactNode }> = ({
               style={{
                 backgroundColor:
                   message.type === "success"
-                    ? "rgba(46, 204, 113, 0.85)" // Green
+                    ? "rgba(46, 204, 113, 0.9)" // Vibrant green for success
                     : message.type === "error"
-                    ? "rgba(52, 152, 219, 0.85)" // Blue
+                    ? "rgba(231, 76, 60, 0.9)" // Vibrant red for error
                     : message.type === "info"
-                    ? "rgba(241, 196, 15, 0.85)" // Yellow
-                    : message.type === "warning"
-                    ? "rgba(243, 156, 18, 0.85)" // Orange
-                    : "rgba(0,102,204,0.4)",
-                color: message.type === "info" ? "#222" : "#fff",
-                backdropFilter: "blur(4px)",
-                WebkitBackdropFilter: "blur(12px)",
-                border: "1px solid rgba(255, 255, 255, 0.2)",
+                    ? "rgba(52, 152, 219, 0.9)" // Soft blue for info
+                    : "rgba(241, 196, 15, 0.9)", // Golden yellow for warning
+                color: "#fff", // White text for all message types
+                backdropFilter: "blur(10px)",
+                WebkitBackdropFilter: "blur(10px)",
+                border: "1px solid rgba(255, 255, 255, 0.3)",
                 boxShadow:
-                  "0 4px 30px rgba(0, 0, 0, 0.2), inset 0 0 10px rgba(255, 255, 255, 0.1)",
+                  "0 8px 32px rgba(0, 0, 0, 0.2), inset 0 0 16px rgba(255, 255, 255, 0.2)",
               }}
             >
               {message.text}

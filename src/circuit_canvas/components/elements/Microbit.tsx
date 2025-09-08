@@ -19,7 +19,7 @@ export default function Microbit({
   const [imgMicrobit, setImgMicrobit] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
-  const [btnPressed, setBtnPressed] = useState<"A" | "B" | null>(null);
+  const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
   useEffect(() => {
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit.svg";
@@ -41,7 +41,7 @@ export default function Microbit({
     image.alt = "Microbit";
   }, []);
 
-  const handleButtonClick = (btn: "A" | "B") => {
+  const handleButtonClick = (btn: "A" | "B" | "AB") => {
     setBtnPressed(btn);
     onControllerInput?.(btn);
     setTimeout(() => setBtnPressed(null), 150);
@@ -100,6 +100,44 @@ export default function Microbit({
             />
           ))
         )}
+        {/* Button AB */}
+        <Group
+          onClick={(e) => {
+            e.cancelBubble = true;
+            handleButtonClick("AB");
+          }}
+          x={164}
+          y={96}
+        >
+          {/* Blue Circle when pressed */}
+          {btnPressed === "AB" && (
+            <Rect
+              width={12}
+              height={12}
+              fill=""
+              stroke="red"
+              strokeWidth={1.5}
+              cornerRadius={12}
+              x={2.8}
+              y={0.6}
+            />
+          )}
+          <Rect
+            width={20}
+            height={20}
+            fill=""
+            cornerRadius={10}
+            shadowBlur={3}
+          />
+          <Text
+            text=""
+            fill="white"
+            x={6}
+            y={3}
+            fontSize={12}
+            fontStyle="bold"
+          />
+        </Group>
 
         {/* Button A */}
         <Group

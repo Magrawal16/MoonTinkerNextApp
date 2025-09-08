@@ -11,13 +11,14 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as Blockly from "blockly";
 import { pythonGenerator } from "blockly/python";
+import { FaArrowRight } from "react-icons/fa";
 import {
   BlocklyPythonIntegration,
   BidirectionalConverter,
 } from "@/blockly_editor/utils/blocklyPythonConvertor";
 import CodeEditor from "@/python_code_editor/components/CodeEditor";
 import { createToolboxXmlFromBlocks } from "../utils/sharedBlockDefinitions";
-import CodePalette from "./CodePalette";
+import PythonCodePalette from "./PythonCodeBlockSnippetPalette";
 
 type EditorMode = "block" | "text";
 
@@ -52,6 +53,13 @@ export default function UnifiedEditor({
   
   // State for blocks palette
   const [showCodePalette, setShowCodePalette] = useState(false);
+
+  // Hide code palette when no controller is selected
+  useEffect(() => {
+    if (!activeControllerId) {
+      setShowCodePalette(false);
+    }
+  }, [activeControllerId]);
 
   // Refs
   const blocklyRef = useRef<HTMLDivElement>(null);
@@ -659,7 +667,7 @@ export default function UnifiedEditor({
   return (
     <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm overflow-hidden relative">
       {/* Blocks Palette Panel */}
-      <CodePalette
+      <PythonCodePalette
         showCodePalette={showCodePalette}
         setShowCodePalette={setShowCodePalette}
       />
@@ -674,13 +682,33 @@ export default function UnifiedEditor({
           <div 
             className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-100"
             style={{ 
-              marginLeft: showCodePalette ? "288px" : "40px",
+              marginLeft: showCodePalette ? "320px" : "0px",
               transition: "margin-left 300ms"
             }}
           >
-            <span className="text-sm text-gray-700 font-medium">
-              Editor Mode
-            </span>
+            <div className="flex items-center gap-3">
+              {/* Code Palette Toggle Button */}
+              <button
+                onClick={() => setShowCodePalette((prev) => !prev)}
+                className="flex items-center justify-center w-fit px-2 py-1 bg-blue-100 hover:bg-yellow-200 text-blue-800 text-sm rounded-md transition-all duration-200 border border-blue-200 hover:border-yellow-300"
+                title={showCodePalette ? "Hide Code Palette" : "Show Code Palette"}
+              >
+                <span
+                  style={{
+                    display: "inline-block",
+                    transition: "transform 0.5s ease-in-out",
+                    transform: showCodePalette ? "rotate(180deg)" : "rotate(0deg)",
+                  }}
+                  className="flex items-center justify-center"
+                >
+                  <FaArrowRight className="w-3 h-3" />
+                </span>
+              </button>
+              
+              <span className="text-sm text-gray-700 font-medium">
+                Editor Mode
+              </span>
+            </div>
 
             {/* Toggle */}
             <div className="flex items-center gap-3">
@@ -736,7 +764,7 @@ export default function UnifiedEditor({
             <div 
               className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg"
               style={{ 
-                marginLeft: showCodePalette ? "292px" : "44px",
+                marginLeft: showCodePalette ? "324px" : "4px",
                 marginRight: "16px",
                 transition: "margin-left 300ms"
               }}
@@ -789,7 +817,7 @@ export default function UnifiedEditor({
           <div 
             className="flex-1 overflow-hidden bg-white relative"
             style={{ 
-              marginLeft: showCodePalette ? "288px" : "40px",
+              marginLeft: showCodePalette ? "320px" : "0px",
               transition: "margin-left 300ms"
             }}
           >

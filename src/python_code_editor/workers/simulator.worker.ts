@@ -102,7 +102,7 @@ class Simulator {
   if (!this.microbit) {
     throw new Error("Microbit controller not initialized.");
   }
-  if (event !== "A" && event !== "B") {
+  if (event !== "A" && event !== "B" && event !== "AB") {
     throw new Error(`Unsupported input event: ${event}`);
   }
   await this.microbit.pressButton(event); // <- await here

@@ -1,4 +1,6 @@
+import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 import { useEffect } from "react";
+
 
 export type ShortcutDefinition = {
   name: string;
@@ -10,12 +12,17 @@ export type ShortcutDefinition = {
 type UseCircuitShortcutsProps = {
   getShortcuts: () => ShortcutDefinition[];
   disableShortcut?: boolean; // Optional flag to disable the shortcut
+  disabledSimulationOnnOff?: boolean;
 };
 
 export default function useCircuitShortcuts({
   getShortcuts,
   disableShortcut,
+  disabledSimulationOnnOff = false,
 }: UseCircuitShortcutsProps) {
+
+    const { showMessage } = useMessage();
+  
   useEffect(() => {
     const matchShortcut = (e: KeyboardEvent, keys: string[]) => {
       const pressed = new Set<string>();
@@ -23,7 +30,13 @@ export default function useCircuitShortcuts({
       if (e.shiftKey) pressed.add("shift");
       if (e.altKey) pressed.add("alt");
       let key = e.key.toLowerCase();
-      if (key === " ") key = "space"; // ✅ normalize space key
+
+      if (disabledSimulationOnnOff && (key === " " || key === "spacebar")) {
+        showMessage("Computing...", "info", 2000);
+        return false;
+      }
+
+      if (key === " ") key = "space";
       pressed.add(key);
 
       return keys.every((key) => pressed.has(key));

@@ -11,7 +11,7 @@ export type MicrobitEvent =
       pinType: "digital" | "analog";
     }
   | { type: "led-change"; x: number; y: number; value: number }
-  | { type: "button-press"; button: "A" | "B" }
+  | { type: "button-press"; button: "A" | "B" | "AB"}
   | { type: "reset" };
 
 type MicrobitEventCallback = (event: MicrobitEvent) => void;
@@ -22,9 +22,9 @@ interface HandlerProxy {
 }
 
 class ButtonInstance {
-  constructor(private name: "A" | "B") {}
+  constructor(private name: "A" | "B" | "AB") {}
 
-  getName(): "A" | "B" {
+  getName(): "A" | "B" | "AB" {
     return this.name;
   }
 
@@ -66,6 +66,14 @@ export class MicrobitSimulator {
       this.digitalWriteListeners[pin].add(cb);
       return () => this.digitalWriteListeners[pin].delete(cb);
     },
+  };
+
+  public readonly TRIGG = {
+    digital_write_pin: this.digitalWritePin.bind(this),
+  };
+
+  public readonly ECHO = {
+    digital_read_pin: this.readDigitalPin.bind(this),
   };
 
   // NEW: Allow external components to set pin values (for sensor simulation)
@@ -142,13 +150,14 @@ export class MicrobitSimulator {
     Array(5).fill(false)
   );
   private pinStates: Record<string, { digital: number; analog: number }> = {};
-  private buttonStates: Record<"A" | "B", boolean> = { A: false, B: false };
-private inputHandlers: Record<"A" | "B", HandlerProxy[]> = { A: [], B: [] };
+  private buttonStates: Record<"A" | "B" | "AB", boolean> = { A: false, B: false, AB: false };
+  private inputHandlers: Record<"A" | "B" | "AB", HandlerProxy[]> = { A: [], B: [], AB: [] };
   private foreverCallbacks: Set<any> = new Set();
 
   public readonly Button = {
     A: new ButtonInstance("A"),
     B: new ButtonInstance("B"),
+    AB: new ButtonInstance("AB"),
   };
 
   public readonly DigitalPin: Record<string, string> = {};
@@ -159,12 +168,19 @@ private inputHandlers: Record<"A" | "B", HandlerProxy[]> = { A: [], B: [] };
     point: this.point.bind(this),
     toggle: this.toggle.bind(this),
   };
+
   public readonly input = {
     on_button_pressed: this.onButtonPressed.bind(this),
     _clear: this.clearInputs.bind(this),
   };
   public readonly basic = {
     show_string: this.showString.bind(this),
+    forever: this.forever.bind(this),
+    pause: this.pause.bind(this),
+  };
+
+  public readonly microbit = {
+    get_distance: this.showString.bind(this),
     forever: this.forever.bind(this),
     pause: this.pause.bind(this),
   };
@@ -262,12 +278,6 @@ private inputHandlers: Record<"A" | "B", HandlerProxy[]> = { A: [], B: [] };
     setTimeout(runCallback, 20);
   }
 
-  // private async pause(ms: number) {
-  //   return new Promise<void>((resolve) => {
-  //     setTimeout(resolve, ms);
-  //   });
-  // }
-
   private async pause(ms: number) {
     return new Promise<void>((resolve) => setTimeout(resolve, ms));
   }
@@ -296,7 +306,7 @@ private inputHandlers: Record<"A" | "B", HandlerProxy[]> = { A: [], B: [] };
         this.ledMatrix[y][x] = false;
       }
     }
-    this.buttonStates = { A: false, B: false };
+    this.buttonStates = { A: false, B: false, AB: false };
     this.clearInputs();
     this.eventEmitter.emit({ type: "reset" });
   }
@@ -359,15 +369,9 @@ private onButtonPressed(button: ButtonInstance, handler: any) {
   });
 }
 
-  // public pressButton(button: ButtonInstance | "A" | "B") {
-  //   const buttonName = typeof button === "string" ? button : button.getName();
-  //   this.buttonStates[buttonName] = true;
-  //   this.inputHandlers[buttonName].forEach((h) => h());
-  //   this.eventEmitter.emit({ type: "button-press", button: buttonName });
-  // }
 
   // Updated pressButton method
-public async pressButton(button: ButtonInstance | "A" | "B") {
+public async pressButton(button: ButtonInstance | "A" | "B" | "AB") {
   const buttonName = typeof button === "string" ? button : button.getName();
   this.buttonStates[buttonName] = true;
 
@@ -388,7 +392,7 @@ private clearInputs() {
     handlerProxy.wrapperProxy.destroy?.();
     handlerProxy.persistentHandler.destroy?.();
   });
-  this.inputHandlers = { A: [], B: [] };
+  this.inputHandlers = { A: [], B: [], AB: [] };
 }
 
   getStateSnapshot() {

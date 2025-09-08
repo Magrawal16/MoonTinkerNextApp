@@ -20,9 +20,11 @@ type ShortcutArgs = {
   resetState: () => void;
   getNodeParent: (nodeId: string) => CircuitElement | null | undefined;
   undo: () => void;
+  redo: () => void;
   toggleSimulation: () => void;
   updateWiresDirect?: () => void; // Add wire update function
   setActiveControllerId: React.Dispatch<React.SetStateAction<string | null>>;
+  isSimulationOn: boolean;
 };
 
 /**
@@ -44,6 +46,11 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
       name: "Undo",
       description: "Undo last action",
       keys: ["ctrl", "z"],
+    },
+    {
+      name: "Redo",
+      description: "Redo last action",
+      keys: ["ctrl", "y"],
     },
     {
       name: "Delete selected",
@@ -81,8 +88,10 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
     resetState,
     getNodeParent,
     undo,
+    redo,
     toggleSimulation,
     setActiveControllerId,
+    isSimulationOn,
   } = args;
 
   return getShortcutMetadata().map((meta) => {
@@ -108,7 +117,18 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
       case "ctrl+z":
         return {
           ...meta,
-          handler: () => undo(),
+          handler: () => {
+            if(isSimulationOn) return;
+            undo();
+          },
+        };
+      case "ctrl+y":
+        return {
+          ...meta,
+          handler: () => {
+            if(isSimulationOn) return;
+            redo();
+          },
         };
       case "delete":
         return {

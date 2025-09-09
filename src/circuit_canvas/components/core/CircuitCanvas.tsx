@@ -165,7 +165,7 @@ export default function CircuitCanvas() {
     wireLayerRef,
     getNodeById,
     getNodeParent,
-    pushToHistory: () => pushToHistory(elements, wires),
+    pushToHistorySnapshot: (els, ws) => pushToHistory(els, ws),
     stopSimulation,
   });
 

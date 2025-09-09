@@ -11,6 +11,7 @@ interface Props {
   containsWire: boolean; // legacy overall wire presence flag (kept for backwards compatibility)
   isSimulationRunning: boolean;
   wires?: { fromNodeId: string; toNodeId: string }[]; // full wire list to evaluate connectivity
+  onAfterRotateImmediateUpdate?: () => void; // allow parent to force wire redraw immediately
 }
 
 /**
@@ -28,6 +29,7 @@ const ElementRotationButtons: React.FC<Props> = ({
   containsWire,
   isSimulationRunning,
   wires = [],
+  onAfterRotateImmediateUpdate,
 }) => {
   const { showMessage } = useMessage();
   const rotateElement = (direction: "left" | "right") => {
@@ -72,10 +74,11 @@ const ElementRotationButtons: React.FC<Props> = ({
       return;
     }
 
-    pushToHistory();
+  // record state before rotation
+  pushToHistory();
 
-    setElements((prev) =>
-      prev.map((el) =>
+    setElements((prev) => {
+      const next = prev.map((el) =>
         el.id === selectedElement.id
           ? {
               ...el,
@@ -85,8 +88,11 @@ const ElementRotationButtons: React.FC<Props> = ({
                   : ((el.rotation || 0) - 30 + 360) % 360,
             }
           : el
-      )
-    );
+      );
+      // force immediate visuals update for wires
+      onAfterRotateImmediateUpdate?.();
+      return next;
+    });
 
   // do not auto stop simulation here; if we reached here while simulation was running it was already stopped above
   };

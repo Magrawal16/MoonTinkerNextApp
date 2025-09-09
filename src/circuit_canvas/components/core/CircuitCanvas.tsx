@@ -85,6 +85,7 @@ export default function CircuitCanvas() {
     null
   );
   const [showPropertiesPannel, setShowPropertiesPannel] = useState(false);
+  const [propertiesPanelClosing, setPropertiesPanelClosing] = useState(false);
 
   const tempDragPositions = useRef<{ [id: string]: { x: number; y: number } }>(
     {}
@@ -97,6 +98,8 @@ export default function CircuitCanvas() {
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  // (moved below where `wires` is declared)
 
   function getNodeById(nodeId: string) {
     return elementsRef.current
@@ -168,6 +171,24 @@ export default function CircuitCanvas() {
     pushToHistorySnapshot: (els, ws) => pushToHistory(els, ws),
     stopSimulation,
   });
+
+  // When undo/redo or any state change removes the currently selected entity,
+  // fade out and close the Properties Panel gracefully.
+  useEffect(() => {
+    if (!showPropertiesPannel || !selectedElement) return;
+    const exists = selectedElement.type === "wire"
+      ? wires.some((w) => w.id === selectedElement.id)
+      : elements.some((el) => el.id === selectedElement.id);
+    if (!exists) {
+      setPropertiesPanelClosing(true);
+      const t = setTimeout(() => {
+        setShowPropertiesPannel(false);
+        setSelectedElement(null);
+        setPropertiesPanelClosing(false);
+      }, 180);
+      return () => clearTimeout(t);
+    }
+  }, [elements, wires, selectedElement, showPropertiesPannel]);
 
   useEffect(() => {
     resetState();
@@ -288,8 +309,33 @@ export default function CircuitCanvas() {
             startSimulation();
           }
         },
-        undo: () => undo(setElements, setWires, stopSimulation),
-        redo: () => redo(setElements, setWires, stopSimulation),
+        undo: () =>
+          undo(
+            (els) => {
+              // Sync refs first, then state, then immediate wire redraw
+              elementsRef.current = els;
+              setElements(els);
+              updateWiresDirect();
+            },
+            (ws) => {
+              setWires(ws); // custom setter keeps wiresRef in sync
+              updateWiresDirect();
+            },
+            stopSimulation
+          ),
+        redo: () =>
+          redo(
+            (els) => {
+              elementsRef.current = els;
+              setElements(els);
+              updateWiresDirect();
+            },
+            (ws) => {
+              setWires(ws);
+              updateWiresDirect();
+            },
+            stopSimulation
+          ),
         isSimulationOn: simulationRunning,
       }),
     disableShortcut: openCodeEditor,
@@ -405,6 +451,7 @@ export default function CircuitCanvas() {
     }
 
     const elementData = e.dataTransfer.getData("application/element-type");
+    console.log("Element data on drop:", elementData);
     if (!elementData) return;
 
     const element = JSON.parse(elementData);
@@ -502,7 +549,7 @@ export default function CircuitCanvas() {
               );
 
               if (simulationRunningRef.current) {
-                showMessage("Simulation running, computing circuit...", "info");
+                //showMessage("Simulation running, computing circuit...", "info");
                 computeCircuit(wiresRef.current);
               } else {
                 showMessage(
@@ -662,11 +709,19 @@ export default function CircuitCanvas() {
               selectedColor={selectedWireColor}
               onColorSelect={(color) => {
                 setSelectedWireColor(color);
-                const wire = wires.find((w) => w.id === selectedElement?.id);
-                if (wire) {
-                  wire.color = color;
-                  setWires((prev) => [...prev]);
-                }
+                const selectedId = selectedElement?.id;
+                if (!selectedId) return;
+                // If a wire is selected, change its color, push AFTER change
+                setWires((prev) => {
+                  const exists = prev.some((w) => w.id === selectedId);
+                  if (!exists) return prev;
+                  const next = prev.map((w) =>
+                    w.id === selectedId ? { ...w, color } : w
+                  );
+                  // Push AFTER mutation so undo only reverts the color
+                  pushToHistory(elementsRef.current, next);
+                  return next;
+                });
               }}
             />
 
@@ -675,14 +730,20 @@ export default function CircuitCanvas() {
               <button
                 onClick={() => {
                   if (!selectedElement) return;
-                  pushToHistory(elements, wires);
-                  setElements((prev) =>
-                    prev.map((el) =>
+                  setElements((prev) => {
+                    const next = prev.map((el) =>
                       el.id === selectedElement.id
-                        ? { ...el, rotation: ((el.rotation || 0) - 30) % 360 }
+                        ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
                         : el
-                    )
-                  );
+                    );
+                    // Update ref immediately so wire math sees new rotation
+                    elementsRef.current = next;
+                    // Update wires instantly (no visual delay)
+                    updateWiresDirect();
+                    // Push AFTER the change so undo reverts only the rotation
+                    pushToHistory(next, wiresRef.current);
+                    return next;
+                  });
                   stopSimulation();
                 }}
                 disabled={!selectedElement}
@@ -694,14 +755,17 @@ export default function CircuitCanvas() {
               <button
                 onClick={() => {
                   if (!selectedElement) return;
-                  pushToHistory(elements, wires);
-                  setElements((prev) =>
-                    prev.map((el) =>
+                  setElements((prev) => {
+                    const next = prev.map((el) =>
                       el.id === selectedElement.id
                         ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
                         : el
-                    )
-                  );
+                    );
+                    elementsRef.current = next;
+                    updateWiresDirect();
+                    pushToHistory(next, wiresRef.current);
+                    return next;
+                  });
                   stopSimulation();
                 }}
                 disabled={!selectedElement}
@@ -838,9 +902,8 @@ export default function CircuitCanvas() {
             />
           </div>
         </div>
-        {selectedElement &&
-          (showPropertiesPannel ? (
-            <div className="absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl">
+    {selectedElement && showPropertiesPannel ? (
+      <div className={`absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}>
               <div className="p-1">
                 <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
                   <button
@@ -854,7 +917,7 @@ export default function CircuitCanvas() {
                   wires={wires}
                   getNodeById={getNodeById}
                   onElementEdit={(updatedElement, deleteElement) => {
-                    pushToHistory(elements, wires);
+                    pushToHistory(elements, wiresRef.current);
                     if (deleteElement) {
                       const updatedWires = wires.filter(
                         (w) =>
@@ -871,34 +934,42 @@ export default function CircuitCanvas() {
                       setEditingWire(null);
                       stopSimulation();
                     } else {
-                      setElements((prev) =>
-                        prev.map((el) =>
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
                           el.id === updatedElement.id
                             ? { ...el, ...updatedElement, x: el.x, y: el.y }
                             : el
-                        )
-                      );
+                        );
+                        elementsRef.current = next;
+                        updateWiresDirect();
+                        return next;
+                      });
                       stopSimulation();
                       setSelectedElement(updatedElement);
                       setCreatingWireStartNode(null);
                     }
                   }}
                   onWireEdit={(updatedWire, deleteElement) => {
-                    pushToHistory(elements, wires);
                     if (deleteElement) {
-                      setWires((prev) =>
-                        prev.filter((w) => w.id !== updatedWire.id)
-                      );
+                      setWires((prev) => {
+                        const next = prev.filter((w) => w.id !== updatedWire.id);
+                        // Push AFTER delete for single-step undo
+                        pushToHistory(elements, next);
+                        return next;
+                      });
                       setSelectedElement(null);
                       setCreatingWireStartNode(null);
                       setEditingWire(null);
                       stopSimulation();
                     } else {
-                      setWires((prev) =>
-                        prev.map((w) =>
+                      setWires((prev) => {
+                        const next = prev.map((w) =>
                           w.id === updatedWire.id ? { ...w, ...updatedWire } : w
-                        )
-                      );
+                        );
+                        // Push AFTER edit
+                        pushToHistory(elements, next);
+                        return next;
+                      });
                       stopSimulation();
                       setSelectedElement(null);
                       setEditingWire(null);
@@ -920,7 +991,7 @@ export default function CircuitCanvas() {
                 />
               </div>
             </div>
-          ) : null)}
+          ) : null}
 
         <div className="relative w-full flex-1 h-[460px] p-1 overflow-hidden">
           {/* Stage Canvas */}

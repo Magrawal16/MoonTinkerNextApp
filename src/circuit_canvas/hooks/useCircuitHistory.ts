@@ -62,8 +62,10 @@ export const useCircuitHistory = () => {
     if (state.index <= 0) return; // Cannot undo beyond initial state
     const newIndex = state.index - 1;
     const snap = state.entries[newIndex];
-    setElements(deepClone(snap.elements));
-    setWires(deepClone(snap.wires));
+    const els = deepClone(snap.elements);
+    const ws = deepClone(snap.wires);
+    setElements(els);
+    setWires(ws);
     setState(prev => ({ ...prev, index: newIndex }));
     stopSimulation();
   }, [state]);
@@ -76,8 +78,10 @@ export const useCircuitHistory = () => {
     if (state.index >= state.entries.length - 1) return; // Cannot redo beyond latest state
     const newIndex = state.index + 1;
     const snap = state.entries[newIndex];
-    setElements(deepClone(snap.elements));
-    setWires(deepClone(snap.wires));
+    const els = deepClone(snap.elements);
+    const ws = deepClone(snap.wires);
+    setElements(els);
+    setWires(ws);
     setState(prev => ({ ...prev, index: newIndex }));
     stopSimulation();
   }, [state]);

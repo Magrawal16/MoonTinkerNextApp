@@ -32,6 +32,7 @@ export type CircuitElement = {
     brightness?: number;
   };
   wires?: Wire[];
+  displayProperties?: string[];
 };
 
 export type Wire = {

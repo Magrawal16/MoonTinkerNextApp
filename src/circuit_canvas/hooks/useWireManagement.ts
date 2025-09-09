@@ -9,7 +9,7 @@ interface UseWireManagementProps {
   wireLayerRef: React.RefObject<Konva.Layer | null>;
   getNodeById: (nodeId: string) => Node | undefined;
   getNodeParent: (nodeId: string) => CircuitElement | null;
-  pushToHistory: () => void;
+  pushToHistorySnapshot: (elements: CircuitElement[], wires: Wire[]) => void;
   stopSimulation: () => void;
 }
 
@@ -19,11 +19,11 @@ export const useWireManagement = ({
   wireLayerRef,
   getNodeById,
   getNodeParent,
-  pushToHistory,
+  pushToHistorySnapshot,
   stopSimulation,
 }: UseWireManagementProps) => {
   // Wire-related state
-  const [wires, setWires] = useState<Wire[]>([]);
+  const [wires, _setWiresState] = useState<Wire[]>([]);
   const [wireCounter, setWireCounter] = useState(0);
   const [selectedWireColor, setSelectedWireColor] = useState<string>("#000000");
   const [creatingWireStartNode, setCreatingWireStartNode] = useState<string | null>(null);
@@ -36,10 +36,25 @@ export const useWireManagement = ({
   const inProgressWireRef = useRef<Konva.Line | null>(null);
   const animatedCircleRef = useRef<Konva.Circle | null>(null);
 
-  // Update wires ref when wires change
-  useEffect(() => {
-    wiresRef.current = wires;
-  }, [wires]);
+  // Centralized setter to keep ref and state in sync immediately
+  const setWires = useCallback(
+    (
+      next:
+        | Wire[]
+        | ((prev: Wire[]) => Wire[])
+    ) => {
+      const resolved = typeof next === "function" ? (next as (p: Wire[]) => Wire[])(wiresRef.current) : next;
+      // Update ref first so any immediate reads see the latest snapshot
+      wiresRef.current = resolved;
+      _setWiresState(resolved);
+      // Optionally batch draw to reflect any external immediate consumers
+      if (wireLayerRef.current) {
+        wireLayerRef.current.batchDraw();
+      }
+      return resolved;
+    },
+    [wireLayerRef]
+  );
 
   // Clear wire creation state when not creating wire
   useEffect(() => {
@@ -117,7 +132,8 @@ export const useWireManagement = ({
 
   // Optimized function to update wires directly in Konva
   const updateWiresDirect = useCallback(() => {
-    wires.forEach((wire) => {
+    const current = wiresRef.current;
+    current.forEach((wire) => {
       const wireLineRef = wireRefs.current[wire.id];
       if (wireLineRef) {
         const newPoints = getWirePoints(wire);
@@ -136,7 +152,7 @@ export const useWireManagement = ({
     if (wireLayerRef.current) {
       wireLayerRef.current.batchDraw();
     }
-  }, [wires, getWirePoints, wireLayerRef]);
+  }, [getWirePoints, wireLayerRef]);
 
   // Optimized function to update in-progress wire during creation
   const updateInProgressWire = useCallback(
@@ -189,14 +205,16 @@ export const useWireManagement = ({
     (nodeId: string) => {
       if (editingWire) {
         // complete wire editing logic
-        pushToHistory();
-        setWires((prev) =>
-          prev.map((wire) =>
+        setWires((prev) => {
+          const next = prev.map((wire) =>
             wire.id === editingWire.wireId
               ? { ...wire, [editingWire.end]: nodeId }
               : wire
-          )
-        );
+          );
+          // push AFTER change
+          pushToHistorySnapshot(elements, next);
+          return next;
+        });
         setEditingWire(null);
         return;
       }
@@ -251,9 +269,7 @@ export const useWireManagement = ({
         return;
       }
 
-      // Second click: create wire
-      pushToHistory();
-
+  // Second click: create wire
       const newWire: Wire = {
         // Ensure unique incremental ID even if wires were loaded from storage
         // or counter was reset. We probe for the next free numeric suffix.
@@ -275,7 +291,10 @@ export const useWireManagement = ({
         color: selectedWireColor,
       };
 
-      setWires([...wires, newWire]);
+  const next = [...wiresRef.current, newWire];
+  setWires(next);
+  // Push AFTER creation so each wire is a single undo step
+  pushToHistorySnapshot(elements, next);
       stopSimulation();
 
       setCreatingWireStartNode(null);
@@ -296,7 +315,7 @@ export const useWireManagement = ({
       wireCounter,
       wires,
       selectedWireColor,
-      pushToHistory,
+  pushToHistorySnapshot,
       stopSimulation,
       getNodeById,
       getNodeParent,
@@ -329,12 +348,14 @@ export const useWireManagement = ({
   // Handle wire editing
   const handleWireEdit = useCallback(
     (wireId: string) => {
-      const updated = wires.filter((w) => w.id !== wireId);
+      const updated = wiresRef.current.filter((w) => w.id !== wireId);
       setWires(updated);
+      // Push AFTER delete
+      pushToHistorySnapshot(elements, updated);
       stopSimulation();
       setEditingWire(null);
     },
-    [wires, stopSimulation]
+    [elements, stopSimulation, pushToHistorySnapshot]
   );
 
   // Get wire color

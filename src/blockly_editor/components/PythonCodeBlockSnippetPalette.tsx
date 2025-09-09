@@ -225,7 +225,7 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "button_handler",
     name: "Button Handler",
     description: "Function for button press",
-    code: `def on_button_{button_lower}_pressed():`,
+    code: `async def on_button_{button_lower}_pressed():`,
     category: "Buttons",
     parameters: [
       {
@@ -295,7 +295,7 @@ const CODE_SNIPPETS: CodeSnippet[] = [
     id: "pause",
     name: "Pause",
     description: "Pause execution in milliseconds", 
-    code: "basic.pause({ms})",
+    code: "await basic.pause({ms})",
     category: "Timing",
     parameters: [
       {
@@ -463,12 +463,16 @@ export default function PythonCodePalette({
   const handleDragStart = (e: React.DragEvent, snippet: CodeSnippet) => {
     const actualCode = generateCode(snippet);
     e.dataTransfer.setData("text/plain", actualCode);
-    e.dataTransfer.setData("application/code-snippet", JSON.stringify({
-      ...snippet,
-      code: actualCode
-    }));
+    e.dataTransfer.setData(
+      "application/code-snippet",
+      JSON.stringify({
+        ...snippet,
+        code: actualCode,
+      })
+    );
     e.dataTransfer.effectAllowed = "copy";
   };
+
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -570,6 +574,7 @@ export default function PythonCodePalette({
                   : 'transform translate-x-0 opacity-100 scale-100'
               }`}
             >
+              
               {currentView ? (
                 // Category-specific view
                 <CategoryView 
@@ -581,6 +586,7 @@ export default function PythonCodePalette({
                   parameterValues={parameterValues}
                   onParameterChange={updateParameterValue}
                   generateCode={generateCode}
+                  onCodeInsert={onCodeInsert} // Add this line
                 />
               ) : (
                 // Main categories view
@@ -681,8 +687,13 @@ interface CategoryViewProps {
   getCategoryIcon: (category: string) => string;
   getCategoryColor: (category: string) => string;
   parameterValues: Record<string, Record<string, string>>;
-  onParameterChange: (snippetId: string, parameterId: string, value: string) => void;
+  onParameterChange: (
+    snippetId: string,
+    parameterId: string,
+    value: string
+  ) => void;
   generateCode: (snippet: CodeSnippet) => string;
+  onCodeInsert?: (code: string) => void; // Add this line
 }
 
 function CategoryView({
@@ -694,7 +705,16 @@ function CategoryView({
   parameterValues,
   onParameterChange,
   generateCode,
+  onCodeInsert
 }: CategoryViewProps) {
+
+
+  const handleCodeClick = (snippet: CodeSnippet) => {
+    if (onCodeInsert) {
+      onCodeInsert(generateCode(snippet));
+    }
+  };
+  
   return (
     <div className="space-y-4">
       {/* Category Header */}
@@ -771,28 +791,30 @@ function CategoryView({
                 
                 {/* Code Block with Drag Handle */}
                 <div className="relative group">
-                  <div 
-                    className="relative p-3 bg-teal-50 rounded-lg border border-teal-200 group-hover:border-teal-300 group-hover:bg-teal-100/50 transition-all duration-200 cursor-grab active:cursor-grabbing"
-                    draggable
-                    onDragStart={(e) => onDragStart(e, snippet)}
-                  >
+  <div 
+    className="relative p-3 bg-teal-50 rounded-lg border border-teal-200 group-hover:border-teal-300 group-hover:bg-teal-100/50 transition-all duration-200 cursor-grab active:cursor-grabbing"
+    draggable
+    onDragStart={(e) => onDragStart(e, snippet)}
+    onClick={() => handleCodeClick(snippet)} // Add this line
+    // ERROR : Cannot find name 'handleCodeClick'.
+  >
                     {/* Drag dots - appears on hover */}
-                    <div className="absolute left-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-50 transition-opacity duration-200">
-                      <svg className="w-2 h-4 text-gray-500" fill="currentColor" viewBox="0 0 8 16">
-                        <circle cx="2" cy="4" r="1"/>
-                        <circle cx="6" cy="4" r="1"/>
-                        <circle cx="2" cy="8" r="1"/>
-                        <circle cx="6" cy="8" r="1"/>
-                        <circle cx="2" cy="12" r="1"/>
-                        <circle cx="6" cy="12" r="1"/>
-                      </svg>
-                    </div>
-                    
-                    <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto pl-6">
-                      {generateCode(snippet)}
-                    </pre>
-                  </div>
-                </div>
+    <div className="absolute left-1 top-1/2 transform -translate-y-1/2 opacity-0 group-hover:opacity-50 transition-opacity duration-200">
+      <svg className="w-2 h-4 text-gray-500" fill="currentColor" viewBox="0 0 8 16">
+        <circle cx="2" cy="4" r="1"/>
+        <circle cx="6" cy="4" r="1"/>
+        <circle cx="2" cy="8" r="1"/>
+        <circle cx="6" cy="8" r="1"/>
+        <circle cx="2" cy="12" r="1"/>
+        <circle cx="6" cy="12" r="1"/>
+      </svg>
+    </div>
+    
+    <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap overflow-x-auto pl-6">
+      {generateCode(snippet)}
+    </pre>
+  </div>
+</div>
               </div>
             </div>
           </div>

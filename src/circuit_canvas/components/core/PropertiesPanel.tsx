@@ -44,8 +44,8 @@ export default function PropertiesPanel({
     if (selectedElement.type === "wire") {
       const wireToUpdate = wires.find((w) => w.id === selectedElement.id);
       if (wireToUpdate) {
-        wireToUpdate.color = selectedWireColor;
-        onWireEdit(wireToUpdate, false);
+        // Do not mutate incoming wire object; send a copy to parent handler
+        onWireEdit({ ...wireToUpdate, color: selectedWireColor }, false);
       }
     } else {
       const updatedElement: CircuitElement = {

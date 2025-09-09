@@ -664,12 +664,25 @@ export default function UnifiedEditor({
     }
   }, [editorMode, workspaceReady]);
 
+  const handleCodeInsert = useCallback((code: string) => {
+  if (!activeControllerId) return;
+  
+  // Get current code and cursor position from Monaco editor
+  // This would need to be implemented based on your editor implementation
+  const currentCode = localCode;
+  
+  // For now, we'll just append the code at the end
+  const newCode = currentCode + (currentCode ? '\n\n' : '') + code;
+  handleCodeChange(newCode);
+}, [activeControllerId, localCode, handleCodeChange]);
+
   return (
     <div className="flex flex-col h-full w-full bg-white rounded-xl shadow-sm overflow-hidden relative">
       {/* Blocks Palette Panel */}
       <PythonCodePalette
         showCodePalette={showCodePalette}
         setShowCodePalette={setShowCodePalette}
+        onCodeInsert={handleCodeInsert}
       />
 
       {!activeControllerId ? (
@@ -679,11 +692,11 @@ export default function UnifiedEditor({
       ) : (
         <>
           {/* Mode Selector Header */}
-          <div 
+          <div
             className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-gray-100"
-            style={{ 
+            style={{
               marginLeft: showCodePalette ? "320px" : "0px",
-              transition: "margin-left 300ms"
+              transition: "margin-left 300ms",
             }}
           >
             <div className="flex items-center gap-3">
@@ -691,20 +704,24 @@ export default function UnifiedEditor({
               <button
                 onClick={() => setShowCodePalette((prev) => !prev)}
                 className="flex items-center justify-center w-fit px-2 py-1 bg-blue-100 hover:bg-yellow-200 text-blue-800 text-sm rounded-md transition-all duration-200 border border-blue-200 hover:border-yellow-300"
-                title={showCodePalette ? "Hide Code Palette" : "Show Code Palette"}
+                title={
+                  showCodePalette ? "Hide Code Palette" : "Show Code Palette"
+                }
               >
                 <span
                   style={{
                     display: "inline-block",
                     transition: "transform 0.5s ease-in-out",
-                    transform: showCodePalette ? "rotate(180deg)" : "rotate(0deg)",
+                    transform: showCodePalette
+                      ? "rotate(180deg)"
+                      : "rotate(0deg)",
                   }}
                   className="flex items-center justify-center"
                 >
                   <FaArrowRight className="w-3 h-3" />
                 </span>
               </button>
-              
+
               <span className="text-sm text-gray-700 font-medium">
                 Editor Mode
               </span>
@@ -761,12 +778,12 @@ export default function UnifiedEditor({
 
           {/* Validation Error Display */}
           {validationError && (
-            <div 
+            <div
               className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg"
-              style={{ 
+              style={{
                 marginLeft: showCodePalette ? "324px" : "4px",
                 marginRight: "16px",
-                transition: "margin-left 300ms"
+                transition: "margin-left 300ms",
               }}
             >
               <div className="flex items-start gap-2">
@@ -814,11 +831,11 @@ export default function UnifiedEditor({
           )}
 
           {/* Editor Content */}
-          <div 
+          <div
             className="flex-1 overflow-hidden bg-white relative"
-            style={{ 
+            style={{
               marginLeft: showCodePalette ? "320px" : "0px",
-              transition: "margin-left 300ms"
+              transition: "margin-left 300ms",
             }}
           >
             {/* Loading Overlay */}

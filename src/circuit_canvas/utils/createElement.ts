@@ -38,6 +38,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["voltage", "resistance"],
   };
 
   const lightbulbElement = {
@@ -71,6 +72,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["resistance"],
   };
 
   const resistorElement = {
@@ -104,6 +106,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["resistance"],
   };
 
   const multimeterElement = {
@@ -139,6 +142,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["voltage", "resistance"],
   };
 
   const potentiometerElement = {
@@ -181,6 +185,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["resistance", "ratio"],
   };
   const ledElement = {
     id,
@@ -215,6 +220,7 @@ export default function createElement(
       },
       ...props.properties,
     },
+    displayProperties: ["resistance"],
   };
 
   const microbitElement = {
@@ -272,6 +278,7 @@ export default function createElement(
       brightness: props.properties?.brightness ?? 128, 
       ...props.properties,
     },
+    displayProperties: ["voltage", "resistance", "temperature", "brightness"],
   };
 
   const ultraSonicSensor4P = {
@@ -319,6 +326,7 @@ export default function createElement(
       resistance: props.properties?.resistance ?? 0,
       ...props.properties,
     },
+    displayProperties: ["voltage", "resistance"],
   };
 
   // switch based on type

@@ -104,7 +104,7 @@ export default function PropertiesPanel({
         </button>
       )}
 
-      {resistance != null && (
+      {resistance != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("resistance")) && (
         <div className="flex flex-col text-xs">
           <label>Resistance (Ω):</label>
           <input
@@ -116,7 +116,7 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {voltage != null && (
+      {voltage != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("voltage")) && (
         <div className="flex flex-col text-xs">
           <label>Voltage (V):</label>
           <input
@@ -128,7 +128,7 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {ratio != null && (
+      {ratio != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("ratio")) && (
         <div className="flex flex-col text-xs">
           <label>Ratio:</label>
           <input
@@ -147,7 +147,7 @@ export default function PropertiesPanel({
       {/* Microbit-specific controls */}
       {selectedElement.type === "microbit" && (
         <>
-          {temperature != null && (
+          {temperature != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("temperature")) && (
             <div className="flex flex-col text-xs">
               <label>Temperature (°C):</label>
               <input
@@ -164,7 +164,7 @@ export default function PropertiesPanel({
             </div>
           )}
 
-          {brightness != null && (
+          {brightness != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("brightness")) && (
             <div className="flex flex-col text-xs">
               <label>Brightness (0–255):</label>
               <input

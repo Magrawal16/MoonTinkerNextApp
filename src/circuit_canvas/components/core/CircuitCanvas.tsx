@@ -196,11 +196,47 @@ export default function CircuitCanvas() {
 
   // Update viewport on mount and resize
   useEffect(() => {
-    const handleResize = () => updateViewport();
+    const handleResize = () => updateViewport(true);
     updateViewport(); // Initial update
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        updateViewport(true);
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    // Detect container size changes (e.g., DevTools open/close) using ResizeObserver
+    let observer: ResizeObserver | null = null;
+    if (stageRef.current?.container()) {
+      observer = new ResizeObserver(() => {
+        // queue microtask to ensure Konva has applied size changes
+        Promise.resolve().then(() => updateViewport(true));
+      });
+      observer.observe(stageRef.current.container());
+    }
+    return () => {
+      window.removeEventListener("resize", handleResize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      if (observer && stageRef.current?.container()) {
+        observer.unobserve(stageRef.current.container());
+      }
+    };
   }, [updateViewport]);
+
+  // Fallback: force a batchDraw on pointer enter in case browser paused canvas while DevTools open
+  useEffect(() => {
+    const container = stageRef.current?.container();
+    if (!container) return;
+    const handleEnter = () => {
+      if (stageRef.current) {
+        // If there was a blank region, forcing viewport recalculation ensures grid draw
+        updateViewport(true);
+        stageRef.current.batchDraw();
+      }
+    };
+    container.addEventListener("pointerenter", handleEnter);
+    return () => container.removeEventListener("pointerenter", handleEnter);
+  }, []);
 
   function resetState() {
   // Reset canvas and seed history with an initial empty state

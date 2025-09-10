@@ -22,7 +22,7 @@ const SENSOR_Y = -25; // Sensor face Y (adjust for your image asset)
 const EYE_OFFSET_X = 30; // Reduced offset for smaller sensor
 const EYE_RADIUS = 15;   // Slightly smaller eyes
 const RANGE_RADIUS = SENSOR_MAX_CM * CM_TO_PX;
-const RANGE_ANGLE = 15; // HC-SR04 typical detection angle: 15° either side (30° total spread)
+const RANGE_ANGLE = 75; // HC-SR04 typical detection angle: 15° either side (30° total spread)
 const BALL_RADIUS = 9;
 
 interface BallPosition {

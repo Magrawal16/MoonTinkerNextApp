@@ -624,9 +624,6 @@ export default function UnifiedEditor({
     }
   };
 
-  // Convert code to blocks when switching to block mode (removed the conflicting effect)
-  // The conversion is now handled directly in handleModeChange for better control
-
   // Handle workspace resize when container becomes visible
   useEffect(() => {
     if (editorMode === "block" && workspaceRef.current && workspaceReady) {
@@ -667,12 +664,101 @@ export default function UnifiedEditor({
   const handleCodeInsert = useCallback((code: string) => {
   if (!activeControllerId) return;
   
-  // Get current code and cursor position from Monaco editor
-  // This would need to be implemented based on your editor implementation
+  // Get current code
   const currentCode = localCode;
+  let newCode = currentCode;
   
-  // For now, we'll just append the code at the end
-  const newCode = currentCode + (currentCode ? '\n\n' : '') + code;
+  // Determine the category based on code content
+  const isImport = code.trim().startsWith('import ') || code.trim().startsWith('from ');
+  const isFunction = code.trim().startsWith('def ') || code.trim().startsWith('async def ');
+  
+  // Handle different insertion strategies based on code type
+  if (isImport) {
+    // Import statements should be at the top
+    const lines = currentCode.split('\n');
+    
+    // Find the last import statement or the top of the file
+    let lastImportIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].trim().startsWith('import ') || lines[i].trim().startsWith('from ')) {
+        lastImportIndex = i;
+      } else if (lines[i].trim().length > 0 && !lines[i].trim().startsWith('#')) {
+        // Found a non-import, non-comment line - stop searching
+        break;
+      }
+    }
+    
+    // Insert after the last import or at the beginning
+    if (lastImportIndex >= 0) {
+      lines.splice(lastImportIndex + 1, 0, code);
+    } else {
+      // No imports found, add at the top
+      lines.unshift(code);
+    }
+    
+    // Ensure there's a blank line after imports if there are other statements
+    if (lines.length > lastImportIndex + 2 && lines[lastImportIndex + 2].trim().length > 0) {
+      lines.splice(lastImportIndex + 2, 0, '');
+    }
+    
+    newCode = lines.join('\n');
+  } else if (isFunction) {
+    // Function definitions should be at the top level, after imports
+    const lines = currentCode.split('\n');
+    let insertIndex = lines.length;
+    
+    // Find the end of imports and any top-level code
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line.startsWith('def ') || line.startsWith('async def ') || line.startsWith('class ')) {
+        insertIndex = i;
+        break;
+      }
+    }
+    
+    // Add a blank line before the function if needed
+    if (insertIndex > 0 && lines[insertIndex - 1].trim() !== '') {
+      lines.splice(insertIndex, 0, '');
+      insertIndex++;
+    }
+    
+    lines.splice(insertIndex, 0, code);
+    newCode = lines.join('\n');
+  } else {
+    // For other code, just append with proper indentation
+    const lines = currentCode.split('\n');
+    const lastLine = lines[lines.length - 1] || '';
+    
+    // Calculate current indentation level
+    const indentMatch = lastLine.match(/^(\s*)/);
+    const currentIndent = indentMatch ? indentMatch[1] : '';
+    
+    // Add indentation to the new code if it's not a top-level statement
+    const codeLines = code.split('\n');
+    const formattedCode = codeLines.map(line => {
+      // Don't add extra indentation to empty lines or comments
+      if (line.trim() === '' || line.trim().startsWith('#')) return line;
+      
+      // Check if this line should be at the top level
+      const isTopLevel = line.trim().startsWith('import ') || 
+                        line.trim().startsWith('from ') || 
+                        line.trim().startsWith('def ') || 
+                        line.trim().startsWith('async def ') || 
+                        line.trim().startsWith('class ') || 
+                        line.trim().startsWith('while ') || 
+                        line.trim().startsWith('for ') || 
+                        line.trim().startsWith('if ') || 
+                        line.trim().startsWith('elif ') || 
+                        line.trim().startsWith('else:');
+      
+      return isTopLevel ? line : currentIndent + line;
+    }).join('\n');
+    
+    // Add a blank line if the current code doesn't end with one
+    const separator = currentCode.trim() === '' ? '' : '\n\n';
+    newCode = currentCode + separator + formattedCode;
+  }
+  
   handleCodeChange(newCode);
 }, [activeControllerId, localCode, handleCodeChange]);
 
@@ -850,8 +936,8 @@ export default function UnifiedEditor({
                     <h3 className="text-lg font-semibold text-gray-800 mb-1">
                       {conversionType === "toBlocks"
                         ? "Converting to Blocks..."
-                        : "Converting to Text..."}
-                    </h3>
+                        : "Converting to Text..."
+                    }</h3>
                     <p className="text-sm text-gray-600">
                       {conversionType === "toBlocks"
                         ? "Transforming your Python code into visual blocks"

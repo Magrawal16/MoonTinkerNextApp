@@ -18,7 +18,7 @@ export const useViewport = (stageRef: RefObject<Konva.Stage | null>) => {
     scale: 1,
   });
 
-  const updateViewport = useCallback(() => {
+  const updateViewport = useCallback((force: boolean = false) => {
     if (!stageRef.current) return;
 
     const stage = stageRef.current;
@@ -36,15 +36,21 @@ export const useViewport = (stageRef: RefObject<Konva.Stage | null>) => {
     };
 
     setViewport((prev) => {
-      // Only update if there's a significant change
-      const threshold = 10;
-      if (
-        Math.abs(prev.x - newViewport.x) > threshold ||
-        Math.abs(prev.y - newViewport.y) > threshold ||
-        Math.abs(prev.width - newViewport.width) > threshold ||
-        Math.abs(prev.height - newViewport.height) > threshold ||
-        Math.abs(prev.scale - newViewport.scale) > 0.01
+      // More sensitive resize detection so DevTools open/close repaints grid
+      const moveThreshold = 10;      // pan threshold
+      const sizeThreshold = 2;       // width/height threshold (smaller so layout changes refresh)
+      const scaleThreshold = 0.01;   // scale threshold
+      if (force ||
+        Math.abs(prev.x - newViewport.x) > moveThreshold ||
+        Math.abs(prev.y - newViewport.y) > moveThreshold ||
+        Math.abs(prev.width - newViewport.width) > sizeThreshold ||
+        Math.abs(prev.height - newViewport.height) > sizeThreshold ||
+        Math.abs(prev.scale - newViewport.scale) > scaleThreshold
       ) {
+        // Schedule a redraw on next frame so layers (grid) repaint immediately
+        requestAnimationFrame(() => {
+          if (stageRef.current) stageRef.current.batchDraw();
+        });
         return newViewport;
       }
       return prev;

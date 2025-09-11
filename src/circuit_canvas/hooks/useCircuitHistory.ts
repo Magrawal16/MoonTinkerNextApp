@@ -1,5 +1,5 @@
 // hooks/useCircuitHistory.ts
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 
 type Snapshot = { elements: CircuitElement[]; wires: Wire[] };
@@ -13,13 +13,58 @@ export const useCircuitHistory = () => {
 
   const deepClone = (v: any) => JSON.parse(JSON.stringify(v));
 
+  // Cache of last-known properties per element id (persists across history navigation)
+  const propertyCacheRef = useRef<Record<string, CircuitElement["properties"]>>({});
+
+  const syncProperties = useCallback((elements: CircuitElement[]) => {
+    elements.forEach((e) => {
+      propertyCacheRef.current[e.id] = deepClone(e.properties);
+    });
+  }, []);
+
+  // Remove transient solver outputs before saving into history
+  const stripComputed = (elements: CircuitElement[]): CircuitElement[] =>
+    elements.map((e) => {
+      const clone = deepClone(e) as CircuitElement;
+      if (clone.computed) {
+        // Drop computed entirely so UI falls back to 0 when simulation is off
+        delete (clone as any).computed;
+      }
+      return clone;
+    });
+
+  const makeSnapshot = (elements: CircuitElement[], wires: Wire[]): Snapshot => ({
+    elements: stripComputed(elements),
+    wires: deepClone(wires),
+  });
+
+  // Merge: keep topology/positions from snapshot but preserve current properties for existing elements
+  const mergePreserveProperties = (
+    current: CircuitElement[],
+    snapshot: CircuitElement[]
+  ): CircuitElement[] => {
+    const currentMap = new Map(current.map((e) => [e.id, e] as const));
+    return snapshot.map((snap) => {
+      const cur = currentMap.get(snap.id);
+      // Prefer last-known properties from cache; fall back to current element, then snapshot
+      const cachedProps = propertyCacheRef.current[snap.id];
+      return {
+        ...snap,
+        properties: cachedProps ?? cur?.properties ?? snap.properties,
+      };
+    });
+  };
+
   // Optional explicit initializer for when your canvas starts non-empty
   const initializeHistory = useCallback((elements: CircuitElement[], wires: Wire[]) => {
-    setState({ entries: [{ elements: deepClone(elements), wires: deepClone(wires) }], index: 0 });
-  }, []);
+    syncProperties(elements);
+    setState({ entries: [makeSnapshot(elements, wires)], index: 0 });
+  }, [syncProperties]);
 
   const pushToHistory = useCallback((elements: CircuitElement[], wires: Wire[]) => {
     setState(prev => {
+  // Always keep property cache up-to-date with latest elements
+  syncProperties(elements);
       let entries = prev.entries;
       let index = prev.index;
 
@@ -34,8 +79,8 @@ export const useCircuitHistory = () => {
         entries = entries.slice(0, index + 1);
       }
 
-      const last = entries[entries.length - 1];
-      const nextSnap: Snapshot = { elements: deepClone(elements), wires: deepClone(wires) };
+  const last = entries[entries.length - 1];
+  const nextSnap: Snapshot = makeSnapshot(elements, wires);
 
       // Skip push if identical to last (prevents accidental double-push)
       const same = JSON.stringify(last) === JSON.stringify(nextSnap);
@@ -52,18 +97,23 @@ export const useCircuitHistory = () => {
 
       return { entries: nextEntries, index: nextIndex };
     });
-  }, []);
+  }, [syncProperties]);
 
   const undo = useCallback((
     setElements: (elements: CircuitElement[]) => void,
     setWires: (wires: Wire[]) => void,
-    stopSimulation: () => void
+    stopSimulation: () => void,
+    getCurrentElements?: () => CircuitElement[]
   ) => {
     if (state.index <= 0) return; // Cannot undo beyond initial state
     const newIndex = state.index - 1;
     const snap = state.entries[newIndex];
-    const els = deepClone(snap.elements);
-    const ws = deepClone(snap.wires);
+    // Snapshots already stripped; deep clone and preserve current properties for existing elements
+  const currentEls = getCurrentElements ? getCurrentElements() : state.entries[state.index].elements;
+  const els = mergePreserveProperties(currentEls, deepClone(snap.elements));
+  // Ensure computed is absent when restoring
+  els.forEach((e: any) => delete e.computed);
+  const ws = deepClone(snap.wires);
     setElements(els);
     setWires(ws);
     setState(prev => ({ ...prev, index: newIndex }));
@@ -73,13 +123,16 @@ export const useCircuitHistory = () => {
   const redo = useCallback((
     setElements: (elements: CircuitElement[]) => void,
     setWires: (wires: Wire[]) => void,
-    stopSimulation: () => void
+    stopSimulation: () => void,
+    getCurrentElements?: () => CircuitElement[]
   ) => {
     if (state.index >= state.entries.length - 1) return; // Cannot redo beyond latest state
     const newIndex = state.index + 1;
     const snap = state.entries[newIndex];
-    const els = deepClone(snap.elements);
-    const ws = deepClone(snap.wires);
+  const currentEls = getCurrentElements ? getCurrentElements() : state.entries[state.index].elements;
+  const els = mergePreserveProperties(currentEls, deepClone(snap.elements));
+  els.forEach((e: any) => delete e.computed);
+  const ws = deepClone(snap.wires);
     setElements(els);
     setWires(ws);
     setState(prev => ({ ...prev, index: newIndex }));
@@ -103,5 +156,6 @@ export const useCircuitHistory = () => {
     clearHistory,
     canUndo,
     canRedo,
+  syncProperties,
   };
 };

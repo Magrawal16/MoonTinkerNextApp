@@ -131,7 +131,7 @@ export default function CircuitCanvas() {
   );
 
   // Use the history hook
-  const { history, pushToHistory, initializeHistory, undo, redo, clearHistory, canUndo, canRedo } =
+  const { history, pushToHistory, initializeHistory, undo, redo, clearHistory, canUndo, canRedo, syncProperties } =
     useCircuitHistory();
 
   // Initialize wire management hook
@@ -357,7 +357,8 @@ export default function CircuitCanvas() {
               setWires(ws); // custom setter keeps wiresRef in sync
               updateWiresDirect();
             },
-            stopSimulation
+            stopSimulation,
+            () => elementsRef.current
           ),
         redo: () =>
           redo(
@@ -370,7 +371,8 @@ export default function CircuitCanvas() {
               setWires(ws);
               updateWiresDirect();
             },
-            stopSimulation
+            stopSimulation,
+            () => elementsRef.current
           ),
         isSimulationOn: simulationRunning,
       }),
@@ -953,8 +955,9 @@ export default function CircuitCanvas() {
                   wires={wires}
                   getNodeById={getNodeById}
                   onElementEdit={(updatedElement, deleteElement) => {
-                    pushToHistory(elements, wiresRef.current);
                     if (deleteElement) {
+                      // Record deletion so it can be undone
+                      pushToHistory(elements, wiresRef.current);
                       const updatedWires = wires.filter(
                         (w) =>
                           getNodeParent(w.fromNodeId)?.id !==
@@ -970,12 +973,15 @@ export default function CircuitCanvas() {
                       setEditingWire(null);
                       stopSimulation();
                     } else {
+                      // Property edits should NOT affect history; apply without push
                       setElements((prev) => {
                         const next = prev.map((el) =>
                           el.id === updatedElement.id
                             ? { ...el, ...updatedElement, x: el.x, y: el.y }
                             : el
                         );
+                        // Keep property cache in sync so undo/redo retains these values
+                        syncProperties(next);
                         elementsRef.current = next;
                         updateWiresDirect();
                         return next;

@@ -78,24 +78,51 @@ export default function Led(props: LedProps) {
             />
           </>
         ) : (
-          // Normal LED filament glow ("M" shaped)
           brightness > 0 && (
-            <Line
-              points={[
-                25, 55, // left leg
-                35, 35, // peak 1
-                45, 55, // valley
-                55, 35, // peak 2
-                65, 55, // right leg
-              ]}
-              stroke="red"
-              strokeWidth={2 + 2 * brightness}
-              shadowColor="red"
-              shadowBlur={10 + 40 * brightness}
-              shadowOpacity={0.5 + 0.5 * brightness}
-              lineCap="round"
-              lineJoin="round"
-            />
+            <>
+              {/* Outer glow */}
+              <Line
+                x={-3}
+                y={5}
+                points={[
+                  30, 40, // left start
+                  34, 30, // top left
+                  37.5, 40, // center bottom
+                  41, 30, // top right
+                  45, 40, // right end
+                ]}
+                stroke="rgba(255,100,100,0.4)"
+                strokeWidth={3 + 4 * brightness}
+                shadowColor="red"
+                shadowBlur={15 + 40 * brightness}
+                shadowOpacity={0.7}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+                globalCompositeOperation="lighten"
+              />
+              {/* Inner bright core */}
+              <Line
+                x={-3}
+                y={5}
+                points={[
+                  30, 40, // left start
+                  34, 30, // top left
+                  37.5, 40, // center bottom
+                  41, 30, // top right
+                  45, 40, // right end
+                ]}
+                stroke="yellow"
+                strokeWidth={1 + 2 * brightness}
+                shadowColor="white"
+                shadowBlur={10 + 30 * brightness}
+                shadowOpacity={0.9}
+                lineCap="round"
+                lineJoin="round"
+                listening={false}
+                globalCompositeOperation="lighten"
+              />
+            </>
           )
         )}
       </Group>

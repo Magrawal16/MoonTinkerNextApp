@@ -8,7 +8,7 @@ export type CircuitElement = {
   nodes: Node[];
   connecters?: ElementConnecter[];
   type: string;
-  displayProperties?: string[]; // which properties to show in the panel
+  
   properties?: {
     voltage?: number; // for power sources like batteries
     resistance?: number; // all components can have resistance

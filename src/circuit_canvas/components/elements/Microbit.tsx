@@ -4,11 +4,9 @@ import {
   BaseElementProps,
   MicrobitProps,
 } from "@/circuit_canvas/types/circuit";
-import {
-  BaseElement,
-} from "@/circuit_canvas/components/core/BaseElement";
-import { useEffect, useState } from "react";
-import { Group, Image, Rect, Text } from "react-konva";
+import { BaseElement } from "@/circuit_canvas/components/core/BaseElement";
+import { useEffect, useState, useRef } from "react";
+import { Group, Image, Rect, Text, Circle } from "react-konva";
 
 export default function Microbit({
   leds,
@@ -20,6 +18,18 @@ export default function Microbit({
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
   const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
+
+  // Logo (touch sensor) interaction state
+  const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
+  const isPressingRef = useRef(false);
+
+  // Tunable constants for logo overlay alignment
+  // Adjust LOGO_X / LOGO_Y to perfectly cover the SVG logo.
+  const LOGO_X = 95.2;     // horizontal position
+  const LOGO_Y = 91.2;     // vertical position (was 55; moved down to align)
+  const LOGO_W = 29.2;
+  const LOGO_H = 16.2;
+
   useEffect(() => {
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit.svg";
@@ -45,6 +55,74 @@ export default function Microbit({
     setBtnPressed(btn);
     onControllerInput?.(btn);
     setTimeout(() => setBtnPressed(null), 150);
+  };
+
+  // Logo stroke color logic
+  const logoStroke =
+    !isSimulationOn
+      ? "rgb(200,36,52)"
+      : logoState === "pressed"
+        ? "green"
+        : logoState === "hover"
+          ? "yellow"
+          : "rgb(200,36,52)";
+
+  const enableLogoInteraction = isSimulationOn;
+
+  const setCursor = (cursor: string, e: any) => {
+    const stage = e?.target?.getStage?.();
+    if (stage) stage.container().style.cursor = cursor;
+  };
+
+  const onLogoEnter = (e: any) => {
+    if (!enableLogoInteraction) return;
+    if (!isPressingRef.current) setLogoState("hover");
+    setCursor("pointer", e);
+  };
+
+  const onLogoLeave = (e: any) => {
+    if (!enableLogoInteraction) return;
+    if (isPressingRef.current) {
+      // user dragged outside while pressing
+      setLogoState("pressed");
+    } else {
+      setLogoState("idle");
+      setCursor("default", e);
+    }
+  };
+
+  const onLogoDown = (e: any) => {
+    if (!enableLogoInteraction) return;
+    isPressingRef.current = true;
+    setLogoState("pressed");
+    setCursor("pointer", e);
+  };
+
+  const endPress = (inside: boolean) => {
+    isPressingRef.current = false;
+    setLogoState(inside ? "hover" : "idle");
+  };
+
+  const onLogoUp = () => {
+    if (!enableLogoInteraction) return;
+    endPress(true);
+  };
+
+  // Global mouseup to handle release outside
+  useEffect(() => {
+    const handleWindowUp = () => {
+      if (isPressingRef.current) endPress(false);
+    };
+    window.addEventListener("mouseup", handleWindowUp);
+    window.addEventListener("touchend", handleWindowUp);
+    return () => {
+      window.removeEventListener("mouseup", handleWindowUp);
+      window.removeEventListener("touchend", handleWindowUp);
+    };
+  }, []);
+
+  const onLogoClick = () => {
+    // Hook for future logo touch event dispatch if needed
   };
 
   return (
@@ -100,6 +178,44 @@ export default function Microbit({
             />
           ))
         )}
+
+        {/* Touch (Logo) Sensor Overlay */}
+        <Group
+          x={LOGO_X}
+          y={LOGO_Y}
+          listening={true}
+          onMouseEnter={onLogoEnter}
+          onMouseLeave={onLogoLeave}
+          onMouseDown={onLogoDown}
+          onMouseUp={onLogoUp}
+          onClick={onLogoClick}
+          onTouchStart={onLogoDown}
+          onTouchEnd={onLogoUp}
+        >
+          {/* Outer oval */}
+          <Rect
+            width={LOGO_W}
+            height={LOGO_H}
+            cornerRadius={20}
+            stroke={logoStroke}
+            strokeWidth={3}
+            fill="rgba(0,0,0,0.55)"
+            opacity={0.95}
+          />
+          {/* Inner pads */}
+          <Circle x={LOGO_W * 0.30} y={LOGO_H / 2} radius={2.5} fill={logoStroke} />
+          <Circle x={LOGO_W * 0.70} y={LOGO_H / 2} radius={2.5} fill={logoStroke} />
+          {/* Invisible enlarged hit area */}
+          <Rect
+            width={LOGO_W + 6}
+            height={LOGO_H + 6}
+            x={-3}
+            y={-3}
+            cornerRadius={24}
+            fill="transparent"
+          />
+        </Group>
+
         {/* Button AB */}
         <Group
           onClick={(e) => {
@@ -109,7 +225,6 @@ export default function Microbit({
           x={164}
           y={96}
         >
-          {/* Blue Circle when pressed */}
           {btnPressed === "AB" && (
             <Rect
               width={12}
@@ -122,21 +237,8 @@ export default function Microbit({
               y={0.6}
             />
           )}
-          <Rect
-            width={20}
-            height={20}
-            fill=""
-            cornerRadius={10}
-            shadowBlur={3}
-          />
-          <Text
-            text=""
-            fill="white"
-            x={6}
-            y={3}
-            fontSize={12}
-            fontStyle="bold"
-          />
+          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
 
         {/* Button A */}
@@ -148,7 +250,6 @@ export default function Microbit({
           x={35}
           y={130}
         >
-          {/* Blue Circle when pressed */}
           {btnPressed === "A" && (
             <Rect
               width={16}
@@ -161,21 +262,8 @@ export default function Microbit({
               y={0.6}
             />
           )}
-          <Rect
-            width={20}
-            height={20}
-            fill=""
-            cornerRadius={10}
-            shadowBlur={3}
-          />
-          <Text
-            text=""
-            fill="white"
-            x={6}
-            y={3}
-            fontSize={12}
-            fontStyle="bold"
-          />
+          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
 
         {/* Button B */}
@@ -187,7 +275,6 @@ export default function Microbit({
           x={165}
           y={130}
         >
-          {/* Blue Circle when pressed */}
           {btnPressed === "B" && (
             <Rect
               width={16}
@@ -200,21 +287,8 @@ export default function Microbit({
               y={0.6}
             />
           )}
-          <Rect
-            width={20}
-            height={20}
-            fill=""
-            cornerRadius={10}
-            shadowBlur={3}
-          />
-          <Text
-            text=""
-            fill="white"
-            x={6}
-            y={3}
-            fontSize={12}
-            fontStyle="bold"
-          />
+          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
       </Group>
     </BaseElement>

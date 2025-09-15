@@ -57,6 +57,10 @@ export default function Lightbulb(props: LightbulbProps) {
   // Thermal inertia: we keep an internal smoothed brightness state
   const [thermalBrightness, setThermalBrightness] = useState(0);
   useEffect(() => {
+     if (isOverloaded) {
+    setThermalBrightness(0);
+    return;
+  }
     // Decide smoothing factor per frame based on heating vs cooling
     const heating = target > thermalBrightness;
     const tau = heating ? HEAT_RISE_MS : COOL_FALL_MS; // time constant
@@ -74,6 +78,7 @@ export default function Lightbulb(props: LightbulbProps) {
 
   // Overload flag based on actual electrical input
   const isOverloaded = rawPowerW > OVERLOAD_POWER_W;
+  
 
   // Color mapping: keep a saturated warm yellow at high power (closer to earlier look)
   // Blend from deep amber (255,100,20) to rich golden yellow (255,215,0) instead of pale warm white.

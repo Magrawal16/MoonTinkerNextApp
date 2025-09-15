@@ -79,6 +79,7 @@ export default function RenderElement({
           y={0}
           power={element.computed?.power ?? 0}
           selected={props.selectedElementId === element.id}
+          color={element.properties?.color as string | undefined}
         />
       )}
       {element.type === "battery" && (

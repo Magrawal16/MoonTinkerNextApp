@@ -17,6 +17,7 @@ export type CircuitElement = {
     distance?: number; // cm
     temperature?: number; 
     brightness?: number;
+    color?: string;
   };
   computed?: {
     current?: number; // computed current through the element
@@ -82,6 +83,7 @@ export type CircuitElementProps = {
     ratio?: number;
     temperature?: number;
     brightness?: number;
+    color?: string;
   };
 };
 

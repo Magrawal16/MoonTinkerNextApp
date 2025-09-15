@@ -196,8 +196,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 27,
-        y: 60,
+        x: 15,
+        y: 62,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Cathode",
@@ -205,8 +205,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 41,
-        y: 60,
+        x: 34,
+        y: 62,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Anode",
@@ -217,10 +217,11 @@ export default function createElement(
       ...{
         voltage: props.properties?.voltage,
         resistance: props.properties?.resistance ?? 1,
+        color: props.properties?.color ?? 'red',
       },
       ...props.properties,
     },
-    displayProperties: ["resistance"],
+    displayProperties: ["resistance", "color"],
   };
 
   const microbitElement = {

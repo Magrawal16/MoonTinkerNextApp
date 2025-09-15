@@ -24,6 +24,7 @@ export default function PropertiesPanel({
   const [ratio, setRatio] = useState<number | null>(null);
   const [temperature, setTemperature] = useState<number | null>(null);
   const [brightness, setBrightness] = useState<number | null>(null);
+  const [color, setColor] = useState<string | null>(null);
   const [selectedWireColor, setSelectedWireColor] = useState<string>(
     wireColor || defaultColors[0].hex
   );
@@ -35,6 +36,7 @@ export default function PropertiesPanel({
     setRatio(selectedElement?.properties?.ratio ?? null);
     setTemperature(selectedElement?.properties?.temperature ?? null);
     setBrightness(selectedElement?.properties?.brightness ?? null);
+    setColor(selectedElement?.properties?.color ?? null);
     setSelectedWireColor(wireColor || defaultColors[0].hex);
   }, [selectedElement]);
 
@@ -57,6 +59,7 @@ export default function PropertiesPanel({
           ratio: ratio ?? undefined,
           temperature: temperature ?? undefined,
           brightness: brightness ?? undefined,
+          color: color ?? undefined,
         },
       };
       onElementEdit(updatedElement, false);
@@ -141,6 +144,23 @@ export default function PropertiesPanel({
           <span className="text-gray-500 mt-1">
             Eff. Resistance: {(ratio * (resistance ?? 0)).toFixed(2)} Ω
           </span>
+        </div>
+      )}
+      {color != null && selectedElement.type === 'led' && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("color")) && (
+        <div className="flex flex-col text-xs">
+          <label>LED Color:</label>
+          <select
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="yellow">Yellow</option>
+            <option value="white">White</option>
+            <option value="orange">Orange</option>
+          </select>
         </div>
       )}
 

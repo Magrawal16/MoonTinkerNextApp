@@ -48,7 +48,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "led",
     label: "Led",
-    iconPath: "assets/circuit_canvas/elements/led.svg",
+    iconPath: "assets/circuit_canvas/elements/red_led.svg",
     defaultProps: { resistance: 1 },
     //max current 20ma, max voltage 2,
   },

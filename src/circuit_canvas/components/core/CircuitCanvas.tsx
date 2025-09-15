@@ -75,6 +75,7 @@ export default function CircuitCanvas() {
 
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationRunningRef = useRef(simulationRunning);
+  const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
   const { showMessage } = useMessage();
 
   useEffect(() => {
@@ -713,6 +714,14 @@ export default function CircuitCanvas() {
     setShowPropertiesPannel(false);
   };
 
+  // Clear any selected wire/element when user begins creating a new wire
+  useEffect(() => {
+    if (creatingWireStartNode) {
+      if (selectedElement) setSelectedElement(null);
+      if (showPropertiesPannel) setShowPropertiesPannel(false);
+    }
+  }, [creatingWireStartNode]);
+
   return (
     <div
       className={styles.canvasContainer}
@@ -1068,8 +1077,29 @@ export default function CircuitCanvas() {
                     const midY = (y1 + y2) / 2;
                     points.splice(2, 0, midX, midY);
                   }
+                  const isSelected = selectedElement?.id === wire.id;
+                  const isHovered = !simulationRunning && !creatingWireStartNode && hoveredWireId === wire.id && !(selectedElement?.id === wire.id);
+                  const baseColor = getWireColor(wire) || "black";
 
-                  return (
+                  return [
+                    isHovered && (
+                      <Line
+                        key={`hover-outline-${wire.id}`}
+                        points={points}
+                        stroke={baseColor}
+                        strokeWidth={isSelected ? 7 : 6}
+                        lineCap="round"
+                        lineJoin="round"
+                        tension={0.1}
+                        bezier
+                        opacity={0.18}
+                        shadowColor={baseColor}
+                        shadowBlur={10}
+                        shadowOpacity={0.6}
+                        shadowEnabled
+                        listening={false}
+                      />
+                    ),
                     <Line
                       key={wire.id}
                       ref={(ref) => {
@@ -1080,23 +1110,17 @@ export default function CircuitCanvas() {
                         }
                       }}
                       points={points}
-                      stroke={getWireColor(wire) || "black"}
-                      strokeWidth={selectedElement?.id === wire.id ? 4 : 3}
-                      hitStrokeWidth={16}
+                      stroke={baseColor}
+                      strokeWidth={isSelected ? 4 : 3}
+                      hitStrokeWidth={18}
                       tension={0.1}
                       lineCap="round"
                       lineJoin="round"
                       bezier
-                      shadowColor={
-                        selectedElement?.id === wire.id
-                          ? "blue"
-                          : getWireColor(wire)
-                      }
-                      shadowEnabled={true}
-                      shadowBlur={selectedElement?.id === wire.id ? 5 : 2}
-                      shadowOpacity={
-                        selectedElement?.id === wire.id ? 0.9 : 0.25
-                      }
+                      shadowColor={isSelected ? "blue" : baseColor}
+                      shadowEnabled
+                      shadowBlur={isSelected ? 5 : 2}
+                      shadowOpacity={isSelected ? 0.9 : 0.25}
                       opacity={0.95}
                       onClick={() => {
                         setSelectedElement({
@@ -1108,8 +1132,14 @@ export default function CircuitCanvas() {
                         });
                         setShowPropertiesPannel(true);
                       }}
-                    />
-                  );
+                      onMouseEnter={() => {
+                        if (!simulationRunning) setHoveredWireId(wire.id);
+                      }}
+                      onMouseLeave={() => {
+                        if (hoveredWireId === wire.id) setHoveredWireId(null);
+                      }}
+                    />,
+                  ];
                 })}
 
                 <Circle

@@ -270,11 +270,32 @@ export const useWireManagement = ({
       }
 
   // Second click: create wire
+      // Before creating, check for an existing wire connecting these two nodes (either direction)
+      const duplicateExists = wiresRef.current.some(
+        (w) =>
+          (w.fromNodeId === creatingWireStartNode && w.toNodeId === nodeId) ||
+          (w.fromNodeId === nodeId && w.toNodeId === creatingWireStartNode)
+      );
+
+      if (duplicateExists) {
+        // Discard creation attempt (Tinkercad-like behavior: silently ignore)
+        setCreatingWireStartNode(null);
+        setCreatingWireJoints([]);
+        if (inProgressWireRef.current) {
+          inProgressWireRef.current.visible(false);
+        }
+        if (animatedCircleRef.current) {
+          animatedCircleRef.current.visible(false);
+        }
+        return; // Do not push history or stop simulation since nothing changed
+      }
+
       const newWire: Wire = {
         // Ensure unique incremental ID even if wires were loaded from storage
         // or counter was reset. We probe for the next free numeric suffix.
         id: (function generateWireId() {
-          const existing = new Set(wires.map((w) => w.id));
+          // Use current ref (more up-to-date than state in fast successive creations)
+          const existing = new Set(wiresRef.current.map((w) => w.id));
           let candidate = wireCounter;
           while (existing.has(`wire-${candidate}`)) candidate++;
           // Update counter so subsequent wires continue after this one
@@ -315,7 +336,7 @@ export const useWireManagement = ({
       wireCounter,
       wires,
       selectedWireColor,
-  pushToHistorySnapshot,
+      pushToHistorySnapshot,
       stopSimulation,
       getNodeById,
       getNodeParent,

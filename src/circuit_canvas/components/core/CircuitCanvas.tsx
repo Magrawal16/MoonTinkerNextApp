@@ -102,6 +102,7 @@ export default function CircuitCanvas() {
   }
 };
 
+
 const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
   setMicrobitControls(prev => ({
     ...prev,

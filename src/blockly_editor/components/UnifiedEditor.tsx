@@ -110,20 +110,20 @@ export default function UnifiedEditor({
    */
   const initializeWorkspace = useCallback(() => {
     if (!blocklyRef.current) {
-      console.log("⚠️ Skipping initialization - no container element");
+      ("⚠️ Skipping initialization - no container element");
       return;
     }
 
     // If workspace already exists and is healthy, don't reinitialize
     if (workspaceRef.current && workspaceRef.current.rendered) {
-      console.log("✅ Workspace already exists and is rendered");
+      ("✅ Workspace already exists and is rendered");
       setWorkspaceReady(true);
       return;
     }
 
     // Clean up existing workspace if it exists but isn't healthy
     if (workspaceRef.current) {
-      console.log("🧹 Cleaning up existing workspace before reinitializing");
+      ("🧹 Cleaning up existing workspace before reinitializing");
       try {
         workspaceRef.current.dispose();
       } catch (error) {
@@ -133,7 +133,7 @@ export default function UnifiedEditor({
       setWorkspaceReady(false);
     }
 
-    console.log("🚀 Initializing Blockly workspace...");
+    ("🚀 Initializing Blockly workspace...");
 
     try {
       // Step 1: Initialize block definitions
@@ -162,7 +162,7 @@ export default function UnifiedEditor({
       setBidirectionalConverter(converter);
 
       // Step 4: Set up change listener for blocks → Python conversion
-      console.log("🔧 Step 4: Setting up change listener...");
+      ("🔧 Step 4: Setting up change listener...");
 
       let conversionTimeout: NodeJS.Timeout | null = null;
 
@@ -214,13 +214,13 @@ export default function UnifiedEditor({
 
       // Step 5: Mark as ready
       setWorkspaceReady(true);
-      console.log("🎉 Workspace initialization complete!");
+      ("🎉 Workspace initialization complete!");
 
       // Step 6: Convert current code to blocks if we have code
       setTimeout(() => {
         const currentCode = localCodeRef.current;
         if (workspace && currentCode.trim() && converter) {
-          console.log("hello world!!!");
+          ("hello world!!!");
           try {
             converter.pythonToBlocks(currentCode);
             lastCodeRef.current = currentCode;
@@ -353,7 +353,7 @@ export default function UnifiedEditor({
       isUpdatingFromBlocks ||
       editorMode !== "block" // Only convert if we're in block mode
     ) {
-      console.log("⚠️ Skipping blocks to code conversion - conditions not met");
+      ("⚠️ Skipping blocks to code conversion - conditions not met");
       return;
     }
 
@@ -377,7 +377,7 @@ export default function UnifiedEditor({
 
         stopSimulation();
       } else {
-        console.log("⚡ Code unchanged, skipping update");
+        ("⚡ Code unchanged, skipping update");
       }
     } catch (error) {
       console.error("❌ Error converting blocks to code:", error);
@@ -533,7 +533,7 @@ export default function UnifiedEditor({
 
     if (newMode === "block") {
       // Converting to block mode - validate the code first
-      console.log("🔄 Validating code before switching to block mode...");
+      ("🔄 Validating code before switching to block mode...");
 
       // Validate that all code can be converted to blocks
       const validation =
@@ -548,7 +548,7 @@ export default function UnifiedEditor({
         return; // Don't switch modes
       }
 
-      console.log("✅ Code validation passed - proceeding with mode switch");
+      ("✅ Code validation passed - proceeding with mode switch");
 
       // Set loading state for conversion to blocks
       setIsConverting(true);
@@ -558,7 +558,7 @@ export default function UnifiedEditor({
 
       // Always reinitialize workspace when switching to block mode
       // This ensures a clean state and prevents stale workspace issues
-      console.log("🔄 Switching to block mode - reinitializing workspace...");
+      ("🔄 Switching to block mode - reinitializing workspace...");
       setWorkspaceReady(false);
 
       // Clean up existing workspace first
@@ -580,7 +580,7 @@ export default function UnifiedEditor({
       }, 100);
     } else {
       // Converting to text mode - convert blocks to Python code first
-      console.log("🔄 Switching to text mode - converting blocks to code...");
+      ("🔄 Switching to text mode - converting blocks to code...");
 
       // Set loading state for conversion to text
       setIsConverting(true);

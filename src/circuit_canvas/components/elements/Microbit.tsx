@@ -1,19 +1,12 @@
-'use client';
+"use client";
 
-import { BaseElementProps, MicrobitProps } from "@/circuit_canvas/types/circuit";
+import {
+  BaseElementProps,
+  MicrobitProps,
+} from "@/circuit_canvas/types/circuit";
 import { BaseElement } from "@/circuit_canvas/components/core/BaseElement";
 import { useEffect, useState, useRef } from "react";
 import { Group, Image, Rect, Text, Circle } from "react-konva";
-
-// Import the microbit-web-bluetooth library correctly
-// Note: This might need to be adjusted based on the actual library structure
-// If it's a default export, we should use:
-// import MicrobitWebBluetooth from 'microbit-web-bluetooth';
-// If it's a named export, we should use the correct name
-
-// Since we don't know the exact structure, let's use a dynamic import approach
-// or check the documentation. For now, I'll comment out the problematic code
-// and provide a placeholder implementation
 
 export default function Microbit({
   leds,
@@ -25,16 +18,15 @@ export default function Microbit({
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
   const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
-  const [connected, setConnected] = useState(false);
-  const microbitRef = useRef<any>(null); // Use any type for now
 
   // Logo (touch sensor) interaction state
   const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
   const isPressingRef = useRef(false);
 
   // Tunable constants for logo overlay alignment
+  // Adjust LOGO_X / LOGO_Y to perfectly cover the SVG logo.
   const LOGO_X = 95.2;     // horizontal position
-  const LOGO_Y = 91.2;     // vertical position
+  const LOGO_Y = 91.2;     // vertical position (was 55; moved down to align)
   const LOGO_W = 29.2;
   const LOGO_H = 16.2;
 
@@ -59,124 +51,11 @@ export default function Microbit({
     image.alt = "Microbit";
   }, []);
 
-  // Initialize Micro:bit connection - commented out for now due to import issues
-  /*
-  useEffect(() => {
-    // Dynamically import the library to avoid build issues
-    import('microbit-web-bluetooth').then(module => {
-      microbitRef.current = new module.default();
-    }).catch(error => {
-      console.error('Failed to load microbit-web-bluetooth:', error);
-    });
-    
-    return () => {
-      if (microbitRef.current) {
-        microbitRef.current.disconnect();
-      }
-    };
-  }, []);
-  */
-
-  const connectMicrobit = async () => {
-    try {
-      /*
-      if (!microbitRef.current) {
-        // Try to import if not already loaded
-        const module = await import('microbit-web-bluetooth');
-        microbitRef.current = new module.default();
-      }
-      
-      await microbitRef.current.connect();
-      setConnected(true);
-      
-      // Set up event listeners with proper typing
-      microbitRef.current.onButtonChanged((button: number, state: boolean) => {
-        if (state) {
-          handleButtonClick(button === 1 ? "A" : "B");
-        }
-      });
-      */
-      
-      // Placeholder implementation
-      console.log("Micro:bit connection would be established here");
-      setConnected(true);
-    } catch (error) {
-      console.error('Failed to connect to Micro:bit:', error);
-    }
-  };
-
-  const convertPythonToHex = async (code: string): Promise<ArrayBuffer> => {
-    // This is a simplified version - you'll need to implement proper conversion
-    const response = await fetch('https://python.microbit.org/v/2/compile', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ code }),
-    });
-    
-    const blob = await response.blob();
-    return await blob.arrayBuffer();
-  };
-
-  const flashCode = async (code: string) => {
-    if (!microbitRef.current || !connected) return;
-    
-    try {
-      // Convert Python code to hex format expected by Micro:bit
-      const hex = await convertPythonToHex(code);
-      await microbitRef.current.flash(hex);
-    } catch (error) {
-      console.error('Failed to flash code:', error);
-    }
-  };
-
   const handleButtonClick = (btn: "A" | "B" | "AB") => {
     setBtnPressed(btn);
     onControllerInput?.(btn);
-    
-    // If connected to physical Micro:bit, trigger button press
-    if (connected && microbitRef.current) {
-      // You might want to send a signal to the physical Micro:bit here
-    }
-    
     setTimeout(() => setBtnPressed(null), 150);
   };
-
-  // Add connection status indicator
-  const connectionIndicator = (
-    <Circle
-      x={200}
-      y={20}
-      radius={5}
-      fill={connected ? "green" : "red"}
-      stroke="black"
-      strokeWidth={1}
-    />
-  );
-
-  // Add connect button to your Micro:bit UI
-  const connectButton = (
-    <Group
-      onClick={connectMicrobit}
-      x={180}
-      y={10}
-    >
-      <Rect
-        width={40}
-        height={20}
-        fill={connected ? "green" : "gray"}
-        cornerRadius={5}
-      />
-      <Text
-        text={connected ? "Connected" : "Connect"}
-        fontSize={10}
-        x={182}
-        y={12}
-        fill="white"
-      />
-    </Group>
-  );
 
   // Logo stroke color logic
   const logoStroke =
@@ -299,10 +178,6 @@ export default function Microbit({
             />
           ))
         )}
-
-        {/* Connect button and connection indicator */}
-        {connectButton}
-        {connectionIndicator}
 
         {/* Touch (Logo) Sensor Overlay */}
         <Group

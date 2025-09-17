@@ -1,317 +1,279 @@
-import React, { useState } from "react";
-import { CircuitElement, Wire, Node, PropertiesPanelProps } from "@/circuit_canvas/types/circuit";
-import { FaCopy, FaDownload, FaMicrochip } from "react-icons/fa";
+import {
+  CircuitElement,
+  Wire,
+  PropertiesPanelProps,
+} from "@/circuit_canvas/types/circuit";
+import { useEffect, useState } from "react";
+import {
+  ColorPaletteDropdown,
+  defaultColors,
+} from "@/circuit_canvas/components/toolbar/customization/ColorPallete";
 
-// Add this interface for microbit controls
-interface MicrobitControlState {
-  pins: Record<string, number>;
-  leds: boolean[][];
-}
-
-const PropertiesPanel: React.FC<PropertiesPanelProps & { 
-  microbitControls?: Record<string, MicrobitControlState>;
-}> = ({
+export default function PropertiesPanel({
   selectedElement,
-  wires,
-  getNodeById,
+  wireColor,
   onElementEdit,
   onWireEdit,
+  wires,
+  getNodeById,
   onEditWireSelect,
   setOpenCodeEditor,
-  wireColor,
-  microbitControls = {}
-}) => {
-  const [copied, setCopied] = useState(false);
+}: PropertiesPanelProps) {
+  const [resistance, setResistance] = useState<number | null>(null);
+  const [voltage, setVoltage] = useState<number | null>(null);
+  const [ratio, setRatio] = useState<number | null>(null);
+  const [temperature, setTemperature] = useState<number | null>(null);
+  const [brightness, setBrightness] = useState<number | null>(null);
+  const [color, setColor] = useState<string | null>(null);
+  const [selectedWireColor, setSelectedWireColor] = useState<string>(
+    wireColor || defaultColors[0].hex
+  );
+  const [showUpdateMessage, setShowUpdateMessage] = useState(false);
 
-  // Generate Python code for micro:bit
-  const generateMicrobitPythonCode = (elementId: string): string => {
-    const controlState = microbitControls[elementId];
-    if (!controlState) return "# No micro:bit configuration found";
-    
-    let code = `from microbit import *\n\n`;
-    
-    // Add pin configurations
-    Object.entries(controlState.pins || {}).forEach(([pinName, value]) => {
-      const pinNum = pinName.replace('pin', '');
-      code += `pin${pinNum}.write_digital(${value})\n`;
-    });
-    
-    code += '\n';
-    
-    // Add LED matrix configuration
-    if (controlState.leds) {
-      code += '# LED matrix pattern\n';
-      code += 'led_pattern = [\n';
-      controlState.leds.forEach(row => {
-        code += '    [';
-        code += row.map(led => led ? '1' : '0').join(', ');
-        code += '],\n';
-      });
-      code += ']\n\n';
-      
-      code += `# Display the pattern\ndef display_pattern(pattern):\n`;
-      code += `    for i in range(5):\n`;
-      code += `        for j in range(5):\n`;
-      code += `            display.set_pixel(i, j, 9 if pattern[i][j] else 0)\n\n`;
-      
-      code += `while True:\n`;
-      code += `    display_pattern(led_pattern)\n`;
-      code += `    sleep(100)\n`;
+  useEffect(() => {
+    setResistance(selectedElement?.properties?.resistance ?? null);
+    setVoltage(selectedElement?.properties?.voltage ?? null);
+    setRatio(selectedElement?.properties?.ratio ?? null);
+    setTemperature(selectedElement?.properties?.temperature ?? null);
+    setBrightness(selectedElement?.properties?.brightness ?? null);
+    setColor(selectedElement?.properties?.color ?? null);
+    setSelectedWireColor(wireColor || defaultColors[0].hex);
+  }, [selectedElement]);
+
+  if (!selectedElement) return null;
+
+  const handleUpdate = () => {
+    if (selectedElement.type === "wire") {
+      const wireToUpdate = wires.find((w) => w.id === selectedElement.id);
+      if (wireToUpdate) {
+        // Do not mutate incoming wire object; send a copy to parent handler
+        onWireEdit({ ...wireToUpdate, color: selectedWireColor }, false);
+      }
+    } else {
+      const updatedElement: CircuitElement = {
+        ...selectedElement,
+        properties: {
+          ...selectedElement.properties,
+          resistance: resistance ?? undefined,
+          voltage: voltage ?? undefined,
+          ratio: ratio ?? undefined,
+          temperature: temperature ?? undefined,
+          brightness: brightness ?? undefined,
+          color: color ?? undefined,
+        },
+      };
+      onElementEdit(updatedElement, false);
     }
-    
-    return code;
+    setShowUpdateMessage(true);
+    setTimeout(() => setShowUpdateMessage(false), 2000);
   };
 
-  const handleCopyCode = () => {
-    if (selectedElement && selectedElement.type === "microbit") {
-      const code = generateMicrobitPythonCode(selectedElement.id);
-      navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handleDownloadCode = () => {
-    if (selectedElement && selectedElement.type === "microbit") {
-      const code = generateMicrobitPythonCode(selectedElement.id);
-      const blob = new Blob([code], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `microbit_code_${selectedElement.id}.py`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+  const handleDelete = () => {
+    if (selectedElement.type === "wire") {
+      const wireToDelete = wires.find((w) => w.id === selectedElement.id);
+      if (wireToDelete) {
+        onWireEdit(wireToDelete, true);
+      }
+    } else {
+      onElementEdit(selectedElement, true);
     }
   };
 
-  const handleOpenCodeEditor = () => {
-    if (selectedElement && selectedElement.type === "microbit") {
-      setOpenCodeEditor(true);
-    }
-  };
+  const connectedWires = wires.filter(
+    (w) =>
+      w.fromNodeId.startsWith(selectedElement.id) ||
+      w.toNodeId.startsWith(selectedElement.id)
+  );
 
-  if (!selectedElement) {
-    return <div className="p-4 text-gray-500">No element selected</div>;
-  }
-
-  if (selectedElement.type === "wire") {
-    const wire = wires.find((w) => w.id === selectedElement.id);
-    if (!wire) return null;
-
-    const fromNode = getNodeById(wire.fromNodeId);
-    const toNode = getNodeById(wire.toNodeId);
-
-    return (
-      <div className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Wire Properties</h3>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">From Node</label>
-          <div className="text-sm text-gray-600">
-            {fromNode ? `Node ${fromNode.id.slice(-4)}` : "Unknown"}
-          </div>
+  return (
+    <div className="backdrop-blur-sm bg-white/10 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm p-2 space-y-1.5 max-w-xs">
+      <div className="text-sm text-shadow-md text-gray-950 space-y-1">
+        <div className="flex justify-between">
+          <span className="font-semibold">Type:</span>
+          <span>{selectedElement.type}</span>
         </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">To Node</label>
-          <div className="text-sm text-gray-600">
-            {toNode ? `Node ${toNode.id.slice(-4)}` : "Unknown"}
-          </div>
+        <div className="flex justify-between">
+          <span className="font-semibold">ID:</span>
+          <span className="text-blue-500 font-semibold truncate">{selectedElement.id}</span>
         </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Wire Color</label>
+      </div>
+
+      {selectedElement.type === "microbit" && (
+        <button
+          className="bg-blue-500 text-white text-xs px-1 py-1 rounded w-full"
+          onClick={() => setOpenCodeEditor(true)}
+        >
+          Open Code Editor
+        </button>
+      )}
+
+      {resistance != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("resistance")) && (
+        <div className="flex flex-col text-xs">
+          <label>Resistance (Ω):</label>
           <input
-            type="color"
-            value={wireColor || "#000000"}
-            onChange={(e) => {
-              onWireEdit({ ...wire, color: e.target.value }, false);
-            }}
-            className="w-full h-8"
+            type="number"
+            value={resistance}
+            onChange={(e) => setResistance(Number(e.target.value))}
+            className="border px-1 py-1 rounded text-xs"
           />
         </div>
-        
-        <div className="flex gap-2">
-          <button
-            onClick={() => onEditWireSelect?.(wire)}
-            className="flex-1 bg-blue-500 text-white py-2 px-4 rounded"
-          >
-            Edit Path
-          </button>
-          <button
-            onClick={() => onWireEdit(wire, true)}
-            className="flex-1 bg-red-500 text-white py-2 px-4 rounded"
-          >
-            Delete
-          </button>
-        </div>
-      </div>
-    );
-  }
+      )}
 
-  // Handle micro:bit element specifically
-  if (selectedElement.type === "microbit") {
-    const pythonCode = generateMicrobitPythonCode(selectedElement.id);
-    
-    return (
-      <div className="p-4">
-        <h3 className="text-lg font-semibold mb-4">Micro:bit Properties</h3>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Element ID</label>
-          <div className="text-sm text-gray-600">{selectedElement.id}</div>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Position</label>
-          <div className="text-sm text-gray-600">
-            X: {selectedElement.x}, Y: {selectedElement.y}
-          </div>
-        </div>
-        
-        {selectedElement.rotation !== undefined && (
-          <div className="mb-4">
-            <label className="block text-sm font-medium mb-1">Rotation</label>
-            <div className="text-sm text-gray-600">{selectedElement.rotation}°</div>
-          </div>
-        )}
-        
-        {/* Python Code Section */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium">Generated Python Code</label>
-            <div className="flex gap-1">
-              <button
-                onClick={handleCopyCode}
-                className="p-1 text-gray-600 hover:text-blue-600"
-                title="Copy code"
-              >
-                <FaCopy size={14} />
-              </button>
-              <button
-                onClick={handleDownloadCode}
-                className="p-1 text-gray-600 hover:text-green-600"
-                title="Download code"
-              >
-                <FaDownload size={14} />
-              </button>
-            </div>
-          </div>
-          
-          <div className="relative">
-            <pre className="bg-gray-100 p-2 text-xs overflow-auto max-h-40 font-mono">
-              {pythonCode}
-            </pre>
-            {copied && (
-              <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded">
-                Copied!
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <button
-          onClick={handleOpenCodeEditor}
-          className="w-full bg-blue-500 text-white py-2 px-4 rounded flex items-center justify-center gap-2"
-        >
-          <FaMicrochip /> Open Code Editor
-        </button>
-        
-        <button
-          onClick={() => onElementEdit(selectedElement, true)}
-          className="w-full mt-2 bg-red-500 text-white py-2 px-4 rounded"
-        >
-          Delete Element
-        </button>
-      </div>
-    );
-  }
-
-  // Handle other element types
-  return (
-    <div className="p-4">
-      <h3 className="text-lg font-semibold mb-4">
-        {selectedElement.type.charAt(0).toUpperCase() + selectedElement.type.slice(1)} Properties
-      </h3>
-      
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Element ID</label>
-        <div className="text-sm text-gray-600">{selectedElement.id}</div>
-      </div>
-      
-      <div className="mb-4">
-        <label className="block text-sm font-medium mb-1">Position</label>
-        <div className="text-sm text-gray-600">
-          X: {selectedElement.x}, Y: {selectedElement.y}
-        </div>
-      </div>
-      
-      {selectedElement.rotation !== undefined && (
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1">Rotation</label>
-          <div className="text-sm text-gray-600">{selectedElement.rotation}°</div>
+      {voltage != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("voltage")) && (
+        <div className="flex flex-col text-xs">
+          <label>Voltage (V):</label>
+          <input
+            type="number"
+            value={voltage}
+            onChange={(e) => setVoltage(Number(e.target.value))}
+            className="border px-1 py-1 rounded text-xs"
+          />
         </div>
       )}
-      
-      {selectedElement.properties && Object.keys(selectedElement.properties).length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-md font-medium mb-2">Properties</h4>
-          {Object.entries(selectedElement.properties).map(([key, value]) => (
-            <div key={key} className="mb-2">
-              <label className="block text-sm font-medium mb-1">
-                {key.charAt(0).toUpperCase() + key.slice(1)}
-              </label>
+
+      {ratio != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("ratio")) && (
+        <div className="flex flex-col text-xs">
+          <label>Ratio:</label>
+          <input
+            type="number"
+            step="0.01"
+            value={ratio}
+            onChange={(e) => setRatio(Number(e.target.value))}
+            className="border px-1 py-1 rounded text-xs"
+          />
+          <span className="text-gray-500 mt-1">
+            Eff. Resistance: {(ratio * (resistance ?? 0)).toFixed(2)} Ω
+          </span>
+        </div>
+      )}
+      {color != null && selectedElement.type === 'led' && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("color")) && (
+        <div className="flex flex-col text-xs">
+          <label>LED Color:</label>
+          <select
+            value={color}
+            onChange={(e) => setColor(e.target.value)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="red">Red</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+            <option value="yellow">Yellow</option>
+            <option value="white">White</option>
+            <option value="orange">Orange</option>
+          </select>
+        </div>
+      )}
+
+      {/* Microbit-specific controls */}
+      {selectedElement.type === "microbit" && (
+        <>
+          {temperature != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("temperature")) && (
+            <div className="flex flex-col text-xs">
+              <label>Temperature (°C):</label>
               <input
-                type={typeof value === "number" ? "number" : "text"}
-                value={value as string | number}
-                onChange={(e) => {
-                  const updatedValue = typeof value === "number" 
-                    ? parseFloat(e.target.value) || 0 
-                    : e.target.value;
-                  
-                  onElementEdit({
-                    ...selectedElement,
-                    properties: {
-                      ...selectedElement.properties,
-                      [key]: updatedValue
-                    }
-                  }, false);
-                }}
-                className="w-full p-2 border rounded"
+                type="range"
+                min="0"
+                max="50"
+                value={temperature}
+                onChange={(e) => setTemperature(Number(e.target.value))}
+                className="w-full"
               />
-            </div>
-          ))}
-        </div>
-      )}
-      
-      {selectedElement.computed && Object.keys(selectedElement.computed).length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-md font-medium mb-2">Computed Values</h4>
-          {Object.entries(selectedElement.computed).map(([key, value]) => (
-            value !== undefined && (
-              <div key={key} className="mb-2">
-                <label className="block text-sm font-medium mb-1">
-                  {key.charAt(0).toUpperCase() + key.slice(1)}
-                </label>
-                <div className="text-sm text-gray-600">
-                  {typeof value === "number" ? value.toFixed(2) : String(value)}
-                </div>
+              <div className="text-xs text-gray-500 mt-1">
+                {temperature}°C
               </div>
-            )
-          ))}
+            </div>
+          )}
+
+          {brightness != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("brightness")) && (
+            <div className="flex flex-col text-xs">
+              <label>Brightness (0–255):</label>
+              <input
+                type="range"
+                min="0"
+                max="255"
+                value={brightness}
+                onChange={(e) => setBrightness(Number(e.target.value))}
+                className="w-full"
+              />
+              <div className="text-xs text-gray-500 mt-1">
+                {brightness}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {selectedElement.type === "wire" && (
+        <div className="flex flex-col text-xs">
+          <label>Wire Color:</label>
+          <ColorPaletteDropdown
+            colors={defaultColors}
+            selectedColor={selectedWireColor}
+            onColorSelect={(color) => setSelectedWireColor(color)}
+          />
         </div>
       )}
-      
-      <button
-        onClick={() => onElementEdit(selectedElement, true)}
-        className="w-full bg-red-500 text-white py-2 px-4 rounded"
-      >
-        Delete Element
-      </button>
+
+      <div className="flex justify-between gap-2 text-xs">
+        <button
+          className="bg-blue-500 text-white px-3 py-1 rounded w-full"
+          onClick={handleUpdate}
+        >
+          Update
+        </button>
+        <button
+          className="bg-red-500 text-white px-3 py-1 rounded w-full"
+          onClick={handleDelete}
+        >
+          Delete
+        </button>
+      </div>
+
+      {connectedWires.length > 0 && (
+        <div className="mt-2">
+          <h3 className="text-xs font-semibold text-gray-600 mb-1">Connected Wires</h3>
+          <ul className="space-y-1 text-xs">
+            {connectedWires.map((wire) => (
+              <li
+                key={wire.id}
+                className="flex justify-between items-center px-2 py-1 rounded bg-white border hover:bg-blue-100"
+              >
+                <span className="truncate font-mono text-gray-800">
+                  {wire.id}
+                  <span className="text-gray-400 ml-1">
+                    ({defaultColors.find((c) => c.hex === wire.color)?.name || "Custom"})
+                  </span>
+                </span>
+                <button
+                  className="text-blue-500 hover:underline"
+                  onClick={() => onEditWireSelect?.(wire)}
+                >
+                  Edit
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {showUpdateMessage && (
+        <div className="fixed bottom-7 right-3 z-10">
+          <div className="flex items-center gap-2 backdrop-blur-sm bg-white/1 border-2 border-green-500 text-green-800 px-1 py-1 rounded shadow-2xl animate-slide-in-up text-md">
+            <svg
+              className="w-4 h-4 text-green-500"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+            </svg>
+            <span>
+              {selectedElement?.type.charAt(0).toUpperCase() + selectedElement?.type.slice(1)} updated!
+            </span>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default PropertiesPanel;
+}

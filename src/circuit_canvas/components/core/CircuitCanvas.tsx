@@ -77,54 +77,6 @@ export default function CircuitCanvas() {
   const simulationRunningRef = useRef(simulationRunning);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
   const { showMessage } = useMessage();
-  const [microbitControls, setMicrobitControls] = useState<{
-    [elementId: string]: {
-      pins: Record<string, number>;
-      leds: boolean[][];
-    };
-  }>({});
-
-  const handleMicrobitPinChange = (elementId: string, pin: number, value: number) => {
-  setMicrobitControls(prev => ({
-    ...prev,
-    [elementId]: {
-      ...prev[elementId],
-      pins: {
-        ...(prev[elementId]?.pins || {}),
-        [`pin${pin}`]: value
-      }
-    }
-  }));
-  
-  // Update the circuit simulation
-  if (simulationRunning) {
-    computeCircuit(wires);
-  }
-};
-
-
-const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
-  setMicrobitControls(prev => ({
-    ...prev,
-    [elementId]: {
-      ...prev[elementId],
-      leds
-    }
-  }));
-  
-  // Update the element's controller state
-  setElements(prev => prev.map(el => 
-    el.id === elementId && el.type === "microbit" 
-      ? { 
-          ...el, 
-          controller: { 
-            ...el.controller, 
-            leds 
-          } 
-        } 
-      : el
-  ));
-};
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -770,17 +722,6 @@ const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
     }
   }, [creatingWireStartNode]);
 
-  const handleFlashCode = async (code: string) => {
-  if (activeControllerId) {
-    const element = elements.find(el => el.id === activeControllerId);
-    if (element && element.type === "microbit") {
-      // This would need to be implemented to communicate with the Microbit component
-      // You might need to use a ref or context to access the flash method
-      console.log("Flashing code to Micro:bit:", code);
-    }
-  }
-};
-
   return (
     <div
       className={styles.canvasContainer}
@@ -839,10 +780,7 @@ const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
                   setElements((prev) => {
                     const next = prev.map((el) =>
                       el.id === selectedElement.id
-                        ? {
-                            ...el,
-                            rotation: ((el.rotation || 0) - 30 + 360) % 360,
-                          }
+                        ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
                         : el
                     );
                     // Update ref immediately so wire math sees new rotation
@@ -1011,105 +949,100 @@ const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
             />
           </div>
         </div>
-        {selectedElement && showPropertiesPannel ? (
-          <div
-            className={`absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${
-              propertiesPanelClosing
-                ? "opacity-0 translate-y-1"
-                : "opacity-100 translate-y-0"
-            }`}
-          >
-            <div className="p-1">
-              <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
-                <button
-                  onClick={handlePropertiesPannelClose}
-                  className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-150"
-                  title="Close"
+    {selectedElement && showPropertiesPannel ? (
+      <div className={`absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}>
+              <div className="p-1">
+                <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
+                  <button
+                    onClick={handlePropertiesPannelClose}
+                    className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-all duration-150"
+                    title="Close"
+                  />
+                </div>
+                <PropertiesPanel
+                  selectedElement={selectedElement}
+                  wires={wires}
+                  getNodeById={getNodeById}
+                  onElementEdit={(updatedElement, deleteElement) => {
+                    if (deleteElement) {
+                      // Record deletion so it can be undone
+                      pushToHistory(elements, wiresRef.current);
+                      const updatedWires = wires.filter(
+                        (w) =>
+                          getNodeParent(w.fromNodeId)?.id !==
+                            updatedElement.id &&
+                          getNodeParent(w.toNodeId)?.id !== updatedElement.id
+                      );
+                      setWires(updatedWires);
+                      setElements((prev) =>
+                        prev.filter((el) => el.id !== updatedElement.id)
+                      );
+                      setSelectedElement(null);
+                      setCreatingWireStartNode(null);
+                      setEditingWire(null);
+                      stopSimulation();
+                    } else {
+                      // Property edits should NOT affect history; apply without push
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
+                          el.id === updatedElement.id
+                            ? { ...el, ...updatedElement, x: el.x, y: el.y }
+                            : el
+                        );
+                        // Keep property cache in sync so undo/redo retains these values
+                        syncProperties(next);
+                        elementsRef.current = next;
+                        updateWiresDirect();
+                        return next;
+                      });
+                      stopSimulation();
+                      setSelectedElement(updatedElement);
+                      setCreatingWireStartNode(null);
+                    }
+                  }}
+                  onWireEdit={(updatedWire, deleteElement) => {
+                    if (deleteElement) {
+                      setWires((prev) => {
+                        const next = prev.filter((w) => w.id !== updatedWire.id);
+                        // Push AFTER delete for single-step undo
+                        pushToHistory(elements, next);
+                        return next;
+                      });
+                      setSelectedElement(null);
+                      setCreatingWireStartNode(null);
+                      setEditingWire(null);
+                      stopSimulation();
+                    } else {
+                      setWires((prev) => {
+                        const next = prev.map((w) =>
+                          w.id === updatedWire.id ? { ...w, ...updatedWire } : w
+                        );
+                        // Push AFTER edit
+                        pushToHistory(elements, next);
+                        return next;
+                      });
+                      stopSimulation();
+                      setSelectedElement(null);
+                      setEditingWire(null);
+                    }
+                  }}
+                  onEditWireSelect={(wire) => {
+                    setSelectedElement({
+                      id: wire.id,
+                      type: "wire",
+                      x: 0,
+                      y: 0,
+                      nodes: [],
+                    });
+                  }}
+                  setOpenCodeEditor={setOpenCodeEditor}
+                  wireColor={
+                    wires.find((w) => w.id === selectedElement.id)?.color
+                  }
                 />
               </div>
-              <PropertiesPanel
-                selectedElement={selectedElement}
-                wires={wires}
-                getNodeById={getNodeById}
-                onElementEdit={(updatedElement, deleteElement) => {
-                  if (deleteElement) {
-                    // Record deletion so it can be undone
-                    pushToHistory(elements, wiresRef.current);
-                    const updatedWires = wires.filter(
-                      (w) =>
-                        getNodeParent(w.fromNodeId)?.id !== updatedElement.id &&
-                        getNodeParent(w.toNodeId)?.id !== updatedElement.id
-                    );
-                    setWires(updatedWires);
-                    setElements((prev) =>
-                      prev.filter((el) => el.id !== updatedElement.id)
-                    );
-                    setSelectedElement(null);
-                    setCreatingWireStartNode(null);
-                    setEditingWire(null);
-                    stopSimulation();
-                  } else {
-                    // Property edits should NOT affect history; apply without push
-                    setElements((prev) => {
-                      const next = prev.map((el) =>
-                        el.id === updatedElement.id
-                          ? { ...el, ...updatedElement, x: el.x, y: el.y }
-                          : el
-                      );
-                      // Keep property cache in sync so undo/redo retains these values
-                      syncProperties(next);
-                      elementsRef.current = next;
-                      updateWiresDirect();
-                      return next;
-                    });
-                    stopSimulation();
-                    setSelectedElement(updatedElement);
-                    setCreatingWireStartNode(null);
-                  }
-                }}
-                onWireEdit={(updatedWire, deleteElement) => {
-                  if (deleteElement) {
-                    setWires((prev) => {
-                      const next = prev.filter((w) => w.id !== updatedWire.id);
-                      // Push AFTER delete for single-step undo
-                      pushToHistory(elements, next);
-                      return next;
-                    });
-                    setSelectedElement(null);
-                    setCreatingWireStartNode(null);
-                    setEditingWire(null);
-                    stopSimulation();
-                  } else {
-                    setWires((prev) => {
-                      const next = prev.map((w) =>
-                        w.id === updatedWire.id ? { ...w, ...updatedWire } : w
-                      );
-                      // Push AFTER edit
-                      pushToHistory(elements, next);
-                      return next;
-                    });
-                    stopSimulation();
-                    setSelectedElement(null);
-                    setEditingWire(null);
-                  }
-                }}
-                onEditWireSelect={(wire) => {
-                  setSelectedElement({
-                    id: wire.id,
-                    type: "wire",
-                    x: 0,
-                    y: 0,
-                    nodes: [],
-                  });
-                }}
-                setOpenCodeEditor={setOpenCodeEditor}
-                wireColor={
-                  wires.find((w) => w.id === selectedElement.id)?.color
-                }
-              />
             </div>
-          </div>
-        ) : null}
+          ) : null}
 
         <div className="relative w-full flex-1 h-[460px] p-1 overflow-hidden">
           {/* Stage Canvas */}
@@ -1145,11 +1078,7 @@ const handleMicrobitLedChange = (elementId: string, leds: boolean[][]) => {
                     points.splice(2, 0, midX, midY);
                   }
                   const isSelected = selectedElement?.id === wire.id;
-                  const isHovered =
-                    !simulationRunning &&
-                    !creatingWireStartNode &&
-                    hoveredWireId === wire.id &&
-                    !(selectedElement?.id === wire.id);
+                  const isHovered = !simulationRunning && !creatingWireStartNode && hoveredWireId === wire.id && !(selectedElement?.id === wire.id);
                   const baseColor = getWireColor(wire) || "black";
 
                   return [

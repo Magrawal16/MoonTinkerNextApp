@@ -86,12 +86,60 @@ export default function Led(props: LedProps) {
   };
   const glow = glowColorMap[(props.color || 'red').toLowerCase()] || glowColorMap.red;
 
+  // Positions and sizes for glow effects per color (to align with LED image)
+  const glowPositionMap: Record<
+    string,
+    {Image: {x: number; y: number;};rect: { x: number; y: number; width: number; height: number }; arcTop: { x: number; y: number, outerRadius: number }; arcBottom: { x: number; y: number } }
+  > = {
+    red: {
+      Image: {x: -1, y: -2.5},
+      rect: { x: 7, y: 17, width: 31, height: 10.1 },
+      arcTop: { x: 22.5, y: 17, outerRadius: 15.5 },
+      arcBottom: { x: 22.5, y: 27 },
+    },
+    green: {
+      Image: {x: -2, y: -1},
+      rect: { x: 7.5, y: 18, width: 31, height: 9.8 },  
+      arcTop: { x: 23, y: 18, outerRadius: 15.5 },
+      arcBottom: { x: 23, y: 27.7 },
+    },
+    blue: {
+      Image: {x: -1, y: -2},
+      rect: { x: 8, y: 18, width: 31, height: 10.1 },
+      arcTop: { x: 23.5, y: 18, outerRadius: 15.5 },
+      arcBottom: { x: 23.5, y: 28 },
+    },
+    yellow: {
+      Image: {x: 0, y: -3},
+      rect: { x: 7, y: 16.9, width: 31, height: 10 },
+      arcTop: { x: 22.5, y: 17, outerRadius: 15.5 },
+      arcBottom: { x: 22.5, y: 26.8 },
+    },
+    white: {
+      Image: {x: -1, y: -3},
+      rect: { x: 7.5, y: 17.4, width: 31, height: 10.1 },
+      arcTop: { x: 22.5, y: 17.5, outerRadius: 16 },
+      arcBottom: { x: 23, y: 27.4 },
+    },
+    orange: {
+      Image: {x: -1.5, y: -2.5},
+      rect: { x: 7.5, y: 16.9, width: 31, height: 10.1 },
+      arcTop: { x: 23, y: 17, outerRadius: 15.5 },
+      arcBottom: { x: 23, y: 26.9 },
+    },
+  };
+  const chosenColor = (props.color || "red").toLowerCase();
+  const pos = glowPositionMap[chosenColor] || glowPositionMap.red;
+  const imgPos = glowPositionMap[chosenColor] || glowPositionMap.red;
+
   return (
     <BaseElement {...props}>
       <Group>
         {/* Always show the LED image, undimmed */}
         {img && (
           <Image
+            x={imgPos.Image.x}
+            y={imgPos.Image.y}
             image={img}
             width={50}
             height={70}
@@ -132,10 +180,10 @@ export default function Led(props: LedProps) {
           brightness > VISIBLE_THRESHOLD && (
             <Group listening={false}>
               <Rect
-                x={8}           // adjust to align with LED base
-                y={18.5}           // shift down to cover rectangular part
-                width={30.5}       // match LED width
-                height={10.1}      // height of straight sides
+                x={pos.rect.x}           // adjust to align with LED base
+                y={pos.rect.y}           // shift down to cover rectangular part
+                width={pos.rect.width}       // match LED width
+                height={pos.rect.height}      // height of straight sides
                 fill={glow.base}
                 opacity={0.25 + 0.4 * brightness}
                 cornerRadius={0} // slight curve
@@ -148,10 +196,10 @@ export default function Led(props: LedProps) {
 
               {/* Semicircle top */}
               <Arc
-                x={23.5}        // center horizontally
-                y={18.6}          // where semicircle starts
+                x={pos.arcTop.x}        // center horizontally
+                y={pos.arcTop.y}          // where semicircle starts
                 innerRadius={0}
-                outerRadius={15.5} // should match half the LED width
+                outerRadius={pos.arcTop.outerRadius} // should match half the LED width
                 angle={180}     // half circle
                 rotation={180}    // facing upward
                 fill={glow.base}
@@ -162,55 +210,23 @@ export default function Led(props: LedProps) {
                 listening={false}
                 globalCompositeOperation="lighten"
               />
-              {/* { <Arc
-                x={21}        // center horizontally
-                y={42}          // where semicircle starts
-                innerRadius={10}
-                outerRadius={15} // should match half the LED width
-                angle={360}     // half circle
-                rotation={180}    // facing upward
-                fill="white"
-                opacity={0.15 + 0.3 * brightness}
-                shadowColor="yellow"
-                shadowBlur={30 + 60 * brightness}
-                shadowOpacity={0.7}
-                listening={false}
-                globalCompositeOperation="lighten"
-              /> } */}
-              {/* {<Ellipse
-                x={22.5}
-                y={42}
-                radiusX={17}
-                radiusY={5}
-                stroke="white"                     // outline color
-                strokeWidth={3}   // thickness of the ring
-                opacity={0.7 + 0 * brightness}
-                shadowColor="white"
-                shadowBlur={25 + 60 * brightness}
-                shadowOpacity={0.7}
-                listening={false}
-                globalCompositeOperation="lighten"
-              />
-              } */}
-              {
+              {/* Semicircle bottom */
                 <Arc
-                x={23.5}        // center horizontally
-                y={28.5}          // where semicircle starts
-                innerRadius={0}
-                outerRadius={15.5} // should match half the LED width
-                angle={180}     // half circle
-                rotation={360}    // facing upward
-                fill={glow.base}
-                opacity={0.25 + 0.4 * brightness}
-                shadowColor={glow.shadow}
-                shadowBlur={30 + 60 * brightness}
-                shadowOpacity={0.7}
-                listening={false}
-                globalCompositeOperation="lighten"
-              />
+                  x={pos.arcBottom.x}        // center horizontally
+                  y={pos.arcBottom.y}          // where semicircle starts
+                  innerRadius={0}
+                  outerRadius={15.5} // should match half the LED width
+                  angle={180}     // half circle
+                  rotation={360}    // facing downward
+                  fill={glow.base}
+                  opacity={0.25 + 0.4 * brightness}
+                  shadowColor={glow.shadow}
+                  shadowBlur={30 + 60 * brightness}
+                  shadowOpacity={0.7}
+                  listening={false}
+                  globalCompositeOperation="lighten"
+                />
               }
-
-
             </Group>
           )
         )}

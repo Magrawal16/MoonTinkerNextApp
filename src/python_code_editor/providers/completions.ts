@@ -55,6 +55,14 @@ export const registerCompletionProvider = (monaco: any, disposables: { dispose: 
             documentation: API.input.on_button_pressed.doc,
             detail: API.input.on_button_pressed.sig,
           });
+          items.push({
+            label: "on_logo_pressed",
+            kind: monaco.languages.CompletionItemKind.Method,
+            insertText: `on_logo_pressed(on_logo_down)`,
+            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+            documentation: API.input.on_logo_pressed.doc,
+            detail: API.input.on_logo_pressed.sig,
+          });
         } else if (dotCtx === "basic") {
           const { show_string, forever, pause } = API.basic as any;
           items.push(

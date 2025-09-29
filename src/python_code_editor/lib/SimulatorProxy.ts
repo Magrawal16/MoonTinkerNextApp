@@ -16,8 +16,12 @@ export interface SimulatorOptions {
 type State = {
   pins: Record<string, { digital: number; analog: number }>;
   leds: boolean[][];
-  buttons: { A: boolean; B: boolean };
+  buttons: { A: boolean; B: boolean; AB: boolean }; // AB present in snapshot
+  logo: boolean; // <- NEW: logo touch state
 };
+
+type ButtonEvent = "A" | "B" | "AB";
+type LogoEvent = { type: "logo"; state: "pressed" | "released" };
 
 export class SimulatorProxy {
   private worker: Worker;
@@ -76,26 +80,44 @@ export class SimulatorProxy {
   }
 
   async disposeAndReload() {
-    // // Optional: Call remote dispose if you want to do any cleanup there
-    // try {
-    //   await this.simulatorRemoteInstance?.dispose?.();
-    // } catch (e) {
-    //   console.warn("Simulator remote dispose failed:", e);
-    // }
     this.simulatorRemoteInstance?.reset();
-
-    // Kill old worker
     this.worker.terminate();
-
-    // Create new worker and reinitialize
     this.worker = this.createWorker();
     this.simulatorRemoteInstance = null;
     await this.initialize();
   }
 
-  async simulateInput(event: "A" | "B" | "AB") {
+  // --- INPUT API ---
+
+  async simulateInput(event: ButtonEvent | LogoEvent) {
     if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
-    return this.simulatorRemoteInstance.simulateInput(event);
+
+    if (typeof event === "string") {
+      // Button A/B/AB
+      return this.simulatorRemoteInstance.simulateInput(event);
+    }
+
+    // Logo event
+    if (event.type === "logo") {
+      if (event.state === "pressed") {
+        return this.simulatorRemoteInstance.pressLogo();
+      } else {
+        return this.simulatorRemoteInstance.releaseLogo();
+      }
+    }
+
+    throw new Error("Unsupported input event");
+  }
+
+  // Convenience methods (optional)
+  async pressLogo() {
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    return this.simulatorRemoteInstance.pressLogo();
+  }
+
+  async releaseLogo() {
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    return this.simulatorRemoteInstance.releaseLogo();
   }
 
   dispose() {

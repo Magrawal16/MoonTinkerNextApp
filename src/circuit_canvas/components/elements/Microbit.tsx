@@ -96,6 +96,9 @@ export default function Microbit({
     isPressingRef.current = true;
     setLogoState("pressed");
     setCursor("pointer", e);
+
+     // --- NEW: notify controller (pressed)
+    onControllerInput?.({ type: "logo", state: "pressed" });
   };
 
   const endPress = (inside: boolean) => {
@@ -106,12 +109,22 @@ export default function Microbit({
   const onLogoUp = () => {
     if (!enableLogoInteraction) return;
     endPress(true);
+
+    // --- NEW: notify controller (released)
+    onControllerInput?.({ type: "logo", state: "released" });
   };
 
   // Global mouseup to handle release outside
   useEffect(() => {
     const handleWindowUp = () => {
-      if (isPressingRef.current) endPress(false);
+      if (isPressingRef.current) {
+        endPress(false);
+
+        // --- NEW: ensure release is sent even if pointer leaves hit area
+        if (enableLogoInteraction) {
+          onControllerInput?.({ type: "logo", state: "released" });
+        }
+      }
     };
     window.addEventListener("mouseup", handleWindowUp);
     window.addEventListener("touchend", handleWindowUp);
@@ -119,7 +132,7 @@ export default function Microbit({
       window.removeEventListener("mouseup", handleWindowUp);
       window.removeEventListener("touchend", handleWindowUp);
     };
-  }, []);
+  }, [enableLogoInteraction, onControllerInput]);
 
   const onLogoClick = () => {
     // Hook for future logo touch event dispatch if needed

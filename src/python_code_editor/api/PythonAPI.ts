@@ -19,6 +19,14 @@ export const API = {
         `\t\${2:# your code}\n\n` +
         `input.on_button_pressed(Button.\${3|A,B,AB|}, \${1})\n`,
     },
+    on_logo_pressed: {
+      sig: "input.on_logo_pressed(on_logo_down: () -> None) -> None",
+      doc: "Register a handler that runs when the logo is pressed.",
+      snippet:
+        `def \${1:on_logo_down}():\n` +
+        `\t\${2:# your code}\n\n` +
+        `input.on_logo_pressed({1})\n`,
+    },
   },
   basic: {
     show_string: {

@@ -11,7 +11,8 @@ export type MicrobitEvent =
       pinType: "digital" | "analog";
     }
   | { type: "led-change"; x: number; y: number; value: number }
-  | { type: "button-press"; button: "A" | "B" | "AB"}
+  | { type: "button-press"; button: "A" | "B" | "AB" }
+  | { type: "logo-touch"; state: "pressed" | "released" } // <-- NEW
   | { type: "reset" };
 
 type MicrobitEventCallback = (event: MicrobitEvent) => void;
@@ -51,6 +52,12 @@ class MicrobitEventEmitter {
 export class MicrobitSimulator {
   private digitalWriteListeners: Record<string, Set<(value: number) => void>> =
     {};
+
+  // --- NEW: Logo touch state + handlers
+  private logoTouched = false;
+  private logoPressedHandlers: HandlerProxy[] = [];
+  private logoReleasedHandlers: HandlerProxy[] = [];
+  // ---
 
   public readonly pins = {
     digital_write_pin: this.digitalWritePin.bind(this),
@@ -150,8 +157,16 @@ export class MicrobitSimulator {
     Array(5).fill(false)
   );
   private pinStates: Record<string, { digital: number; analog: number }> = {};
-  private buttonStates: Record<"A" | "B" | "AB", boolean> = { A: false, B: false, AB: false };
-  private inputHandlers: Record<"A" | "B" | "AB", HandlerProxy[]> = { A: [], B: [], AB: [] };
+  private buttonStates: Record<"A" | "B" | "AB", boolean> = {
+    A: false,
+    B: false,
+    AB: false,
+  };
+  private inputHandlers: Record<"A" | "B" | "AB", HandlerProxy[]> = {
+    A: [],
+    B: [],
+    AB: [],
+  };
   private foreverCallbacks: Set<any> = new Set();
 
   public readonly Button = {
@@ -171,6 +186,10 @@ export class MicrobitSimulator {
 
   public readonly input = {
     on_button_pressed: this.onButtonPressed.bind(this),
+    // --- NEW: logo touch registration (Python API)
+    on_logo_pressed: this.onLogoPressed.bind(this),
+    on_logo_released: this.onLogoReleased.bind(this),
+    logo_is_touched: this.logoIsTouched.bind(this),
     _clear: this.clearInputs.bind(this),
   };
   public readonly basic = {
@@ -307,9 +326,81 @@ export class MicrobitSimulator {
       }
     }
     this.buttonStates = { A: false, B: false, AB: false };
+
+    // --- NEW: reset logo
+    this.logoTouched = false;
+    this.cleanupLogoHandlers();
+    // ---
+
     this.clearInputs();
     this.eventEmitter.emit({ type: "reset" });
   }
+
+  // ----- NEW: LOGO TOUCH SUPPORT -----
+
+  // Python: input.on_logo_pressed(handler)
+  private onLogoPressed(handler: any) {
+    const { create_proxy } = this.pyodide.pyimport("pyodide.ffi");
+    const persistentHandler = create_proxy(handler);
+    const wrapperProxy = create_proxy(() => {
+      try {
+        return Promise.resolve(persistentHandler());
+      } catch (err) {
+        console.error("Error in logo pressed handler:", err);
+      }
+    });
+    this.logoPressedHandlers.push({ wrapperProxy, persistentHandler });
+  }
+
+  // Python: input.on_logo_released(handler)
+  private onLogoReleased(handler: any) {
+    const { create_proxy } = this.pyodide.pyimport("pyodide.ffi");
+    const persistentHandler = create_proxy(handler);
+    const wrapperProxy = create_proxy(() => {
+      try {
+        return Promise.resolve(persistentHandler());
+      } catch (err) {
+        console.error("Error in logo released handler:", err);
+      }
+    });
+    this.logoReleasedHandlers.push({ wrapperProxy, persistentHandler });
+  }
+
+  // Python: input.logo_is_touched()
+  private logoIsTouched(): boolean {
+    return this.logoTouched;
+  }
+
+  // JS API: programmatic press/release from UI
+  public async pressLogo() {
+    this.logoTouched = true;
+    for (const h of this.logoPressedHandlers) {
+      await h.wrapperProxy();
+    }
+    this.eventEmitter.emit({ type: "logo-touch", state: "pressed" });
+  }
+
+  public async releaseLogo() {
+    this.logoTouched = false;
+    for (const h of this.logoReleasedHandlers) {
+      await h.wrapperProxy();
+    }
+    this.eventEmitter.emit({ type: "logo-touch", state: "released" });
+  }
+
+  private cleanupLogoHandlers() {
+    this.logoPressedHandlers.forEach((h) => {
+      h.wrapperProxy.destroy?.();
+      h.persistentHandler.destroy?.();
+    });
+    this.logoReleasedHandlers.forEach((h) => {
+      h.wrapperProxy.destroy?.();
+      h.persistentHandler.destroy?.();
+    });
+    this.logoPressedHandlers = [];
+    this.logoReleasedHandlers = [];
+  }
+
 
   private analogWritePin(pin: string, value: number) {
     this.pinStates[pin].analog = value;
@@ -346,60 +437,67 @@ export class MicrobitSimulator {
   }
 
   // Fixed onButtonPressed method
-private onButtonPressed(button: ButtonInstance, handler: any) {
-  const buttonName = button.getName();
+  private onButtonPressed(button: ButtonInstance, handler: any) {
+    const buttonName = button.getName();
 
-  const { create_proxy } = this.pyodide.pyimport("pyodide.ffi");
+    const { create_proxy } = this.pyodide.pyimport("pyodide.ffi");
 
-  // Create a persistent proxy for the handler to prevent automatic destruction
-  const persistentHandler = create_proxy(handler);
-  
-  const wrapperProxy = create_proxy(() => {
-    try {
-      return Promise.resolve(persistentHandler()); // Use the persistent proxy
-    } catch (err) {
-      console.error("Error in button handler:", err);
-    }
-  });
+    // Create a persistent proxy for the handler to prevent automatic destruction
+    const persistentHandler = create_proxy(handler);
 
-  // Store both proxies so we can clean them up later
-  this.inputHandlers[buttonName].push({
-    wrapperProxy,
-    persistentHandler
-  });
-}
+    const wrapperProxy = create_proxy(() => {
+      try {
+        return Promise.resolve(persistentHandler()); // Use the persistent proxy
+      } catch (err) {
+        console.error("Error in button handler:", err);
+      }
+    });
 
-
-  // Updated pressButton method
-public async pressButton(button: ButtonInstance | "A" | "B" | "AB") {
-  const buttonName = typeof button === "string" ? button : button.getName();
-  this.buttonStates[buttonName] = true;
-
-  for (const handlerProxy of this.inputHandlers[buttonName]) {
-    await handlerProxy.wrapperProxy(); // Use the wrapper proxy
+    // Store both proxies so we can clean them up later
+    this.inputHandlers[buttonName].push({
+      wrapperProxy,
+      persistentHandler,
+    });
   }
 
-  this.eventEmitter.emit({ type: "button-press", button: buttonName });
-}
+  // Updated pressButton method
+  public async pressButton(button: ButtonInstance | "A" | "B" | "AB") {
+    const buttonName = typeof button === "string" ? button : button.getName();
+    this.buttonStates[buttonName] = true;
 
-// Updated clearInputs method
-private clearInputs() {
-  this.inputHandlers.A.forEach((handlerProxy) => {
-    handlerProxy.wrapperProxy.destroy?.();
-    handlerProxy.persistentHandler.destroy?.();
-  });
-  this.inputHandlers.B.forEach((handlerProxy) => {
-    handlerProxy.wrapperProxy.destroy?.();
-    handlerProxy.persistentHandler.destroy?.();
-  });
-  this.inputHandlers = { A: [], B: [], AB: [] };
-}
+    for (const handlerProxy of this.inputHandlers[buttonName]) {
+      await handlerProxy.wrapperProxy(); // Use the wrapper proxy
+    }
+
+    this.eventEmitter.emit({ type: "button-press", button: buttonName });
+  }
+
+  // Updated clearInputs method
+  private clearInputs() {
+    this.inputHandlers.A.forEach((handlerProxy) => {
+      handlerProxy.wrapperProxy.destroy?.();
+      handlerProxy.persistentHandler.destroy?.();
+    });
+    this.inputHandlers.B.forEach((handlerProxy) => {
+      handlerProxy.wrapperProxy.destroy?.();
+      handlerProxy.persistentHandler.destroy?.();
+    });
+    this.inputHandlers.AB.forEach((handlerProxy) => {
+      handlerProxy.wrapperProxy.destroy?.();
+      handlerProxy.persistentHandler.destroy?.();
+    });
+    this.inputHandlers = { A: [], B: [], AB: [] };
+
+    // --- NEW: also clear logo handlers
+    this.cleanupLogoHandlers();
+  }
 
   getStateSnapshot() {
     return {
       pins: { ...this.pinStates },
       leds: this.ledMatrix.map((row) => [...row]),
       buttons: { ...this.buttonStates },
+      logo: this.logoTouched, // <-- NEW
     };
   }
 

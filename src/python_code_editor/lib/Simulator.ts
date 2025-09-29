@@ -1,3 +1,4 @@
+// src/python_code_editor/lib/Simulator.ts
 import { PythonInterpreter } from "../interpreter/PythonInterpreter";
 import { MicrobitSimulator, MicrobitEvent } from "../mock/microbitInstance";
 
@@ -10,6 +11,9 @@ interface SimulatorOptions {
   onOutput?: (line: string) => void;
   onEvent?: (event: MicrobitEvent) => void;
 }
+
+type ButtonEvent = "A" | "B" | "AB";
+type LogoEvent = { type: "logo"; state: "pressed" | "released" };
 
 export class Simulator {
   private interpreter: PythonInterpreter;
@@ -70,9 +74,36 @@ export class Simulator {
   reset() {
     if (this.microbit) {
       this.microbit.reset();
-      // stop any ongoing simulation
     } else {
       throw new Error("Microbit controller not initialized.");
     }
+  }
+
+  // --- INPUT API ---
+
+  async simulateInput(event: ButtonEvent | LogoEvent) {
+    if (!this.microbit) throw new Error("Microbit controller not initialized.");
+
+    if (typeof event === "string") {
+      // buttons
+      return this.microbit.pressButton(event);
+    }
+
+    if (event.type === "logo") {
+      if (event.state === "pressed") return this.microbit.pressLogo();
+      if (event.state === "released") return this.microbit.releaseLogo();
+    }
+
+    throw new Error("Unsupported input event");
+  }
+
+  async pressLogo() {
+    if (!this.microbit) throw new Error("Microbit controller not initialized.");
+    return this.microbit.pressLogo();
+  }
+
+  async releaseLogo() {
+    if (!this.microbit) throw new Error("Microbit controller not initialized.");
+    return this.microbit.releaseLogo();
   }
 }

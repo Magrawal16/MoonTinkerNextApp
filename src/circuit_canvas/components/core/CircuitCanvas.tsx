@@ -282,6 +282,9 @@ export default function CircuitCanvas() {
           power: undefined,
           measurement: el.computed?.measurement ?? undefined,
         },
+        controller: el.controller
+        ? { ...el.controller, logoTouched: false } // NEW: clear logo state
+        : el.controller,
       }))
     );
     setControllerMap((prev) => {
@@ -490,7 +493,6 @@ export default function CircuitCanvas() {
     }
 
     const elementData = e.dataTransfer.getData("application/element-type");
-    console.log("Element data on drop:", elementData);
     if (!elementData) return;
 
     const element = JSON.parse(elementData);
@@ -557,6 +559,7 @@ export default function CircuitCanvas() {
                         controller: {
                           leds: Array(5).fill(Array(5).fill(false)),
                           pins: {},
+                          logoTouched: false, // NEW
                         },
                       }
                     : el
@@ -564,6 +567,7 @@ export default function CircuitCanvas() {
               );
             }
             if (event.type === "led-change") {
+              await updateControllerFromState(newElement.id); // NEW
               const state = await simulator.getStates();
               const leds = state.leds;
               const pins = state.pins;
@@ -576,6 +580,7 @@ export default function CircuitCanvas() {
               );
             }
             if (event.type === "pin-change") {
+              await updateControllerFromState(newElement.id); // NEW
               const state = await simulator.getStates();
               const pins = state.pins;
               const leds = state.leds;
@@ -597,10 +602,31 @@ export default function CircuitCanvas() {
                 );
               }
             }
+            if (event.type === "logo-touch") { // NEW
+              await updateControllerFromState(newElement.id);
+              // No circuit recompute here by default; add if you want it to affect logic.
+            }
           },
         });
 
         await simulator.initialize();
+
+        const updateControllerFromState = async (elementId: string) => {
+          // NEW
+          const state = await simulator.getStates();
+          const leds = state.leds;
+          const pins = state.pins;
+          const logo = state.logo; // boolean
+          setElements((prev) =>
+            prev.map((el) =>
+              el.id === elementId
+                ? { ...el, controller: { leds, pins, logoTouched: !!logo } } // NEW
+                : el
+            )
+          );
+        };
+
+
         const states = await simulator.getStates();
 
         // Update map and controller LED state
@@ -608,7 +634,7 @@ export default function CircuitCanvas() {
         setElements((prev) =>
           prev.map((el) =>
             el.id === newElement.id
-              ? { ...el, controller: { leds: states.leds, pins: states.pins } } // Initialize controller state
+              ? { ...el, controller: { leds: states.leds, pins: states.pins, logoTouched: !!states.logo } } // NEW
               : el
           )
         );
@@ -1250,15 +1276,27 @@ export default function CircuitCanvas() {
                     }}
                     selectedElementId={selectedElement?.id || null}
                     // @ts-ignore
-                    onControllerInput={(elementId, input) => {
-                      const sim = controllerMap[elementId];
-                      if (
-                        sim &&
-                        (input === "A" || input === "B" || input === "AB")
-                      ) {
-                        sim.simulateInput(input);
-                      }
-                    }}
+                    onControllerInput={(elementId: string, input: any) => { // NEW
+  const sim = controllerMap[elementId];
+  if (!sim) return;
+
+  const anySim = sim as any;
+
+  // Buttons
+  if (input === "A" || input === "B" || input === "AB") {
+    anySim.simulateInput?.(input);
+    return;
+  }
+
+  // Logo touch
+  if (typeof input === "object" && input?.type === "logo") {
+    if (input.state === "pressed") {
+      (anySim.pressLogo?.() ?? anySim.simulateInput?.(input));
+    } else if (input.state === "released") {
+      (anySim.releaseLogo?.() ?? anySim.simulateInput?.(input));
+    }
+  }
+}}
                   />
                 ))}
               </Layer>

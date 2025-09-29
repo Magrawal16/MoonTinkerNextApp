@@ -33,12 +33,12 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
     monacoRef.current = monaco;
 
     editor.updateOptions({
-      quickSuggestions: { other: true, comments: false, strings: true },
+      quickSuggestions: { other: false, comments: false, strings: true },
       suggestOnTriggerCharacters: true,
       tabCompletion: "on",
       suggestSelection: "first",
       wordBasedSuggestions: "currentDocument",
-      inlineSuggest: { enabled: true },
+      inlineSuggest: { enabled: false },
     });
 
     // Register language services

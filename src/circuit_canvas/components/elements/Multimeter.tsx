@@ -70,7 +70,7 @@ export default function Multimeter(props: MultimeterProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 20, y: 20 }}
-            shadowOpacity={props.selected ? 2 : 0}
+            shadowOpacity={props.selected ? 0.2 : 0}
           />
         )}
         <Line

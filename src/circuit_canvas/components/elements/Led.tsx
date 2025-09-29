@@ -146,7 +146,7 @@ export default function Led(props: LedProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 7 : 0}
             shadowOffset={{ x: 12, y: -12 }}
-            shadowOpacity={props.selected ? 2 : 0}
+            shadowOpacity={props.selected ? 0.2 : 0}
             opacity={isOverloaded ? 0.8 : 1}
           />
         )}

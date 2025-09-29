@@ -138,6 +138,23 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     category: "Buttons",
     parameters: [ { id: "button", name: "Button", type: "dropdown", options: ["A","B","AB"], defaultValue: "A", placeholder: "Button" } ]
   },
+  // Touch / Logo Sensor Section
+  {
+    id: "logo_pressed_listener",
+    name: "Logo Pressed Listener",
+    description: "Register handler for logo touch (pressed)",
+    code: "input.on_logo_pressed(on_logo_{handler})",
+    category: "Buttons",
+    parameters: [ { id: "handler", name: "Handler function", type: "dropdown",options: ["down","up"], defaultValue: "on_logo_down", placeholder: "Function name" } ]
+  },
+  {
+    id: "logo_released_listener",
+    name: "Logo Released Listener",
+    description: "Register handler for logo release",
+    code: "input.on_logo_released(on_logo_{handler})",
+    category: "Buttons",
+    parameters: [ { id: "handler", name: "Handler function", type: "dropdown",options: ["down","up"], defaultValue: "on_logo_down", placeholder: "Function name" } ]
+  },
 
   // Loops Section
   { id: "forever_loop", name: "Forever Loop", description: "Run code continuously", code: `basic.forever(lambda: None)`, category: "Loops" },

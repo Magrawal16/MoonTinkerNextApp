@@ -15,7 +15,7 @@ export default function createElement(
       {
         id: id + "-node-1",
         x: 13,
-        y: 38,
+        y: 39.5,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",

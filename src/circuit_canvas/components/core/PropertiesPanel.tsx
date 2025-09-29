@@ -3,7 +3,7 @@ import {
   Wire,
   PropertiesPanelProps,
 } from "@/circuit_canvas/types/circuit";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ColorPaletteDropdown,
   defaultColors,
@@ -30,15 +30,40 @@ export default function PropertiesPanel({
   );
   const [showUpdateMessage, setShowUpdateMessage] = useState(false);
 
+  // Parse numeric input safely: empty string => null, invalid => null
+  const parseNumber = (v: string): number | null => {
+    if (v === "") return null;
+    const n = Number(v);
+    return Number.isNaN(n) ? null : n;
+  };
+
+  // Whether this element wants to show a given property
+  const showProp = (
+    name:
+      | "resistance"
+      | "voltage"
+      | "ratio"
+      | "temperature"
+      | "brightness"
+      | "color"
+  ) =>
+    !selectedElement?.displayProperties ||
+    selectedElement.displayProperties.includes(name);
+
   useEffect(() => {
-    setResistance(selectedElement?.properties?.resistance ?? null);
-    setVoltage(selectedElement?.properties?.voltage ?? null);
-    setRatio(selectedElement?.properties?.ratio ?? null);
-    setTemperature(selectedElement?.properties?.temperature ?? null);
-    setBrightness(selectedElement?.properties?.brightness ?? null);
-    setColor(selectedElement?.properties?.color ?? null);
-    setSelectedWireColor(wireColor || defaultColors[0].hex);
+    if (!selectedElement) return;
+    setResistance(selectedElement.properties?.resistance ?? null);
+    setVoltage(selectedElement.properties?.voltage ?? null);
+    setRatio(selectedElement.properties?.ratio ?? null);
+    setTemperature(selectedElement.properties?.temperature ?? null);
+    setBrightness(selectedElement.properties?.brightness ?? null);
+    setColor(selectedElement.properties?.color ?? null);
   }, [selectedElement]);
+
+  // Keep wire color in sync with prop updates from parent
+  useEffect(() => {
+    setSelectedWireColor(wireColor || defaultColors[0].hex);
+  }, [wireColor]);
 
   if (!selectedElement) return null;
 
@@ -46,7 +71,6 @@ export default function PropertiesPanel({
     if (selectedElement.type === "wire") {
       const wireToUpdate = wires.find((w) => w.id === selectedElement.id);
       if (wireToUpdate) {
-        // Do not mutate incoming wire object; send a copy to parent handler
         onWireEdit({ ...wireToUpdate, color: selectedWireColor }, false);
       }
     } else {
@@ -64,6 +88,7 @@ export default function PropertiesPanel({
       };
       onElementEdit(updatedElement, false);
     }
+
     setShowUpdateMessage(true);
     setTimeout(() => setShowUpdateMessage(false), 2000);
   };
@@ -71,9 +96,7 @@ export default function PropertiesPanel({
   const handleDelete = () => {
     if (selectedElement.type === "wire") {
       const wireToDelete = wires.find((w) => w.id === selectedElement.id);
-      if (wireToDelete) {
-        onWireEdit(wireToDelete, true);
-      }
+      if (wireToDelete) onWireEdit(wireToDelete, true);
     } else {
       onElementEdit(selectedElement, true);
     }
@@ -85,6 +108,12 @@ export default function PropertiesPanel({
       w.toNodeId.startsWith(selectedElement.id)
   );
 
+  const effResistanceText = useMemo(() => {
+    if (ratio == null || resistance == null) return "--";
+    const val = ratio * resistance;
+    return Number.isFinite(val) ? val.toFixed(2) : "--";
+  }, [ratio, resistance]);
+
   return (
     <div className="backdrop-blur-sm bg-white/10 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm p-2 space-y-1.5 max-w-xs">
       <div className="text-sm text-shadow-md text-gray-950 space-y-1">
@@ -94,7 +123,9 @@ export default function PropertiesPanel({
         </div>
         <div className="flex justify-between">
           <span className="font-semibold">ID:</span>
-          <span className="text-blue-500 font-semibold truncate">{selectedElement.id}</span>
+          <span className="text-blue-500 font-semibold truncate">
+            {selectedElement.id}
+          </span>
         </div>
       </div>
 
@@ -107,50 +138,53 @@ export default function PropertiesPanel({
         </button>
       )}
 
-      {resistance != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("resistance")) && (
+      {/* Numeric fields — never show for wires */}
+      {selectedElement.type !== "wire" && showProp("resistance") && (
         <div className="flex flex-col text-xs">
           <label>Resistance (Ω):</label>
           <input
             type="number"
-            value={resistance}
-            onChange={(e) => setResistance(Number(e.target.value))}
+            value={resistance ?? ""} // empty allowed
+            onChange={(e) => setResistance(parseNumber(e.target.value))}
             className="border px-1 py-1 rounded text-xs"
           />
         </div>
       )}
 
-      {voltage != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("voltage")) && (
+      {selectedElement.type !== "wire" && showProp("voltage") && (
         <div className="flex flex-col text-xs">
           <label>Voltage (V):</label>
           <input
             type="number"
-            value={voltage}
-            onChange={(e) => setVoltage(Number(e.target.value))}
+            value={voltage ?? ""}
+            onChange={(e) => setVoltage(parseNumber(e.target.value))}
             className="border px-1 py-1 rounded text-xs"
           />
         </div>
       )}
 
-      {ratio != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("ratio")) && (
+      {selectedElement.type !== "wire" && showProp("ratio") && (
         <div className="flex flex-col text-xs">
           <label>Ratio:</label>
           <input
             type="number"
             step="0.01"
-            value={ratio}
-            onChange={(e) => setRatio(Number(e.target.value))}
+            value={ratio ?? ""}
+            onChange={(e) => setRatio(parseNumber(e.target.value))}
             className="border px-1 py-1 rounded text-xs"
           />
           <span className="text-gray-500 mt-1">
-            Eff. Resistance: {(ratio * (resistance ?? 0)).toFixed(2)} Ω
+            Eff. Resistance: {effResistanceText} Ω
           </span>
         </div>
       )}
-      {color != null && selectedElement.type === 'led' && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("color")) && (
+
+      {/* LED-specific color */}
+      {selectedElement.type === "led" && showProp("color") && (
         <div className="flex flex-col text-xs">
           <label>LED Color:</label>
           <select
-            value={color}
+            value={color ?? "red"}
             onChange={(e) => setColor(e.target.value)}
             className="border px-1 py-1 rounded text-xs bg-white"
           >
@@ -164,52 +198,49 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {/* Microbit-specific controls */}
-      {selectedElement.type === "microbit" && (
-        <>
-          {temperature != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("temperature")) && (
-            <div className="flex flex-col text-xs">
-              <label>Temperature (°C):</label>
-              <input
-                type="range"
-                min="0"
-                max="50"
-                value={temperature}
-                onChange={(e) => setTemperature(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                {temperature}°C
-              </div>
-            </div>
-          )}
-
-          {brightness != null && (!selectedElement.displayProperties || selectedElement.displayProperties.includes("brightness")) && (
-            <div className="flex flex-col text-xs">
-              <label>Brightness (0–255):</label>
-              <input
-                type="range"
-                min="0"
-                max="255"
-                value={brightness}
-                onChange={(e) => setBrightness(Number(e.target.value))}
-                className="w-full"
-              />
-              <div className="text-xs text-gray-500 mt-1">
-                {brightness}
-              </div>
-            </div>
-          )}
-        </>
+      {/* Micro:bit-specific controls */}
+      {selectedElement.type === "microbit" && showProp("temperature") && (
+        <div className="flex flex-col text-xs">
+          <label>Temperature (°C):</label>
+          <input
+            type="range"
+            min="0"
+            max="50"
+            value={temperature ?? 0}
+            onChange={(e) => setTemperature(parseNumber(e.target.value) ?? 0)}
+            className="w-full"
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            {temperature ?? 0}°C
+          </div>
+        </div>
       )}
 
+      {selectedElement.type === "microbit" && showProp("brightness") && (
+        <div className="flex flex-col text-xs">
+          <label>Brightness (0–255):</label>
+          <input
+            type="range"
+            min="0"
+            max="255"
+            value={brightness ?? 0}
+            onChange={(e) => setBrightness(parseNumber(e.target.value) ?? 0)}
+            className="w-full"
+          />
+          <div className="text-xs text-gray-500 mt-1">
+            {brightness ?? 0}
+          </div>
+        </div>
+      )}
+
+      {/* Wire-specific color */}
       {selectedElement.type === "wire" && (
         <div className="flex flex-col text-xs">
           <label>Wire Color:</label>
           <ColorPaletteDropdown
             colors={defaultColors}
             selectedColor={selectedWireColor}
-            onColorSelect={(color) => setSelectedWireColor(color)}
+            onColorSelect={(c) => setSelectedWireColor(c)}
           />
         </div>
       )}
@@ -231,7 +262,9 @@ export default function PropertiesPanel({
 
       {connectedWires.length > 0 && (
         <div className="mt-2">
-          <h3 className="text-xs font-semibold text-gray-600 mb-1">Connected Wires</h3>
+          <h3 className="text-xs font-semibold text-gray-600 mb-1">
+            Connected Wires
+          </h3>
           <ul className="space-y-1 text-xs">
             {connectedWires.map((wire) => (
               <li
@@ -241,7 +274,10 @@ export default function PropertiesPanel({
                 <span className="truncate font-mono text-gray-800">
                   {wire.id}
                   <span className="text-gray-400 ml-1">
-                    ({defaultColors.find((c) => c.hex === wire.color)?.name || "Custom"})
+                    (
+                    {defaultColors.find((c) => c.hex === wire.color)?.name ||
+                      "Custom"}
+                    )
                   </span>
                 </span>
                 <button
@@ -269,7 +305,9 @@ export default function PropertiesPanel({
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
             <span>
-              {selectedElement?.type.charAt(0).toUpperCase() + selectedElement?.type.slice(1)} updated!
+              {selectedElement.type.charAt(0).toUpperCase() +
+                selectedElement.type.slice(1)}{" "}
+              updated!
             </span>
           </div>
         </div>

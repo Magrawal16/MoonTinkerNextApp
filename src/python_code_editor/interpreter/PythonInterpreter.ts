@@ -145,7 +145,6 @@ export class PythonInterpreter {
       sys.stdout = DualOutput()
       sys.stderr = sys.stdout
       builtins.print = lambda *args, **kwargs: sys.stdout.write(" ".join(map(str, args)) + "\\n")
-      from microbit import *
     `);
   }
 

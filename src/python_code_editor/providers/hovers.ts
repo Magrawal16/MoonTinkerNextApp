@@ -3,7 +3,8 @@ import { API } from "../api/PythonAPI";
 import { getDotContext, push } from "../utils/utils";
 
 export const registerHoverProvider = (monaco: any, disposables: { dispose: () => void }[]) => {
-  push(disposables,
+  push(
+    disposables,
     monaco.languages.registerHoverProvider("python", {
       provideHover: (model: any, position: any) => {
         const word = model.getWordAtPosition(position);
@@ -25,6 +26,10 @@ export const registerHoverProvider = (monaco: any, disposables: { dispose: () =>
         }
         if (dotOwner === "pins") {
           const md = getSigDoc(API.pins as any, word.word);
+          if (md) return { contents: [{ value: `**${md.sig}**\n\n${md.doc}` }] };
+        }
+        if (dotOwner === "input") {
+          const md = getSigDoc(API.input as any, word.word);
           if (md) return { contents: [{ value: `**${md.sig}**\n\n${md.doc}` }] };
         }
         if (dotOwner === "Button" && (API.Button as readonly string[]).includes(word.word as any)) {

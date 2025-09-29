@@ -3,7 +3,8 @@ import { API } from "../api/PythonAPI";
 import { push } from "../utils/utils";
 
 export const registerSignatureHelp = (monaco: any, disposables: { dispose: () => void }[]) => {
-  push(disposables,
+  push(
+    disposables,
     monaco.languages.registerSignatureHelpProvider("python", {
       signatureHelpTriggerCharacters: ["(", ","],
       provideSignatureHelp: (model: any, position: any) => {

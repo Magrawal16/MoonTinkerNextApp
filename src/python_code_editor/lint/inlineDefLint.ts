@@ -5,8 +5,12 @@ export const addInlineDefLint = (monaco: any, editor: any) => {
 
   const run = () => {
     const matches = model.findMatches(
-      String.raw`on_button_pressed\s*\(\s*Button\.(A|B|AB)\s*,\s*def\b`,
-      false, false, false, null, true
+      String.raw`(on_button_pressed\s*\(\s*Button\.(A|B|AB)\s*,\s*def\b)|(on_logo_(pressed|released)\s*\(\s*def\b)`,
+      false,
+      false,
+      false,
+      null,
+      true
     );
 
     const markers = matches.map((m: any) => ({

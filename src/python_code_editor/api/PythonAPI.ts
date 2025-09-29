@@ -27,6 +27,12 @@ export const API = {
         `\t\${2:# your code}\n\n` +
         `input.on_logo_pressed({1})\n`,
     },
+    on_logo_released: {
+      sig: "input.on_logo_released(handler: () -> None) -> None",
+      doc: "Register a handler for when the logo is released.",
+      snippet:
+        "def ${1:on_logo_up}():\n    ${2:pass}\n\ninput.on_logo_released(${1:on_logo_up})\n",
+    },
   },
   basic: {
     show_string: {

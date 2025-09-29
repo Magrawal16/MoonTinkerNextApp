@@ -1,31 +1,66 @@
+// components/editor/python/PythonCodeEditor.tsx
 "use client";
-import Editor from "@monaco-editor/react";
-import { useState, useRef, useMemo } from "react";
+import Editor, { OnMount } from "@monaco-editor/react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { API } from "../api/PythonAPI";
+import { registerCompletionProvider } from "../providers/completions";
+import { registerHoverProvider } from "../providers/hovers";
+import { registerSignatureHelp } from "../providers/signatures";
+import { registerSymbolProvider } from "../providers/symbols";
+import { addInlineDefLint } from "../lint/inlineDefLint";
 
 interface StandaloneEditorProps {
   code: string;
   onChange: (value: string) => void;
 }
 
-export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
+type Monaco = Parameters<OnMount>[1];
+
+export default function PythonCodeEditor({ code, onChange }: StandaloneEditorProps) {
   const [fontSize, setFontSize] = useState(14);
   const [isDragOver, setIsDragOver] = useState(false);
   const editorRef = useRef<any>(null);
-  // Drag preview state (visual indicator like a green guideline)
-  const [dragPreview, setDragPreview] = useState<{
-    visible: boolean;
-    top: number; // px relative to editor content area
-    left: number; // px relative to editor content area
-    width: number; // px
-  }>({ visible: false, top: 0, left: 0, width: 0 });
-  // Cache indent unit string based on typical 4 spaces (updated at drop time using the model options if available)
+  const monacoRef = useRef<Monaco | null>(null);
+  const disposablesRef = useRef<{ dispose: () => void }[]>([]);
+
+  // Drag preview line
+  const [dragPreview, setDragPreview] = useState({ visible: false, top: 0, left: 0, width: 0 });
+
   const defaultIndentUnit = useMemo(() => " ".repeat(4), []);
 
-  const handleEditorDidMount = (editor: any) => {
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
+
+    editor.updateOptions({
+      quickSuggestions: { other: true, comments: false, strings: true },
+      suggestOnTriggerCharacters: true,
+      tabCompletion: "on",
+      suggestSelection: "first",
+      wordBasedSuggestions: "currentDocument",
+      inlineSuggest: { enabled: true },
+    });
+
+    // Register language services
+    const disposables: { dispose: () => void }[] = [];
+    registerCompletionProvider(monaco, disposables);
+    registerHoverProvider(monaco, disposables);
+    registerSignatureHelp(monaco, disposables);
+    registerSymbolProvider(monaco, disposables);
+    disposablesRef.current = disposables;
+
+    // Lint: inline def misuse
+    addInlineDefLint(monaco, editor);
   };
 
-  // Classify snippet type to decide placement rules (top-level vs block content)
+  useEffect(() => {
+    return () => {
+      disposablesRef.current.forEach((d) => d?.dispose?.());
+      disposablesRef.current = [];
+    };
+  }, []);
+
+  // ------- Drag & drop (unchanged from your version) -------
   const classifySnippet = (raw: string): "top-level" | "block" => {
     if (!raw) return "block";
     const firstLine = raw.replace(/\r\n?/g, "\n").split("\n").find((l) => l.trim().length > 0) || "";
@@ -37,32 +72,15 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
     return "block";
   };
 
-  // Compute effective indentation for insertion based on current position and context.
-  // Rules:
-  // - If dropping on a blank line and the previous non-empty line ends with ':', indent one level from that line.
-  // - Else if the current line ends with ':', indent one level from current line's indent.
-  // - Otherwise use the current line's indentation.
-  const computeEffectiveIndent = (
-    model: any,
-    position: { lineNumber: number; column: number },
-    indentUnit: string
-  ) => {
+  const computeEffectiveIndent = (model: any, position: { lineNumber: number; column: number }, indentUnit: string) => {
     const getLine = (ln: number) => (model?.getLineContent?.(ln) ?? "") as string;
     const lineText = getLine(position.lineNumber);
     const currentIndent = (lineText.match(/^\s*/) || [""])[0];
     const isBlank = lineText.trim().length === 0;
-
     const endsWithColon = /:\s*$/.test(lineText.trimEnd());
-    if (!isBlank) {
-      return currentIndent + (endsWithColon ? indentUnit : "");
-    }
+    if (!isBlank) return currentIndent + (endsWithColon ? indentUnit : "");
+    if (currentIndent.length > 0) return currentIndent;
 
-    // If the blank line already has whitespace, respect it
-    if (currentIndent.length > 0) {
-      return currentIndent;
-    }
-
-    // Scan upward for previous non-empty line and mirror its indent (+1 level if it ends with ':')
     let ln = position.lineNumber - 1;
     while (ln >= 1) {
       const prev = getLine(ln);
@@ -73,7 +91,6 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
       }
       ln--;
     }
-    // Top of file: nothing above
     return "";
   };
 
@@ -81,8 +98,6 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
     setIsDragOver(true);
-
-  // Show a green guideline where the snippet will be inserted
     try {
       const editor = editorRef.current;
       if (!editor) return;
@@ -90,46 +105,35 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
       const model = editor.getModel?.();
       if (!dom || !model) return;
 
-      // Get the position under the cursor
       const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
       const pos = target?.position || editor.getPosition?.();
       if (!pos) return;
 
-  // Compute indentation for preview based on context
-  const opts = model.getOptions?.();
-  const indentSize: number = (opts?.indentSize as number) || 4;
-  const indentUnit = " ".repeat(Math.max(1, indentSize));
+      const opts = model.getOptions?.();
+      const indentSize: number = (opts?.indentSize as number) || 4;
+      const indentUnit = " ".repeat(Math.max(1, indentSize));
       const dragged = e.dataTransfer.getData("text/plain");
       const kind = classifySnippet(dragged);
       const effectiveIndent = kind === "top-level" ? "" : computeEffectiveIndent(model, pos, indentUnit);
 
-      // Compute pixel position for the guideline using visible position APIs
-      const baseCoord = editor.getScrolledVisiblePosition({
-        lineNumber: pos.lineNumber,
-        column: 1,
-      });
+      const baseCoord = editor.getScrolledVisiblePosition({ lineNumber: pos.lineNumber, column: 1 });
       if (!baseCoord) return;
       const indentCoord = editor.getScrolledVisiblePosition({
         lineNumber: pos.lineNumber,
         column: Math.max(1, effectiveIndent.length + 1),
       });
-  // Place guideline on current line start, at computed indent
-  const top = baseCoord.top;
+
+      const top = baseCoord.top;
       const left = indentCoord ? indentCoord.left : baseCoord.left;
 
-      const hostRect = (dom.querySelector('.monaco-scrollable-element') as HTMLElement | null)?.getBoundingClientRect?.() ?? dom.getBoundingClientRect();
+      const hostRect =
+        (dom.querySelector(".monaco-scrollable-element") as HTMLElement | null)?.getBoundingClientRect?.() ??
+        dom.getBoundingClientRect();
       const containerRect = (dom.parentElement as HTMLElement | null)?.getBoundingClientRect?.() ?? hostRect;
       const containerWidth = containerRect.width;
 
-      setDragPreview({
-        visible: true,
-        top,
-        left,
-        width: Math.max(0, containerWidth - left - 8),
-      });
-    } catch {
-      // ignore preview errors
-    }
+      setDragPreview({ visible: true, top, left, width: Math.max(0, containerWidth - left - 8) });
+    } catch {}
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -143,34 +147,29 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
     setIsDragOver(false);
     setDragPreview((p) => ({ ...p, visible: false }));
 
-  const codeSnippet = e.dataTransfer.getData("text/plain");
+    const codeSnippet = e.dataTransfer.getData("text/plain");
     if (codeSnippet && editorRef.current) {
       const editor = editorRef.current;
       const model = editor.getModel?.();
       const position = editor.getPosition();
       if (!model || !position) return;
 
-  // Determine indentation context for the insertion
-  const lineContent: string = model.getLineContent(position.lineNumber) ?? "";
-  const currentIndent = (lineContent.match(/^\s*/) || [""])[0];
-  const isCursorAtLineStart = position.column <= (currentIndent.length + 1);
+      const lineContent: string = model.getLineContent(position.lineNumber) ?? "";
+      const currentIndent = (lineContent.match(/^\s*/) || [""])[0];
+      const isCursorAtLineStart = position.column <= currentIndent.length + 1;
 
-  const opts = model.getOptions?.();
-  const indentSize: number = (opts?.indentSize as number) || 4;
-  const indentUnit = " ".repeat(Math.max(1, indentSize));
-  const kind = classifySnippet(codeSnippet);
-  const effectiveIndent = kind === "top-level" ? "" : computeEffectiveIndent(model, position, indentUnit);
+      const opts = model.getOptions?.();
+      const indentSize: number = (opts?.indentSize as number) || 4;
+      const indentUnit = " ".repeat(Math.max(1, indentSize));
+      const kind = classifySnippet(codeSnippet);
+      const effectiveIndent = kind === "top-level" ? "" : computeEffectiveIndent(model, position, indentUnit);
 
-      // Prepare snippet with indentation applied to each line
       const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, "\n");
       const raw = normalizeNewlines(codeSnippet);
       const lines = raw.split("\n");
-      const indented = lines
-        .map((ln) => (ln.length ? effectiveIndent + ln : ln))
-        .join("\n");
+      const indented = lines.map((ln) => (ln.length ? effectiveIndent + ln : ln)).join("\n");
 
-      // If dropping in the middle or end of a non-empty line, start on a new line first
-  const needLeadingNewline = !isCursorAtLineStart || /\S/.test(lineContent);
+      const needLeadingNewline = !isCursorAtLineStart || /\S/.test(lineContent);
       const textToInsert = (needLeadingNewline ? "\n" : "") + indented + "\n";
 
       const range = {
@@ -180,52 +179,35 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
         endColumn: position.column,
       };
 
-      editor.executeEdits("drag-drop-python-indent", [
-        { range, text: textToInsert, forceMoveMarkers: true },
-      ]);
+      editor.executeEdits("drag-drop-python-indent", [{ range, text: textToInsert, forceMoveMarkers: true }]);
 
-      // Update external state and move cursor
       const newValue = editor.getValue();
       onChange(newValue);
       editor.focus();
 
-      // Compute new cursor position at end of inserted snippet
       const insertedLines = textToInsert.split("\n");
-      const additionalLines = insertedLines.length - 1; // because we prefixed maybe a newline and always append newline
+      const additionalLines = insertedLines.length - 1;
       const newLineNumber = position.lineNumber + additionalLines;
-      const lastLineText = insertedLines[insertedLines.length - 2] || ""; // line before the final trailing newline
+      const lastLineText = insertedLines[insertedLines.length - 2] || "";
       editor.setPosition({ lineNumber: newLineNumber, column: Math.max(1, lastLineText.length + 1) });
     }
   };
 
   return (
     <div
-      className={`ms-3.5
-  w-full min-w-[200px] h-full min-h-[260px] max-h-[84vh]
-  flex flex-col rounded-xl shadow-2xl border border-white/20
-        monaco-transparent
+      className={`ms-3.5 w-full min-w-[200px] h-full min-h-[260px] max-h-[84vh]
+        flex flex-col rounded-xl shadow-2xl border border-white/20 monaco-transparent
         bg-gradient-to-br from-slate-900/80 via-blue-950/70 to-slate-700/70
-        backdrop-blur-2xl m-1 mt-0.5 ${isDragOver ? 'ring-2 ring-indigo-400 ring-opacity-60' : ''}
-      `}
-      style={{
-  boxShadow: "0 8px 40px rgba(0, 41, 100, 0.28)",
-  // Allow horizontal scrollbar from Monaco to be visible
-  overflow: "hidden", // keep rounded corners for content, Monaco manages its own scrollbars
-      }}
+        backdrop-blur-2xl m-1 mt-0.5 ${isDragOver ? "ring-2 ring-indigo-400 ring-opacity-60" : ""}`}
+      style={{ boxShadow: "0 8px 40px rgba(0, 41, 100, 0.28)", overflow: "hidden" }}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-  {/* Removed blue overlay; rely on precise guideline */}
-      
       {/* Toolbar */}
       <div
-        className="
-          flex items-center justify-between px-3 py-2
-          border-b border-white/10
-          bg-gradient-to-r from-slate-700/70 via-blue-900/50 to-transparent
-          backdrop-blur-lg select-none
-        "
+        className="flex items-center justify-between px-3 py-2 border-b border-white/10
+          bg-gradient-to-r from-slate-700/70 via-blue-900/50 to-transparent backdrop-blur-lg select-none"
         style={{ minHeight: 42 }}
       >
         <span className="text-sm tracking-wide font-bold font-mono text-white/90 drop-shadow-md">
@@ -249,6 +231,7 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
           </button>
         </div>
       </div>
+
       {/* Monaco Editor */}
       <div className="flex-1 min-h-0 w-full relative">
         <Editor
@@ -268,12 +251,12 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
             fontLigatures: true,
             renderLineHighlight: "all",
             lineDecorationsWidth: 0,
-            wordWrap: "off", // ensure long single lines do not wrap
+            wordWrap: "off",
             wordWrapColumn: 0,
             wrappingStrategy: "advanced",
             scrollbar: {
               vertical: "auto",
-              horizontal: "visible", // always show horizontal bar so users discover scrolling
+              horizontal: "visible",
               useShadows: false,
               horizontalScrollbarSize: 14,
               verticalScrollbarSize: 12,
@@ -283,6 +266,7 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
           height="100%"
           width="100%"
         />
+
         {/* Drag preview guideline */}
         {dragPreview.visible && (
           <div

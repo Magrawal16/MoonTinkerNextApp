@@ -16,7 +16,7 @@ import {
   BlocklyPythonIntegration,
   BidirectionalConverter,
 } from "@/blockly_editor/utils/blocklyPythonConvertor";
-import CodeEditor from "@/python_code_editor/components/CodeEditor";
+import CodeEditor from "@/python_code_editor/components/PythonCodeEditor";
 import { createToolboxXmlFromBlocks } from "../utils/sharedBlockDefinitions";
 import PythonCodePalette from "./PythonCodeBlockSnippetPalette";
 

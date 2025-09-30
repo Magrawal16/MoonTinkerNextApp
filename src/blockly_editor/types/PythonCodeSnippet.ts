@@ -143,17 +143,17 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     id: "logo_pressed_listener",
     name: "Logo Pressed Listener",
     description: "Register handler for logo touch (pressed)",
-    code: "input.on_logo_pressed(on_logo_{handler})",
-    category: "Buttons",
-    parameters: [ { id: "handler", name: "Handler function", type: "dropdown",options: ["down","up"], defaultValue: "on_logo_down", placeholder: "Function name" } ]
+    code: `def on_logo_down():\n    #your code\n\ninput.on_logo_pressed(on_logo_down)`,
+    category: "Sensor",
+    //parameters: [ { id: "handler", name: "Handler function", type: "text", defaultValue: "on_logo_down", placeholder: "Function name" } ]
   },
   {
     id: "logo_released_listener",
     name: "Logo Released Listener",
     description: "Register handler for logo release",
-    code: "input.on_logo_released(on_logo_{handler})",
-    category: "Buttons",
-    parameters: [ { id: "handler", name: "Handler function", type: "dropdown",options: ["down","up"], defaultValue: "on_logo_down", placeholder: "Function name" } ]
+    code: `def on_logo_up():\n    #your code\n\ninput.on_logo_released(on_logo_up)`,
+    category: "Sensor",
+    //parameters: [ { id: "handler", name: "Handler function", type: "text", defaultValue: "on_logo_up", placeholder: "Function name" } ]
   },
 
   // Loops Section
@@ -193,4 +193,4 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
   { id: "radio_import", name: "Radio Import", description: "Import radio module", code: "import radio", category: "Imports" }
 ];
 
-export const CATEGORIES = ["Display", "Pins", "Buttons", "Loops", "Timing", "Imports"] as const;
+export const CATEGORIES = ["Display", "Pins", "Buttons", "Sensor","Loops", "Timing", "Imports"] as const;

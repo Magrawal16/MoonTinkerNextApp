@@ -134,6 +134,8 @@ export default function PythonCodePalette({
         return "⏱️";
       case "Imports":
         return "📦";
+      case "Sensor":
+        return "👆";
       default:
         return "📋";
     }
@@ -153,6 +155,8 @@ export default function PythonCodePalette({
         return "bg-red-500";
       case "Imports":
         return "bg-gray-500";
+      case "Sensor":
+        return "bg-teal-500";
       default:
         return "bg-gray-400";
     }
@@ -307,6 +311,8 @@ function CategoriesListView({
                   {category === "Loops" && "Count and repeat sets of commands"}
                   {category === "Timing" && "Pause and timing functions"}
                   {category === "Imports" && "Essential Python module imports"}
+                  {category === "Sensor" && "Use logo touch and sensor events"}
+
                 </p>
               </div>
             </div>
@@ -377,6 +383,7 @@ function CategoryView({
             {category === "Loops" && "Count and repeat sets of commands"}
             {category === "Timing" && "Pause and timing functions"}
             {category === "Imports" && "Essential Python module imports"}
+            {category === "Sensor" && "Use logo touch and sensor events"}
           </p>
         </div>
       </div>

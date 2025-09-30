@@ -25,10 +25,10 @@ export default function Microbit({
 
   // Tunable constants for logo overlay alignment
   // Adjust LOGO_X / LOGO_Y to perfectly cover the SVG logo.
-  const LOGO_X = 95.2;     // horizontal position
-  const LOGO_Y = 91.2;     // vertical position (was 55; moved down to align)
-  const LOGO_W = 29.2;
-  const LOGO_H = 16.2;
+  const LOGO_X = 99.6;     // horizontal position
+  const LOGO_Y = 93.8;     // vertical position (was 55; moved down to align)
+  const LOGO_W = 23.2;
+  const LOGO_H = 14;
 
   useEffect(() => {
     const image = new window.Image();
@@ -60,12 +60,12 @@ export default function Microbit({
   // Logo stroke color logic
   const logoStroke =
     !isSimulationOn
-      ? "rgb(200,36,52)"
+      ? "rgb(46,197,150)"
       : logoState === "pressed"
         ? "green"
         : logoState === "hover"
           ? "yellow"
-          : "rgb(200,36,52)";
+          : "rgb(46,197,150)";
 
   const enableLogoInteraction = isSimulationOn;
 
@@ -147,7 +147,7 @@ export default function Microbit({
             width={220}
             height={220}
             x={0}
-            y={-25}
+            y={-89}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
@@ -159,6 +159,8 @@ export default function Microbit({
             image={imgOnnState}
             width={220}
             height={220}
+            x={-0.7}
+            y={-65}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
@@ -182,10 +184,10 @@ export default function Microbit({
           leds.map((col, x) => (
             <Rect
               key={`${x}-${y}`}
-              x={82.2 + x * 12.4}
-              y={51 + y * 12.4}
+              x={83.8 + x * 11.8}
+              y={51 + y * 13}
               width={4}
-              height={10}
+              height={10.1}
               fill={leds[x][y] ? "yellow" : "#333"}
               cornerRadius={3}
             />
@@ -195,7 +197,7 @@ export default function Microbit({
         {/* Touch (Logo) Sensor Overlay */}
         <Group
           x={LOGO_X-2}
-          y={LOGO_Y-63}
+          y={LOGO_Y-63.2}
           listening={true}
           onMouseEnter={onLogoEnter}
           onMouseLeave={onLogoLeave}
@@ -209,9 +211,9 @@ export default function Microbit({
           <Rect
             width={LOGO_W}
             height={LOGO_H}
-            cornerRadius={20}
+            cornerRadius={24}
             stroke={logoStroke}
-            strokeWidth={3}
+            strokeWidth={3.7}
             fill="rgba(0,0,0,0.55)"
             opacity={0.95}
           />
@@ -260,8 +262,8 @@ export default function Microbit({
             e.cancelBubble = true;
             handleButtonClick("A");
           }}
-          x={35}
-          y={130}
+          x={39.4}
+          y={73.5}
         >
           {btnPressed === "A" && (
             <Rect
@@ -285,8 +287,8 @@ export default function Microbit({
             e.cancelBubble = true;
             handleButtonClick("B");
           }}
-          x={165}
-          y={130}
+          x={158.9}
+          y={73.5}
         >
           {btnPressed === "B" && (
             <Rect

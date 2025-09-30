@@ -260,7 +260,7 @@ export const registerCompletionProvider = (
             {
               label: "def function scaffold",
               kind: k.Snippet,
-              insertText: "def ${1:name}(${2}):\n    ${3:pass}\n",
+              insertText: "def ${1:name}(${2}):\n    ${3:# your code}\n",
               insertTextRules:
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: "Define a Python function.",
@@ -269,7 +269,7 @@ export const registerCompletionProvider = (
               label: "class scaffold",
               kind: k.Snippet,
               insertText:
-                "class ${1:Name}:\n    def __init__(self${2}):\n        ${3:pass}\n",
+                "class ${1:Name}:\n    def __init__(self${2}):\n        ${3:# your code}\n",
               insertTextRules:
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: "Define a Python class.",
@@ -288,7 +288,7 @@ export const registerCompletionProvider = (
               label: "on_logo_pressed scaffold",
               kind: k.Snippet,
               insertText:
-                "def ${1:on_logo_down}():\n    ${2:pass}\n\ninput.on_logo_pressed(${1:on_logo_down})\n",
+                "def ${1:on_logo_down}():\n    ${2:# your code}\n\ninput.on_logo_pressed(${1:on_logo_down})\n",
               insertTextRules:
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: "Scaffold a logo press handler.",
@@ -306,7 +306,7 @@ export const registerCompletionProvider = (
             {
               label: "while True loop",
               kind: k.Snippet,
-              insertText: "while True:\n    ${1:pass}\n",
+              insertText: "while True:\n    ${1:# your code}\n",
               insertTextRules:
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: "Plain Python loop (runs forever).",

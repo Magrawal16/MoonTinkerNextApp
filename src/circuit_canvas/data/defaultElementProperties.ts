@@ -59,6 +59,12 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     defaultProps: { voltage: 3.3, resistance: 0 },
   },
   {
+    type: "microbitWithBreakout",
+    label: "Microbit with Breakout",
+    iconPath: "assets/circuit_canvas/elements/microbit_with_breakout.svg",
+    defaultProps: { voltage: 3.3, resistance: 0 },
+  },
+  {
     type: "ultrasonicsensor4p",
     label: "Ultra Sonic Sensor 4P",
     iconPath: "assets/circuit_canvas/elements/UltraSonicSensor4P.svg",

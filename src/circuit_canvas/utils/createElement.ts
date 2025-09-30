@@ -282,6 +282,64 @@ export default function createElement(
     displayProperties: ["voltage", "resistance", "temperature", "brightness"],
   };
 
+  const microbitElementWithBreakout = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-0",
+        x: 42.9,
+        y: 227,
+        parentId: id,
+        placeholder: "P0",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-1",
+        x: 74.8,
+        y: 227,
+        parentId: id,
+        placeholder: "P1",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-2",
+        x: 111.4,
+        y: 227,
+        parentId: id,
+        placeholder: "P2",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-3V",
+        x: 148,
+        y: 227,
+        parentId: id,
+        placeholder: "3.3V",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-GND",
+        x: 180,
+        y: 227,
+        parentId: id,
+        placeholder: "GND",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: props.properties?.voltage ?? 3.3,
+      resistance: props.properties?.resistance ?? 0,
+      temperature: props.properties?.temperature ?? 25, 
+      brightness: props.properties?.brightness ?? 128, 
+      ...props.properties,
+    },
+    displayProperties: ["voltage", "resistance", "temperature", "brightness"],
+  };
+
   const ultraSonicSensor4P = {
     id,
     type: props.type,
@@ -356,6 +414,9 @@ export default function createElement(
       break;
     case "ultrasonicsensor4p":
       element = ultraSonicSensor4P;
+      break;
+    case "microbitWithBreakout":
+      element = microbitElementWithBreakout;
       break;
     default:
       element = null;

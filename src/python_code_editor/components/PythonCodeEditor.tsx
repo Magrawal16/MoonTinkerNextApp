@@ -425,11 +425,11 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
       {/* VS Code-like Title Bar */}
       <div className="flex items-center justify-between px-4 py-2 bg-[#2d2d2d] border-b border-[#3c3c3c]">
         <div className="flex items-center space-x-2">
-          {/* <div className="flex space-x-1.5">
-            <div className="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
-            <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
-            <div className="w-3 h-3 rounded-full bg-[#27ca3f]"></div>
-          </div> */}
+          <div className="flex space-x-1.5">
+            <div className="w-3 h-3 rounded-l-xl bg-gray-500"></div>
+            {/* <div className="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+            <div className="w-3 h-3 rounded-full bg-[#27ca3f]"></div> */}
+          </div>
           <span className="text-[13px] font-medium text-[#cccccc] ml-2">
             Python Editor 
           </span>

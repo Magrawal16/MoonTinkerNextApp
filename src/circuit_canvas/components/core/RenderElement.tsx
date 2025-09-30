@@ -14,6 +14,7 @@ import Multimeter from "@/circuit_canvas/components/elements/Multimeter";
 import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
+import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
 
 interface RenderElementProps {
   element: CircuitElement;
@@ -128,6 +129,28 @@ export default function RenderElement({
           x={1}
           y={22}
           onControllerInput={(input: "A" | "B" | "AB") => {
+            props.onControllerInput(element.id, input);
+          }}
+          leds={
+            (element.controller?.leds as boolean[][] | undefined) ??
+            Array(5).fill(Array(5).fill(false))
+          }
+          selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
+          pins={
+            (element.controller?.pins as Record<
+              string,
+              { digital?: number }
+            >) ?? {}
+          }
+        />
+      )}
+      {element.type === "microbitWithBreakout" && (
+        <MicrobitWithBreakout
+          id={element.id}
+          x={1}
+          y={22}
+          onControllerInput={(elementId: string, input: any) => {
             props.onControllerInput(element.id, input);
           }}
           leds={

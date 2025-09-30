@@ -96,7 +96,8 @@ export type PaletteElementType =
   | "potentiometer"
   | "led"
   | "microbit"
-  | "ultrasonicsensor4p";
+  | "ultrasonicsensor4p"
+  | "microbitWithBreakout";
 
 export type PropertiesPanelProps = {
   selectedElement: CircuitElement | null;

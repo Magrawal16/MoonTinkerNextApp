@@ -65,7 +65,7 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
     {
       name: "Start/stop simulation",
       description: "Start or stop the circuit simulation",
-      keys: ["space"],
+      keys: ["ctrl", "space"],
     },
   ];
 }
@@ -167,7 +167,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             stopSimulation();
           },
         };
-      case "space":
+      case "ctrl+space":
         return {
           ...meta,
           handler: () => {

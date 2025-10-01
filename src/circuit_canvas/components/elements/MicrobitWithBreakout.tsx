@@ -25,10 +25,10 @@ export default function Microbit({
 
   // Tunable constants for logo overlay alignment
   // Adjust LOGO_X / LOGO_Y to perfectly cover the SVG logo.
-  const LOGO_X = 95.2;     // horizontal position
-  const LOGO_Y = 91.2;     // vertical position (was 55; moved down to align)
-  const LOGO_W = 29.2;
-  const LOGO_H = 16.2;
+  const LOGO_X = 101;     // horizontal position
+  const LOGO_Y = 87.3;     // vertical position (was 55; moved down to align)
+  const LOGO_W = 23.2;
+  const LOGO_H = 14;
 
   useEffect(() => {
     const image = new window.Image();
@@ -60,12 +60,12 @@ export default function Microbit({
   // Logo stroke color logic
   const logoStroke =
     !isSimulationOn
-      ? "rgb(200,36,52)"
+      ? "rgb(46,197,150)"
       : logoState === "pressed"
         ? "green"
         : logoState === "hover"
           ? "yellow"
-          : "rgb(200,36,52)";
+          : "rgb(46,197,150)";
 
   const enableLogoInteraction = isSimulationOn;
 
@@ -147,7 +147,7 @@ export default function Microbit({
             width={220}
             height={220}
             x={0}
-            y={-25}
+            y={-89}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
@@ -159,6 +159,8 @@ export default function Microbit({
             image={imgOnnState}
             width={220}
             height={220}
+            x={0.7}
+            y={-71}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
@@ -182,10 +184,10 @@ export default function Microbit({
           leds.map((col, x) => (
             <Rect
               key={`${x}-${y}`}
-              x={82.2 + x * 12.4}
-              y={51 + y * 12.4}
+              x={85 + x * 11.8}
+              y={44.4 + y * 13}
               width={4}
-              height={10}
+              height={10.1}
               fill={leds[x][y] ? "yellow" : "#333"}
               cornerRadius={3}
             />
@@ -195,7 +197,7 @@ export default function Microbit({
         {/* Touch (Logo) Sensor Overlay */}
         <Group
           x={LOGO_X-2}
-          y={LOGO_Y-63}
+          y={LOGO_Y-63.2}
           listening={true}
           onMouseEnter={onLogoEnter}
           onMouseLeave={onLogoLeave}
@@ -209,9 +211,9 @@ export default function Microbit({
           <Rect
             width={LOGO_W}
             height={LOGO_H}
-            cornerRadius={20}
+            cornerRadius={24}
             stroke={logoStroke}
-            strokeWidth={3}
+            strokeWidth={3.7}
             fill="rgba(0,0,0,0.55)"
             opacity={0.95}
           />
@@ -235,8 +237,8 @@ export default function Microbit({
             e.cancelBubble = true;
             handleButtonClick("AB");
           }}
-          x={164}
-          y={96}
+          x={157.1}
+          y={20}
         >
           {btnPressed === "AB" && (
             <Rect
@@ -246,11 +248,11 @@ export default function Microbit({
               stroke="red"
               strokeWidth={1.5}
               cornerRadius={12}
-              x={2.8}
-              y={0.6}
+              x={5.3}
+              y={10}
             />
           )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Rect width={12} height={12} x={5.4} y={10} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
 
@@ -260,8 +262,8 @@ export default function Microbit({
             e.cancelBubble = true;
             handleButtonClick("A");
           }}
-          x={35}
-          y={130}
+          x={39.4}
+          y={60}
         >
           {btnPressed === "A" && (
             <Rect
@@ -271,11 +273,11 @@ export default function Microbit({
               stroke="#1B5FC5"
               strokeWidth={1.2}
               cornerRadius={12}
-              x={2.8}
-              y={0.6}
+              x={5.3}
+              y={7}
             />
           )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Rect width={10} height={15} x={8} y={6} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
 
@@ -285,8 +287,8 @@ export default function Microbit({
             e.cancelBubble = true;
             handleButtonClick("B");
           }}
-          x={165}
-          y={130}
+          x={158.9}
+          y={60}
         >
           {btnPressed === "B" && (
             <Rect
@@ -297,10 +299,10 @@ export default function Microbit({
               strokeWidth={1.2}
               cornerRadius={12}
               x={1.6}
-              y={0.6}
+              y={7}
             />
           )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+          <Rect width={10} height={15} x={5} y={5} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
       </Group>

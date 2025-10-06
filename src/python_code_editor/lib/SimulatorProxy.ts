@@ -48,7 +48,6 @@ export class SimulatorProxy {
     const SimulatorConstructor = Comlink.wrap<typeof Simulator>(this.worker);
 
     const { language, controller } = this.options;
-    console.log(controller, +" in SimulatorProxy controller");
     this.simulatorRemoteInstance = await new SimulatorConstructor({
       language,
       controller,

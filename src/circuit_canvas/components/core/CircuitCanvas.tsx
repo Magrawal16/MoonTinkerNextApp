@@ -1250,6 +1250,7 @@ export default function CircuitCanvas() {
                         setActiveControllerId(element.id);
                       }
                     }}
+                    selectedElementId={selectedElement?.id || null}
                     // @ts-ignore
                     onControllerInput={(elementId: string, input: any) => { // NEW
   const sim = controllerMap[elementId];

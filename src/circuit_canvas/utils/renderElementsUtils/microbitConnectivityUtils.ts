@@ -33,7 +33,6 @@ export function findConnectedMicrobit(
   if (element.type !== "ultrasonicsensor4p" || !elements || !wires) {
     return null;
   }
-
   // Get sensor nodes
   const sensorNodes = element.nodes;
   const vccNode = sensorNodes.find(n => n.placeholder === "VCC(+5V)");
@@ -42,7 +41,7 @@ export function findConnectedMicrobit(
   const echoNode = sensorNodes.find(n => n.placeholder === "ECHO");
 
   // Find all microbits in the circuit
-  const microbits = elements.filter(el => el.type === "microbit");
+  const microbits = elements.filter(el => el.type === "microbit" || el.type === "microbitWithBreakout");
 
   for (const microbit of microbits) {
     const connectionStatus = checkMicrobitConnection(
@@ -175,7 +174,7 @@ export function findAllConnectedMicrobits(
   const trigNode = sensorNodes.find(n => n.placeholder === "TRIG");
   const echoNode = sensorNodes.find(n => n.placeholder === "ECHO");
 
-  const microbits = elements.filter(el => el.type === "microbit");
+  const microbits = elements.filter(el => el.type === "microbit" || el.type === "microbitWithBreakout");
   const connectedMicrobits: ConnectedMicrobitData[] = [];
 
   for (const microbit of microbits) {

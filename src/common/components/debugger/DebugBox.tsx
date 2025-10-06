@@ -186,7 +186,7 @@ export function DebugBox({ data, className, onClose }: DebugBoxProps) {
             : {},
           microbits: Array.isArray(elements)
             ? elements
-                .filter((el: any) => safeAccess(el, "type") === "microbit")
+                .filter((el: any) => safeAccess(el, "type") === "microbit" || safeAccess(el, "type") === "microbitWithBreakout")
                 .map((mb: any) => safeAccess(mb, "id", "unknown"))
             : [],
           ultrasonicSensors: Array.isArray(elements)

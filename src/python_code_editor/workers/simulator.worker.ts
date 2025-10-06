@@ -96,7 +96,6 @@ class Simulator {
     if (!this.microbit) {
       throw new Error(this.options.controller + " controller not initialized at reset.");
     }
-    console.log("Resetting " + this.options.controller + " state");
     this.microbit.reset();
   }
 

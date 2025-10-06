@@ -34,8 +34,6 @@ function solveSingleSubcircuit(
 ): CircuitElement[] {
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
-  console.log('nodes : '+ JSON.stringify(Array.from(nodeEquivalenceMap)))
-  console.log('nodes id : '+ JSON.stringify(Array.from(effectiveNodeIds)))
   if (effectiveNodeIds.size === 0) {
     return zeroOutComputed(elements);
   }
@@ -58,15 +56,6 @@ function solveSingleSubcircuit(
     nodeIndex,
     currentSourceIndexMap
   );
-
-  if (DEBUG) {
-    console.log("G:", matrixToString(G));
-    console.log("B:", matrixToString(B));
-    console.log("C:", matrixToString(C));
-    console.log("D:", matrixToString(D));
-    console.log("I:", I);
-    console.log("E:", E);
-  }
 
   const { A, z } = buildFullSystem(G, B, C, D, I, E);
 
@@ -590,7 +579,6 @@ function computeElementResults(
  * Returns solution vector x or null if no unique solution.
  */
 function solveLinearSystem(A: number[][], z: number[]): number[] | null {
-  debugger;
   const n = A.length;
   if (n === 0) return [];
 
@@ -689,9 +677,5 @@ export function _quickTestRun() {
   const elements = [battery, resistor];
   const wires: Wire[] = []; // no separate wires
 
-  console.log(
-    "Running quick test (Battery 3V in series with R=3Ω). Expect ~1A current."
-  );
   const res = solveCircuit(elements, wires);
-  console.log("Results:", JSON.stringify(res, null, 2));
 }

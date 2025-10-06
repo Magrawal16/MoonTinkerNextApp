@@ -315,7 +315,7 @@ export default function CircuitCanvas() {
 
     // Run user code for all controllers
     elements.forEach((el) => {
-      if (el.type === "microbit") {
+      if (el.type === "microbit" || el.type === "microbitWithBreakout") {
         const sim = controllerMap[el.id];
         const code = controllerCodeMap[el.id] ?? "";
         if (sim && code) {
@@ -538,16 +538,17 @@ export default function CircuitCanvas() {
     setSelectedElement(newElement);
     setShowPropertiesPannel(true);
     setActiveControllerId(null);
-    if (newElement.type === "microbit") {
+    if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
       setActiveControllerId(newElement.id);
     }
 
-    if (newElement.type === "microbit") {
+    if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
       // Init simulator in the background (non-blocking)
+      const controllerType = newElement.type === "microbit" ? "microbit" : "microbitWithBreakout";
       void (async () => {
         const simulator = new Simulator({
           language: "python",
-          controller: "microbit",
+          controller: controllerType,
           onOutput: (line) => console.log(`[${newElement.id}]`, line),
           onEvent: async (event) => {
             if (event.type === "reset") {
@@ -1243,7 +1244,7 @@ export default function CircuitCanvas() {
                         setSelectedElement(current);
                         setShowPropertiesPannel(true);
                         setActiveControllerId(null);
-                        if (element.type === "microbit") {
+                        if (element.type === "microbit" || element.type === "microbitWithBreakout") {
                           setActiveControllerId(element.id);
                         }
                       }
@@ -1270,7 +1271,7 @@ export default function CircuitCanvas() {
                       setShowPropertiesPannel(true);
                       setActiveControllerId(null);
                       setOpenCodeEditor(false);
-                      if (element?.type === "microbit") {
+                      if (element?.type === "microbit" || element?.type === "microbitWithBreakout") {
                         setActiveControllerId(element.id);
                       }
                     }}

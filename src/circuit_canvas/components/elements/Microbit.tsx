@@ -18,7 +18,6 @@ export default function Microbit({
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
   const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
-
   // Logo (touch sensor) interaction state
   const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
   const isPressingRef = useRef(false);
@@ -137,7 +136,6 @@ export default function Microbit({
   const onLogoClick = () => {
     // Hook for future logo touch event dispatch if needed
   };
-
   return (
     <BaseElement {...props}>
       <Group>

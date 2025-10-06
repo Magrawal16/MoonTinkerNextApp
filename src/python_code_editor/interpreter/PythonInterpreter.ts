@@ -91,13 +91,13 @@ export class PythonInterpreter {
   }
 
   registerHardwareModule(name: string, module: Record<string, any>) {
-    if (!this.pyodide) throw new Error("Interpreter not initialized");
+    if (!this.pyodide) throw new Error("Interpreter not initialized at register hardware module.");
     this.hardwareModules[name] = module;
     this.pyodide.registerJsModule(name, module);
   }
 
   async run(code: string): Promise<string> {
-    if (!this.pyodide) throw new Error("Interpreter not initialized");
+    if (!this.pyodide) throw new Error("Interpreter not initialized at run pythoninterpreter.");
     code = this.transformCode(code);
     try {
       await this.injectPrintRedirect();

@@ -67,7 +67,6 @@ export class MicrobitSimulator {
 
     // NEW: subscribe to writes on a specific digital pin
     onDigitalWrite: (pin: string, cb: (value: number) => void) => {
-      debugger;
       if (!this.digitalWriteListeners[pin])
         this.digitalWriteListeners[pin] = new Set();
       this.digitalWriteListeners[pin].add(cb);

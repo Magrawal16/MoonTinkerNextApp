@@ -4,7 +4,7 @@ import type { MicrobitEvent } from "../mock/microbitInstance";
 import { Simulator } from "@/python_code_editor/lib/Simulator";
 
 type SupportedLanguage = "python";
-type SupportedController = "microbit";
+type SupportedController = "microbit" | "microbitWithBreakout";
 
 export interface SimulatorOptions {
   language: SupportedLanguage;
@@ -48,7 +48,7 @@ export class SimulatorProxy {
     const SimulatorConstructor = Comlink.wrap<typeof Simulator>(this.worker);
 
     const { language, controller } = this.options;
-
+    console.log(controller, +"+ in SimulatorProxy controller");
     this.simulatorRemoteInstance = await new SimulatorConstructor({
       language,
       controller,
@@ -65,17 +65,17 @@ export class SimulatorProxy {
   }
 
   async run(code: string): Promise<string> {
-    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at run.");
     return this.simulatorRemoteInstance.run(code);
   }
 
   async getStates(): Promise<State> {
-    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at get states.");
     return this.simulatorRemoteInstance.getStates();
   }
 
   async reset() {
-    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at reset.");
     return this.simulatorRemoteInstance.reset();
   }
 
@@ -111,12 +111,12 @@ export class SimulatorProxy {
 
   // Convenience methods (optional)
   async pressLogo() {
-    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at press logo.");
     return this.simulatorRemoteInstance.pressLogo();
   }
 
   async releaseLogo() {
-    if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at release logo.");
     return this.simulatorRemoteInstance.releaseLogo();
   }
 

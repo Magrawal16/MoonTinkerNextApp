@@ -5,7 +5,7 @@ import { MicrobitSimulator } from "../mock/microbitInstance";
 import type { MicrobitEvent } from "../mock/microbitInstance";
 
 type SupportedLanguage = "python";
-type SupportedController = "microbit";
+type SupportedController = "microbit" | "microbitWithBreakout";
 
 interface SimulatorOptions {
   language: SupportedLanguage;
@@ -48,11 +48,11 @@ class Simulator {
 
     if (
       this.options.language === "python" &&
-      this.options.controller === "microbit"
+      (this.options.controller === "microbit" || this.options.controller === "microbitWithBreakout")
     ) {
       this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
       this.interpreter.registerHardwareModule(
-        "microbit",
+        this.options.controller,
         this.microbit.getPythonModule()
       );
 
@@ -87,16 +87,16 @@ class Simulator {
 
   getStates() {
     if (!this.microbit) {
-      throw new Error("Microbit controller not initialized.");
+      throw new Error(this.options.controller + " controller not initialized at get states.");
     }
     return this.microbit.getStateSnapshot();
   }
 
   reset() {
     if (!this.microbit) {
-      throw new Error("Microbit controller not initialized.");
+      throw new Error(this.options.controller + " controller not initialized at reset.");
     }
-    ("Resetting microbit state");
+    console.log("Resetting " + this.options.controller + " state");
     this.microbit.reset();
   }
 
@@ -104,7 +104,7 @@ class Simulator {
 
   async simulateInput(event: ButtonEvent | LogoEvent) {
     if (!this.microbit) {
-      throw new Error("Microbit controller not initialized.");
+      throw new Error(this.options.controller + " controller not initialized at simulate input.");
     }
 
     if (typeof event === "string") {
@@ -122,12 +122,12 @@ class Simulator {
   }
 
   async pressLogo() {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
+    if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at press logo.");
     return this.microbit.pressLogo();
   }
 
   async releaseLogo() {
-    if (!this.microbit) throw new Error("Microbit controller not initialized.");
+    if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at release logo.");
     return this.microbit.releaseLogo();
   }
 }

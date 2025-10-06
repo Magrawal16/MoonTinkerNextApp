@@ -567,45 +567,20 @@ export default function CircuitCanvas() {
                 )
               );
             }
-            if (event.type === "led-change") {
-              await updateControllerFromState(newElement.id); // NEW
-              const state = await simulator.getStates();
-              const leds = state.leds;
-              const pins = state.pins;
-              setElements((prev) =>
-                prev.map((el) =>
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds, pins } }
-                    : el
-                )
-              );
-            }
-            if (event.type === "pin-change") {
-              await updateControllerFromState(newElement.id); // NEW
-              const state = await simulator.getStates();
-              const pins = state.pins;
-              const leds = state.leds;
-              setElements((prev) =>
-                prev.map((el) =>
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds, pins } }
-                    : el
-                )
-              );
-
-              if (simulationRunningRef.current) {
-                //showMessage("Simulation running, computing circuit...", "info");
-                computeCircuit(wiresRef.current);
-              } else {
-                showMessage(
-                  "Simulation not running, skipping circuit computation.",
-                  "info"
-                );
-              }
-            }
-            if (event.type === "logo-touch") { // NEW
+            if (event.type === "led-change" || event.type === "pin-change" || event.type === "logo-touch") {
+              // Use newElement.id, since this simulator instance is for this element
               await updateControllerFromState(newElement.id);
-              // No circuit recompute here by default; add if you want it to affect logic.
+              const state = await simulator.getStates();
+              const leds = state.leds;
+              const pins = state.pins;
+              const logo = state.logo;
+              setElements((prev) =>
+                prev.map((el) =>
+                  el.id === newElement.id
+                    ? { ...el, controller: { leds, pins, logoTouched: !!logo } }
+                    : el
+                )
+              );
             }
           },
         });
@@ -1275,7 +1250,6 @@ export default function CircuitCanvas() {
                         setActiveControllerId(element.id);
                       }
                     }}
-                    selectedElementId={selectedElement?.id || null}
                     // @ts-ignore
                     onControllerInput={(elementId: string, input: any) => { // NEW
   const sim = controllerMap[elementId];

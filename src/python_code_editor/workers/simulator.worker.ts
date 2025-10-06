@@ -52,7 +52,7 @@ class Simulator {
     ) {
       this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
       this.interpreter.registerHardwareModule(
-        this.options.controller,
+        "microbit", // <-- always use "microbit"
         this.microbit.getPythonModule()
       );
 

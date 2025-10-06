@@ -73,6 +73,10 @@ export function getElementCenter(element: CircuitElement): {
       return { x: 34, y: 30 }; // Approximate center of LED
     case "microbit":
       return { x: 111, y: 113 }; // Approximate center of microbit
+    case "microbitWithBreakout":
+      return { x: 111, y: 113 }; // Approximate center of microbit with breakout
+    case "ultrasonicsensor4p":
+      return { x: 60, y: 30 }; // Approximate center of ultrasonic sensor
     default:
       return { x: 0, y: 0 };
   }
@@ -100,6 +104,10 @@ export function getElementDimensions(element: CircuitElement): {
       return { width: 68, height: 60 };
     case "microbit":
       return { width: 222, height: 226 };
+    case "microbitWithBreakout":
+      return { width: 222, height: 226 };
+    case "ultrasonicsensor4p":
+      return { width: 120, height: 40 };
     default:
       return { width: 50, height: 50 };
   }

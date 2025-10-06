@@ -128,7 +128,7 @@ export default function RenderElement({
           id={element.id}
           x={1}
           y={22}
-          onControllerInput={(input: "A" | "B" | "AB") => {
+          onControllerInput={(input: any) => {
             props.onControllerInput(element.id, input);
           }}
           leds={
@@ -150,7 +150,7 @@ export default function RenderElement({
           id={element.id}
           x={1}
           y={22}
-          onControllerInput={(elementId: string, input: any) => {
+          onControllerInput={(input: any) => {
             props.onControllerInput(element.id, input);
           }}
           leds={

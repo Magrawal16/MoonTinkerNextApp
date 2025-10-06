@@ -129,7 +129,7 @@ export default function PropertiesPanel({
         </div>
       </div>
 
-      {selectedElement.type === "microbit" && (
+      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && (
         <button
           className="bg-blue-500 text-white text-xs px-1 py-1 rounded w-full"
           onClick={() => setOpenCodeEditor(true)}
@@ -199,7 +199,7 @@ export default function PropertiesPanel({
       )}
 
       {/* Micro:bit-specific controls */}
-      {selectedElement.type === "microbit" && showProp("temperature") && (
+      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("temperature") && (
         <div className="flex flex-col text-xs">
           <label>Temperature (°C):</label>
           <input
@@ -216,7 +216,7 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {selectedElement.type === "microbit" && showProp("brightness") && (
+      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("brightness") && (
         <div className="flex flex-col text-xs">
           <label>Brightness (0–255):</label>
           <input

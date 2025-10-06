@@ -180,30 +180,34 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
   elements.forEach((e) => {
     if (!Array.isArray(e.nodes)) return;
     if (e.type === "microbit" || e.type === "microbitWithBreakout") {
-      // const pos = e.nodes.find((n) => n.placeholder === "3.3V")?.id;
-      // const neg = e.nodes.find((n) => n.placeholder === "GND")?.id;
-
-      const posIds = e.nodes
-        .filter((n) => n.placeholder === "3.3V")
-        .map((n) => n.id);
+      // Identify 3.3V and GND pins on micro:bit and treat same-rail pins as equivalent nets
+      const posIds = e.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
       const negIds = e.nodes
         .filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND"))
         .map((n) => n.id);
 
-      // Which of those are actually connected by wires already?
-      const pos = posIds.filter((id) => allNodeIds.has(id));
-      const neg = negIds.filter((id) => allNodeIds.has(id));
+      // Register pins that are actually present in the circuit graph (i.e., touched by any wire)
+      const connectedPos = posIds.filter((id) => allNodeIds.has(id));
+      const connectedNeg = negIds.filter((id) => allNodeIds.has(id));
 
-      const anyPinConnected = e.nodes.some((n) => allNodeIds.has(n.id));
+      // Ensure parent entries exist for any connected pin
+      [...connectedPos, ...connectedNeg].forEach((id) => {
+        parent.set(id, id);
+      });
 
+      // Internally tie together rails: all 3.3V pins are one node; all GND pins are one node
+      if (connectedPos.length > 1) {
+        const root = connectedPos[0];
+        for (let i = 1; i < connectedPos.length; i++) union(root, connectedPos[i]);
+      }
+      if (connectedNeg.length > 1) {
+        const root = connectedNeg[0];
+        for (let i = 1; i < connectedNeg.length; i++) union(root, connectedNeg[i]);
+      }
+
+      // Also register any other micro:bit pin that is actually wired so it can participate in unions
       e.nodes.forEach((n) => {
-        const isConnected = allNodeIds.has(n.id);
-        const is33V = n.id === String(pos);
-        const isGND = n.id === String(neg);
-        if (isConnected || ((is33V || isGND) && anyPinConnected)) {
-          parent.set(n.id, n.id);
-          allNodeIds.add(n.id);
-        }
+        if (allNodeIds.has(n.id)) parent.set(n.id, n.id);
       });
     } else {
       e.nodes.forEach((n) => {
@@ -412,19 +416,16 @@ function buildMNAMatrices(
       E[idx] = el.properties?.voltage ?? 0;
     } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
       // Collect all 3.3V and GND node ids in this element
-      const posIds = el.nodes
-        .filter((n) => n.placeholder === "3.3V")
-        .map((n) => n.id);
-      const negIds = el.nodes
-        .filter((n) => n.placeholder === "GND")
-        .map((n) => n.id);
+      const posIds = el.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
+      const negIds = el.nodes.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND")).map((n) => n.id);
 
       // Need at least one pos and one neg to model the internal source
       if (posIds.length === 0 || negIds.length === 0) continue;
 
-      // choose representative nodes for stamping (equivalence/map will merge others)
-      const pos = posIds[0];
-      const neg = negIds[0];
+      // Prefer a pin that is actually present in the node map (i.e., connected), else fall back
+      const firstConnected = (ids: string[]) => ids.find((id) => nodeMap.has(id)) ?? ids[0];
+      const pos = firstConnected(posIds);
+      const neg = firstConnected(negIds);
 
       const pIdx = safeNodeIndex(pos);
       const nIdx = safeNodeIndex(neg);

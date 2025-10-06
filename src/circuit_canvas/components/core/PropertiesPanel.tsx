@@ -20,6 +20,10 @@ export default function PropertiesPanel({
   setOpenCodeEditor,
 }: PropertiesPanelProps) {
   const [resistance, setResistance] = useState<number | null>(null);
+  // Store resistance internally in ohms; expose a unit-aware UI (Ω / kΩ)
+  const [resistanceUnit, setResistanceUnit] = useState<"ohm" | "kohm">("ohm");
+  // Decoupled text input so switching unit doesn't change the shown number
+  const [resistanceInput, setResistanceInput] = useState<string>("");
   const [voltage, setVoltage] = useState<number | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
   const [temperature, setTemperature] = useState<number | null>(null);
@@ -53,6 +57,16 @@ export default function PropertiesPanel({
   useEffect(() => {
     if (!selectedElement) return;
     setResistance(selectedElement.properties?.resistance ?? null);
+    // Pick a sensible default unit based on stored ohms
+    const r = selectedElement.properties?.resistance;
+    if (r != null) {
+      setResistanceUnit(r >= 1000 ? "kohm" : "ohm");
+      // Initialize the input once based on the chosen unit
+      setResistanceInput((r >= 1000 ? (r / 1000) : r).toString());
+    } else {
+      setResistanceUnit("ohm");
+      setResistanceInput("");
+    }
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
     setTemperature(selectedElement.properties?.temperature ?? null);
@@ -74,7 +88,7 @@ export default function PropertiesPanel({
         onWireEdit({ ...wireToUpdate, color: selectedWireColor }, false);
       }
     } else {
-      const updatedElement: CircuitElement = {
+      let updatedElement: CircuitElement = {
         ...selectedElement,
         properties: {
           ...selectedElement.properties,
@@ -86,6 +100,49 @@ export default function PropertiesPanel({
           color: color ?? undefined,
         },
       };
+
+      // For resistor, update node positions inline  similar to LED mapping
+      if (selectedElement.type === "resistor") {
+        const r = resistance ?? selectedElement.properties?.resistance ?? 5;
+        const eps = 1e-6;
+        const key =
+          Math.abs(r - 5) < eps ? "5ohm" :
+          Math.abs(r - 10) < eps ? "10ohm" :
+          Math.abs(r - 15) < eps ? "15ohm" :
+          Math.abs(r - 20) < eps ? "20ohm" :
+          Math.abs(r - 25) < eps ? "25ohm" :
+          Math.abs(r - 5000) < eps ? "5kohm" :
+          Math.abs(r - 10000) < eps ? "10kohm" :
+          Math.abs(r - 15000) < eps ? "15kohm" :
+          Math.abs(r - 20000) < eps ? "20kohm" :
+          Math.abs(r - 25000) < eps ? "25kohm" :
+          "5ohm";
+
+        const nodeMap: Record<string, { left: { x: number; y: number }; right: { x: number; y: number } }> = {
+          "5ohm":   { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+          "10ohm":  { left: { x: 4,  y: 36.5 }, right: { x: 96,  y: 36.5 } },
+          "15ohm":  { left: { x: 4,  y: 37.5 }, right: { x: 96,  y: 37.2 } },
+          "20ohm":  { left: { x: 5,  y: 36 }, right: { x: 96,  y: 36.2 } },
+          "25ohm":  { left: { x: 4,  y: 34.5 }, right: { x: 96,  y: 34.5 } },
+          "5kohm":  { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+          "10kohm": { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+          "15kohm": { left: { x: 4,  y: 34.5 }, right: { x: 96,  y: 34.5 } },
+          "20kohm": { left: { x: 4,  y: 35 }, right: { x: 96,  y: 35 } },
+          "25kohm": { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        };
+        const pos = nodeMap[key];
+        const node1 = selectedElement.nodes.find((n) => n.id.endsWith("-node-1")) || selectedElement.nodes[0];
+        const node2 = selectedElement.nodes.find((n) => n.id.endsWith("-node-2")) || selectedElement.nodes[1];
+        if (node1 && node2) {
+          updatedElement = {
+            ...updatedElement,
+            nodes: [
+              { ...node1, x: pos.left.x, y: pos.left.y },
+              { ...node2, x: pos.right.x, y: pos.right.y },
+            ],
+          };
+        }
+      }
       onElementEdit(updatedElement, false);
     }
 
@@ -141,13 +198,48 @@ export default function PropertiesPanel({
       {/* Numeric fields — never show for wires */}
       {selectedElement.type !== "wire" && showProp("resistance") && (
         <div className="flex flex-col text-xs">
-          <label>Resistance (Ω):</label>
-          <input
-            type="number"
-            value={resistance ?? ""} // empty allowed
-            onChange={(e) => setResistance(parseNumber(e.target.value))}
-            className="border px-1 py-1 rounded text-xs"
-          />
+          <label>Resistance:</label>
+          <div className="flex items-stretch gap-1">
+            <input
+              type="number"
+              value={resistanceInput}
+              onChange={(e) => {
+                const raw = e.target.value;
+                setResistanceInput(raw);
+                if (raw === "") {
+                  setResistance(null);
+                  return;
+                }
+                const n = Number(raw);
+                if (!Number.isFinite(n)) {
+                  setResistance(null);
+                  return;
+                }
+                // Update internal ohms for previews (eff. resistance), persistence still happens on Update
+                setResistance(resistanceUnit === "kohm" ? n * 1000 : n);
+              }}
+              className="border px-1 py-1 rounded text-xs w-full"
+            />
+            <select
+              className="border px-1 py-1 rounded text-xs bg-white"
+              value={resistanceUnit}
+              onChange={(e) => {
+                const next = (e.target.value as "ohm" | "kohm");
+                setResistanceUnit(next);
+                // Do not change the displayed number when switching unit,
+                // but keep internal ohms consistent for preview calculations
+                if (resistanceInput !== "") {
+                  const n = Number(resistanceInput);
+                  if (Number.isFinite(n)) {
+                    setResistance(next === "kohm" ? n * 1000 : n);
+                  }
+                }
+              }}
+            >
+              <option value="ohm">Ω</option>
+              <option value="kohm">kΩ</option>
+            </select>
+          </div>
         </div>
       )}
 

@@ -81,24 +81,57 @@ export default function createElement(
     x: props.pos.x,
     y: props.pos.y,
     rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: -7,
-        y: 42,
-        parentId: id,
-        placeholder: "Terminal 1",
-        fillColor: "red",
-      },
-      {
-        id: id + "-node-2",
-        x: 48,
-        y: 42,
-        parentId: id,
-        placeholder: "Terminal 1",
-        fillColor: "red",
-      },
-    ],
+    ...(() => {
+      // Inline variant map like LED's nodePositionMap
+      // You can tweak each entry's coordinates later per your SVGs
+      const nodeMap: Record<string, { left: { x: number; y: number }; right: { x: number; y: number } }> = {
+        "5ohm":   { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "10ohm":  { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "15ohm":  { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "20ohm":  { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "25ohm":  { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "5kohm":  { left: { x: 5,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "10kohm": { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "15kohm": { left: { x: 4,  y: 37.5 }, right: { x: 96,  y: 37.5 } },
+        "20kohm": { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+        "25kohm": { left: { x: 4,  y: 35.5 }, right: { x: 96,  y: 35.5 } },
+      };
+      const r = props.properties?.resistance ?? 5; // ohms
+      const eps = 1e-6;
+      const key =
+        Math.abs(r - 5) < eps ? "5ohm" :
+        Math.abs(r - 10) < eps ? "10ohm" :
+        Math.abs(r - 15) < eps ? "15ohm" :
+        Math.abs(r - 20) < eps ? "20ohm" :
+        Math.abs(r - 25) < eps ? "25ohm" :
+        Math.abs(r - 5000) < eps ? "5kohm" :
+        Math.abs(r - 10000) < eps ? "10kohm" :
+        Math.abs(r - 15000) < eps ? "15kohm" :
+        Math.abs(r - 20000) < eps ? "20kohm" :
+        Math.abs(r - 25000) < eps ? "25kohm" :
+        "5ohm";
+      const pos = nodeMap[key];
+      return {
+        nodes: [
+          {
+            id: id + "-node-1",
+            x: pos.left.x,
+            y: pos.left.y,
+            parentId: id,
+            placeholder: "Terminal 1",
+            fillColor: "red",
+          },
+          {
+            id: id + "-node-2",
+            x: pos.right.x,
+            y: pos.right.y,
+            parentId: id,
+            placeholder: "Terminal 1",
+            fillColor: "red",
+          },
+        ],
+      };
+    })(),
     properties: {
       ...{
         voltage: props.properties?.voltage,

@@ -96,6 +96,7 @@ export default function RenderElement({
           id={element.id}
           x={1}
           y={22}
+          resistance={element.properties?.resistance}
           selected={props.selectedElementId === element.id}
         />
       )}

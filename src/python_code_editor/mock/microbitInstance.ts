@@ -60,8 +60,19 @@ export class MicrobitSimulator {
   // ---
 
   public readonly pins = {
-    digital_write_pin: this.digitalWritePin.bind(this),
-    digital_read_pin: this.readDigitalPin.bind(this),
+    digital_write_pin: (pin: string, value: number) => {
+      // Only care about TRIG_PIN being set HIGH
+      if (value === 1) {
+        // Simulate trigger event (for demo, you can emit an event or log)
+        this.triggerPinHigh(pin);
+      }
+      // Store pin state correctly
+      this.pinStates[pin].digital = value;
+    },
+    digital_read_pin: (pin: string) => {
+      // Always return dummy value (simulate echo)
+      return 1; // or 0, as needed for demo
+    },
     analog_write_pin: this.analogWritePin.bind(this),
     read_analog_pin: this.readAnalogPin.bind(this),
 
@@ -400,7 +411,6 @@ export class MicrobitSimulator {
     this.logoReleasedHandlers = [];
   }
 
-
   private analogWritePin(pin: string, value: number) {
     this.pinStates[pin].analog = value;
     this.eventEmitter.emit({
@@ -509,5 +519,19 @@ export class MicrobitSimulator {
       DigitalPin: this.DigitalPin,
       basic: this.basic,
     };
+  }
+
+  private triggerPinHigh(pin: string) {
+    // Simulate ultrasonic trigger (for demo, emit event or log)
+    // Example: emit event to UI or set a flag
+    if (this.eventEmitter) {
+      this.eventEmitter.emit({
+        type: "pin-change",
+        pin,
+        value: 1,
+        pinType: "digital",
+      });
+    }
+    // You can also set a flag or perform other logic here
   }
 }

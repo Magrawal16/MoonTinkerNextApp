@@ -257,7 +257,6 @@ useEffect(() => {
     return "gray";
   };
 
-
   return (
     <BaseElement {...props}>
       {img && (

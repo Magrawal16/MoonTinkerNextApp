@@ -340,13 +340,6 @@ export default function UnifiedEditor({
    * Handle blocks to code conversion
    */
   const handleBlocksToCode = useCallback(() => {
-    console.log("🔄 handleBlocksToCode called", {
-      bidirectionalConverter: !!bidirectionalConverter,
-      activeControllerId,
-      isUpdatingFromBlocks,
-      editorMode,
-    });
-
     if (
       !bidirectionalConverter ||
       !activeControllerId ||
@@ -363,11 +356,6 @@ export default function UnifiedEditor({
 
       // Only update if the code actually changed
       if (generatedCode !== lastCodeRef.current) {
-        console.log(
-          "✅ Blocks converted to code:",
-          generatedCode.length,
-          "characters"
-        );
         lastCodeRef.current = generatedCode;
 
         setControllerCodeMap((prev) => ({
@@ -590,12 +578,6 @@ export default function UnifiedEditor({
       if (bidirectionalConverter && activeControllerId && workspaceReady) {
         try {
           const generatedCode = bidirectionalConverter.blocksToPython();
-          console.log(
-            "✅ Blocks converted to code:",
-            generatedCode.length,
-            "characters"
-          );
-
           // Update both the controller code map and local code
           setControllerCodeMap((prev) => ({
             ...prev,

@@ -34,21 +34,21 @@ export default function Microbit({
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit_with_breakout.svg";
     image.onload = () => setImgMicrobitWithBreakout(image);
-    image.alt = "Microbit";
+    image.alt = "MicrobitWithBreakout";
   }, []);
 
   useEffect(() => {
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit_usb_onn.svg";
     image.onload = () => setImgOnnState(image);
-    image.alt = "Microbit";
+    image.alt = "MicrobitWithBreakout";
   }, []);
 
   useEffect(() => {
     const image = new window.Image();
     image.src = "assets/circuit_canvas/elements/microbit_usb_off.svg";
     image.onload = () => setImgOffState(image);
-    image.alt = "Microbit";
+    image.alt = "MicrobitWithBreakout";
   }, []);
 
   const handleButtonClick = (btn: "A" | "B" | "AB") => {

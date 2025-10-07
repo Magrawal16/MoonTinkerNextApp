@@ -52,7 +52,7 @@ class Simulator {
     ) {
       this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
       this.interpreter.registerHardwareModule(
-        this.options.controller,
+        "microbit", // <-- always use "microbit"
         this.microbit.getPythonModule()
       );
 
@@ -96,7 +96,6 @@ class Simulator {
     if (!this.microbit) {
       throw new Error(this.options.controller + " controller not initialized at reset.");
     }
-    console.log("Resetting " + this.options.controller + " state");
     this.microbit.reset();
   }
 

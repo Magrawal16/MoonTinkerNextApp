@@ -4,7 +4,7 @@
 export interface Parameter {
   id: string;
   name: string;
-  type: 'dropdown' | 'number' | 'text';
+  type: "dropdown" | "number" | "text";
   options?: string[];
   defaultValue: string;
   placeholder: string;
@@ -34,9 +34,23 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "led.plot({x}, {y})",
     category: "Display",
     parameters: [
-      { id: "x", name: "X coordinate", type: "dropdown", options: ["0","1","2","3","4"], defaultValue: "0", placeholder: "X" },
-      { id: "y", name: "Y coordinate", type: "dropdown", options: ["0","1","2","3","4"], defaultValue: "0", placeholder: "Y" }
-    ]
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "X",
+      },
+      {
+        id: "y",
+        name: "Y coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "Y",
+      },
+    ],
   },
   {
     id: "led_unplot",
@@ -45,9 +59,23 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "led.unplot({x}, {y})",
     category: "Display",
     parameters: [
-      { id: "x", name: "X coordinate", type: "dropdown", options: ["0","1","2","3","4"], defaultValue: "0", placeholder: "X" },
-      { id: "y", name: "Y coordinate", type: "dropdown", options: ["0","1","2","3","4"], defaultValue: "0", placeholder: "Y" }
-    ]
+      {
+        id: "x",
+        name: "X coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "X",
+      },
+      {
+        id: "y",
+        name: "Y coordinate",
+        type: "dropdown",
+        options: ["0", "1", "2", "3", "4"],
+        defaultValue: "0",
+        placeholder: "Y",
+      },
+    ],
   },
   {
     id: "show_string",
@@ -56,8 +84,14 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: 'basic.show_string("{text}")',
     category: "Display",
     parameters: [
-      { id: "text", name: "Text to display", type: "text", defaultValue: "Hello", placeholder: "Enter text" }
-    ]
+      {
+        id: "text",
+        name: "Text to display",
+        type: "text",
+        defaultValue: "Hello",
+        placeholder: "Enter text",
+      },
+    ],
   },
   {
     id: "show_number",
@@ -66,8 +100,14 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "basic.show_number({number})",
     category: "Display",
     parameters: [
-      { id: "number", name: "Number to display", type: "number", defaultValue: "42", placeholder: "Enter number" }
-    ]
+      {
+        id: "number",
+        name: "Number to display",
+        type: "number",
+        defaultValue: "42",
+        placeholder: "Enter number",
+      },
+    ],
   },
   {
     id: "show_image",
@@ -76,10 +116,36 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "display.show(Image.{image})",
     category: "Display",
     parameters: [
-      { id: "image", name: "Image", type: "dropdown", options: ["HEART","HEART_SMALL","HAPPY","SMILE","SAD","CONFUSED","ANGRY","ASLEEP","SURPRISED","SILLY","FABULOUS","MEH"], defaultValue: "HEART", placeholder: "Select image" }
-    ]
+      {
+        id: "image",
+        name: "Image",
+        type: "dropdown",
+        options: [
+          "HEART",
+          "HEART_SMALL",
+          "HAPPY",
+          "SMILE",
+          "SAD",
+          "CONFUSED",
+          "ANGRY",
+          "ASLEEP",
+          "SURPRISED",
+          "SILLY",
+          "FABULOUS",
+          "MEH",
+        ],
+        defaultValue: "HEART",
+        placeholder: "Select image",
+      },
+    ],
   },
-  { id: "clear_screen", name: "Clear Screen", description: "Clear the LED display", code: "basic.clear_screen()", category: "Display" },
+  {
+    id: "clear_screen",
+    name: "Clear Screen",
+    description: "Clear the LED display",
+    code: "basic.clear_screen()",
+    category: "Display",
+  },
 
   // Pins Section
   {
@@ -89,9 +155,23 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "pins.digital_write_pin(DigitalPin.{pin}, {value})",
     category: "Pins",
     parameters: [
-      { id: "pin", name: "Pin", type: "dropdown", options: ["P0","P1","P2"], defaultValue: "P0", placeholder: "Pin" },
-      { id: "value", name: "Value", type: "dropdown", options: ["0","1"], defaultValue: "1", placeholder: "Value" }
-    ]
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin",
+      },
+      {
+        id: "value",
+        name: "Value",
+        type: "dropdown",
+        options: ["0", "1"],
+        defaultValue: "1",
+        placeholder: "Value",
+      },
+    ],
   },
   {
     id: "digital_read",
@@ -99,7 +179,16 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Read digital value from pin",
     code: "pins.digital_read_pin(DigitalPin.{pin})",
     category: "Pins",
-    parameters: [ { id: "pin", name: "Pin", type: "dropdown", options: ["P0","P1","P2"], defaultValue: "P0", placeholder: "Pin" } ]
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin",
+      },
+    ],
   },
   {
     id: "analog_write",
@@ -108,9 +197,22 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     code: "pins.analog_write_pin(AnalogPin.{pin}, {value})",
     category: "Pins",
     parameters: [
-      { id: "pin", name: "Pin", type: "dropdown", options: ["P0","P1","P2"], defaultValue: "P0", placeholder: "Pin" },
-      { id: "value", name: "Value (0-1023)", type: "number", defaultValue: "512", placeholder: "0-1023" }
-    ]
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin",
+      },
+      {
+        id: "value",
+        name: "Value (0-1023)",
+        type: "number",
+        defaultValue: "512",
+        placeholder: "0-1023",
+      },
+    ],
   },
   {
     id: "analog_read",
@@ -118,7 +220,16 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Read analog value from pin",
     code: "pins.read_analog_pin(AnalogPin.{pin})",
     category: "Pins",
-    parameters: [ { id: "pin", name: "Pin", type: "dropdown", options: ["P0","P1","P2"], defaultValue: "P0", placeholder: "Pin" } ]
+    parameters: [
+      {
+        id: "pin",
+        name: "Pin",
+        type: "dropdown",
+        options: ["P0", "P1", "P2"],
+        defaultValue: "P0",
+        placeholder: "Pin",
+      },
+    ],
   },
 
   // Buttons Section
@@ -128,7 +239,16 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Function for button press",
     code: `async def on_button_{button_lower}_pressed():`,
     category: "Buttons",
-    parameters: [ { id: "button", name: "Button", type: "dropdown", options: ["A","B","AB"], defaultValue: "A", placeholder: "Button" } ]
+    parameters: [
+      {
+        id: "button",
+        name: "Button",
+        type: "dropdown",
+        options: ["A", "B", "AB"],
+        defaultValue: "A",
+        placeholder: "Button",
+      },
+    ],
   },
   {
     id: "button_listener",
@@ -136,7 +256,16 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Listen for button press",
     code: "input.on_button_pressed(Button.{button}, on_button_{button_lower}_pressed)",
     category: "Buttons",
-    parameters: [ { id: "button", name: "Button", type: "dropdown", options: ["A","B","AB"], defaultValue: "A", placeholder: "Button" } ]
+    parameters: [
+      {
+        id: "button",
+        name: "Button",
+        type: "dropdown",
+        options: ["A", "B", "AB"],
+        defaultValue: "A",
+        placeholder: "Button",
+      },
+    ],
   },
   // Touch / Logo Sensor Section
   {
@@ -155,17 +284,90 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     category: "Sensor",
     //parameters: [ { id: "handler", name: "Handler function", type: "text", defaultValue: "on_logo_up", placeholder: "Function name" } ]
   },
+  {
+    id: "micropython_4p_ultrasonic",
+    name: "microPython : 4pUltrasonic sensor",
+    description: "Ultrasonic sensor simulation using TRIG and ECHO pins",
+    code: `from microbit import *
+
+# Pin configuration
+TRIG_PIN = "Your trig pin"
+ECHO_PIN = "Your echo pin"
+
+def measure():
+    # Clear TRIG pin
+    pins.digital_write_pin(TRIG_PIN, 0) 
+    basic.sleep(5)
+    
+    # Send trigger pulse
+    pins.digital_write_pin(TRIG_PIN, 1)
+    basic.sleep(1)  # 15ms pulse for reliability
+    pins.digital_write_pin(TRIG_PIN, 0)
+    
+    # Wait for sensor response
+    basic.sleep(100)
+    
+    # Read echo pin
+    return pins.digital_read_pin(ECHO_PIN)
+
+def show_result(detected):
+    # Clear display
+    for x in range(5):
+        for y in range(5):
+            led.unplot(x, y)
+    
+    if detected:
+        # Full screen for detection
+        for x in range(5):
+            for y in range(5):
+                led.plot(x, y)
+    else:
+        # Single center dot for no detection
+        led.plot(2, 2)
+
+# Main program
+basic.show_string("---")
+pins.digital_write_pin(TRIG_PIN, 1)
+basic.pause(1000)
+
+while True:
+    result = measure()
+    show_result(result)
+    basic.pause(300)
+`,
+    category: "Sensor",
+  },
 
   // Loops Section
-  { id: "forever_loop", name: "Forever Loop", description: "Run code continuously", code: `basic.forever(lambda: None)`, category: "Loops" },
-  { id: "while_true", name: "While True Loop", description: "Infinite loop structure", code: `while True:\n    # Your code here`, category: "Loops" },
+  {
+    id: "forever_loop",
+    name: "Forever Loop",
+    description: "Run code continuously",
+    code: `basic.forever(lambda: None)`,
+    category: "Loops",
+  },
+  {
+    id: "while_true",
+    name: "While True Loop",
+    description: "Infinite loop structure",
+    code: `while True:\n    # Your code here`,
+    category: "Loops",
+  },
   {
     id: "for_range",
     name: "For Range Loop",
     description: "Loop with range",
     code: `for i in range({count}):\n    # Your code here`,
     category: "Loops",
-    parameters: [ { id: "count", name: "Loop count", type: "number", defaultValue: "10", placeholder: "Enter count" } ]
+    parameters: [
+      {
+        id: "count",
+        name: "Loop count",
+        type: "number",
+        defaultValue: "10",
+        placeholder: "Enter count",
+      },
+    ],
   },
 
   // Timing Section
@@ -175,7 +377,15 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Pause execution in milliseconds",
     code: "await basic.pause({ms})",
     category: "Timing",
-    parameters: [ { id: "ms", name: "Milliseconds", type: "number", defaultValue: "1000", placeholder: "Enter ms" } ]
+    parameters: [
+      {
+        id: "ms",
+        name: "Milliseconds",
+        type: "number",
+        defaultValue: "1000",
+        placeholder: "Enter ms",
+      },
+    ],
   },
   {
     id: "sleep_ms",
@@ -183,14 +393,54 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     description: "Sleep for milliseconds",
     code: "sleep({ms})",
     category: "Timing",
-    parameters: [ { id: "ms", name: "Milliseconds", type: "number", defaultValue: "1000", placeholder: "Enter ms" } ]
+    parameters: [
+      {
+        id: "ms",
+        name: "Milliseconds",
+        type: "number",
+        defaultValue: "1000",
+        placeholder: "Enter ms",
+      },
+    ],
   },
-  { id: "ticks_ms", name: "Get Ticks (ms)", description: "Get current time in milliseconds", code: "running_time()", category: "Timing" },
+  {
+    id: "ticks_ms",
+    name: "Get Ticks (ms)",
+    description: "Get current time in milliseconds",
+    code: "running_time()",
+    category: "Timing",
+  },
 
   // Imports Section
-  { id: "microbit_import", name: "Microbit Import", description: "Import microbit module", code: "from microbit import *", category: "Imports" },
-  { id: "music_import", name: "Music Import", description: "Import music module", code: "import music", category: "Imports" },
-  { id: "radio_import", name: "Radio Import", description: "Import radio module", code: "import radio", category: "Imports" }
+  {
+    id: "microbit_import",
+    name: "Microbit Import",
+    description: "Import microbit module",
+    code: "from microbit import *",
+    category: "Imports",
+  },
+  {
+    id: "music_import",
+    name: "Music Import",
+    description: "Import music module",
+    code: "import music",
+    category: "Imports",
+  },
+  {
+    id: "radio_import",
+    name: "Radio Import",
+    description: "Import radio module",
+    code: "import radio",
+    category: "Imports",
+  },
 ];
 
-export const CATEGORIES = ["Display", "Pins", "Buttons", "Sensor","Loops", "Timing", "Imports"] as const;
+export const CATEGORIES = [
+  "Display",
+  "Pins",
+  "Buttons",
+  "Sensor",
+  "Loops",
+  "Timing",
+  "Imports",
+] as const;

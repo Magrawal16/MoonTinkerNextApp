@@ -8,6 +8,7 @@ import {
   ColorPaletteDropdown,
   defaultColors,
 } from "@/circuit_canvas/components/toolbar/customization/ColorPallete";
+import { getLedNodePositions } from "@/circuit_canvas/utils/ledNodeMap";
 
 export default function PropertiesPanel({
   selectedElement,
@@ -139,6 +140,22 @@ export default function PropertiesPanel({
             nodes: [
               { ...node1, x: pos.left.x, y: pos.left.y },
               { ...node2, x: pos.right.x, y: pos.right.y },
+            ],
+          };
+        }
+      }
+
+      // For LED, update node positions when color changes so cathode/anode pins align with the artwork per color
+      if (selectedElement.type === "led") {
+        const pos = getLedNodePositions(color ?? selectedElement.properties?.color ?? "red");
+        const cathode = selectedElement.nodes.find((n) => n.id.endsWith("-node-1")) || selectedElement.nodes[0];
+        const anode = selectedElement.nodes.find((n) => n.id.endsWith("-node-2")) || selectedElement.nodes[1];
+        if (cathode && anode) {
+          updatedElement = {
+            ...updatedElement,
+            nodes: [
+              { ...cathode, x: pos.cathode.x, y: pos.cathode.y },
+              { ...anode, x: pos.anode.x, y: pos.anode.y },
             ],
           };
         }

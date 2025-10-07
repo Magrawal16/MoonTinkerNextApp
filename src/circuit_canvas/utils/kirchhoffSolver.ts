@@ -34,10 +34,6 @@ function solveSingleSubcircuit(
 ): CircuitElement[] {
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
-<<<<<<< HEAD
-
-=======
->>>>>>> ce560aaba9b8e3aa9d272b5841dd274f132a65d2
   if (effectiveNodeIds.size === 0) {
     return zeroOutComputed(elements);
   }
@@ -62,7 +58,6 @@ function solveSingleSubcircuit(
   let nodeVoltages: Record<string, number> = {};
   let x: number[] | null = null;
 
-<<<<<<< HEAD
   const MAX_ITERS = 8;
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const { G, B, C, D, I, E } = buildMNAMatrices(
@@ -108,19 +103,6 @@ function solveSingleSubcircuit(
     if (!changed) break; // converged
   }
 
-=======
-  const { A, z } = buildFullSystem(G, B, C, D, I, E);
-
-  if (DEBUG) console.log("A:", matrixToString(A), "z:", z);
-
-  const x = solveLinearSystem(A, z);
-  if (!x) {
-    return zeroOutComputed(elements);
-  }
-
-  const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
-
->>>>>>> ce560aaba9b8e3aa9d272b5841dd274f132a65d2
   const results = computeElementResults(
     elements,
     nodeVoltages,
@@ -684,10 +666,6 @@ function computeElementResults(
  * Returns solution vector x or null if no unique solution.
  */
 function solveLinearSystem(A: number[][], z: number[]): number[] | null {
-<<<<<<< HEAD
-
-=======
->>>>>>> ce560aaba9b8e3aa9d272b5841dd274f132a65d2
   const n = A.length;
   if (n === 0) return [];
 
@@ -786,11 +764,7 @@ export function _quickTestRun() {
   const elements = [battery, resistor];
   const wires: Wire[] = []; // no separate wires
 
-<<<<<<< HEAD
   
   const res = solveCircuit(elements, wires);
   
-=======
-  const res = solveCircuit(elements, wires);
->>>>>>> ce560aaba9b8e3aa9d272b5841dd274f132a65d2
 }

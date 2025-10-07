@@ -297,7 +297,7 @@ ECHO_PIN = "Your echo pin"
 def measure():
     # Clear TRIG pin
     pins.digital_write_pin(TRIG_PIN, 0) 
-    basic.sleep(5)
+    basic.sleep(15)
     
     # Send trigger pulse
     pins.digital_write_pin(TRIG_PIN, 1)

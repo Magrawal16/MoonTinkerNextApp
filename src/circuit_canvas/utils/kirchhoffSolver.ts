@@ -50,28 +50,63 @@ function solveSingleSubcircuit(
 
   const currentSourceIndexMap = mapCurrentSourceIndices(elementsWithCurrent);
 
-  const { G, B, C, D, I, E } = buildMNAMatrices(
-    elements,
-    nodeEquivalenceMap,
-    nodeIndex,
-    currentSourceIndexMap
+  // LED polarity handling: iterate stamping with LED on/off states until stable
+  const ledIds = new Set(
+    elements.filter((e) => e.type === "led").map((e) => e.id)
   );
+  let ledOnMap = new Map<string, boolean>(); // default: all off
+  let nodeVoltages: Record<string, number> = {};
+  let x: number[] | null = null;
 
-  const { A, z } = buildFullSystem(G, B, C, D, I, E);
+  const MAX_ITERS = 8;
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const { G, B, C, D, I, E } = buildMNAMatrices(
+      elements,
+      nodeEquivalenceMap,
+      nodeIndex,
+      currentSourceIndexMap,
+      ledOnMap
+    );
 
-  if (DEBUG) console.log("A:", matrixToString(A), "z:", z);
 
-  const x = solveLinearSystem(A, z);
-  if (!x) {
-    return zeroOutComputed(elements);
+    const { A, z } = buildFullSystem(G, B, C, D, I, E);
+
+    if (DEBUG) console.log("A:", matrixToString(A), "z:", z);
+
+    x = solveLinearSystem(A, z);
+    if (!x) {
+      return zeroOutComputed(elements);
+    }
+
+    nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+
+    // Re-evaluate LED forward bias and update on/off map
+    let changed = false;
+    const nextMap = new Map<string, boolean>(ledOnMap);
+    for (const el of elements) {
+      if (el.type !== "led") continue;
+      const cathodeId = el.nodes?.[0]?.id;
+      const anodeId = el.nodes?.[1]?.id;
+      const cNode = cathodeId ? nodeEquivalenceMap.get(cathodeId) : undefined;
+      const aNode = anodeId ? nodeEquivalenceMap.get(anodeId) : undefined;
+      const Vc = cNode ? nodeVoltages[cNode] ?? 0 : 0;
+      const Va = aNode ? nodeVoltages[aNode] ?? 0 : 0;
+      const Vf = getLedForwardVoltage(el.properties?.color);
+      const forward = Va - Vc; // anode minus cathode
+      const isOn = forward >= Vf; // forward-biased beyond threshold
+      if ((ledOnMap.get(el.id) ?? false) !== isOn) {
+        nextMap.set(el.id, isOn);
+        changed = true;
+      }
+    }
+    ledOnMap = nextMap;
+    if (!changed) break; // converged
   }
-
-  const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
 
   const results = computeElementResults(
     elements,
     nodeVoltages,
-    x,
+    x!,
     nodeEquivalenceMap,
     currentSourceIndexMap,
     n
@@ -309,7 +344,8 @@ function buildMNAMatrices(
   elements: CircuitElement[],
   nodeMap: Map<string, string>,
   nodeIndex: Map<string, number>,
-  currentMap: Map<string, number>
+  currentMap: Map<string, number>,
+  ledOnMap?: Map<string, boolean>
 ) {
   const n = nodeIndex.size; // number of non-ground nodes
   const m = currentMap.size; // number of current sources / voltage sources
@@ -346,8 +382,7 @@ function buildMNAMatrices(
 
     if (
       el.type === "resistor" ||
-      el.type === "lightbulb" ||
-      el.type === "led"
+      el.type === "lightbulb"
     ) {
       const R = el.properties?.resistance ?? 1;
       const g = 1 / R;
@@ -356,6 +391,21 @@ function buildMNAMatrices(
       if (ai !== undefined && bi !== undefined) {
         G[ai][bi] -= g;
         G[bi][ai] -= g;
+      }
+    } else if (el.type === "led") {
+      // LED is directional: only conduct when forward-biased beyond threshold.
+      const isOn = ledOnMap?.get(el.id) ?? false;
+      if (isOn) {
+        const R = el.properties?.resistance ?? 100; // on-state series resistance approximation
+        const g = 1 / R;
+        if (ai !== undefined) G[ai][ai] += g;
+        if (bi !== undefined) G[bi][bi] += g;
+        if (ai !== undefined && bi !== undefined) {
+          G[ai][bi] -= g;
+          G[bi][ai] -= g;
+        }
+      } else {
+        // Off: open circuit (no stamp)
       }
     } else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
@@ -509,6 +559,25 @@ function getNodeVoltages(x: number[], ids: string[], groundId: string) {
   return result;
 }
 
+// Estimated forward voltage per LED color (V). Used as a simple threshold.
+function getLedForwardVoltage(color?: string) {
+  const c = (color || 'red').toLowerCase();
+  switch (c) {
+    case 'red':
+    case 'orange':
+      return 1.8;
+    case 'yellow':
+      return 2.0;
+    case 'green':
+      return 2.1;
+    case 'blue':
+    case 'white':
+      return 2.8;
+    default:
+      return 2.0;
+  }
+}
+
 function computeElementResults(
   elements: CircuitElement[],
   nodeVoltages: Record<string, number>,
@@ -527,10 +596,28 @@ function computeElementResults(
       power = 0,
       measurement = 0;
 
-    if (["resistor", "lightbulb", "led"].includes(el.type)) {
+    if (["resistor", "lightbulb"].includes(el.type)) {
       const R = el.properties?.resistance ?? 1;
       current = voltage / R;
       power = voltage * current;
+    } else if (el.type === "led") {
+      // Respect polarity: forward conduction only (anode is node[1], cathode is node[0] per createElement)
+      const a = nodeMap.get(el.nodes?.[1]?.id ?? "");
+      const c = nodeMap.get(el.nodes?.[0]?.id ?? "");
+      const Va = a ? nodeVoltages[a] ?? 0 : 0;
+      const Vc = c ? nodeVoltages[c] ?? 0 : 0;
+      const forward = Va - Vc;
+      const Vf = getLedForwardVoltage(el.properties?.color);
+      if (forward >= Vf) {
+        const R = el.properties?.resistance ?? 100;
+        current = forward / R;
+        voltage = forward; // drop across LED path we model
+        power = voltage * current;
+      } else {
+        current = 0;
+        power = 0;
+        // keep voltage as Va-Vb for probes, but LED behaves open
+      }
     } else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
       const Va2 = nodeVoltages[nodeMap.get(nodeA.id) ?? ""] ?? 0;
@@ -677,5 +764,7 @@ export function _quickTestRun() {
   const elements = [battery, resistor];
   const wires: Wire[] = []; // no separate wires
 
+  
   const res = solveCircuit(elements, wires);
+  
 }

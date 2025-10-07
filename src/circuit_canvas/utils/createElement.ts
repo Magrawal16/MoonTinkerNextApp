@@ -1,4 +1,5 @@
 import { CircuitElement, CircuitElementProps } from "../types/circuit";
+import { getLedNodePositions } from "../utils/ledNodeMap";
 
 export default function createElement(
   props: CircuitElementProps
@@ -229,17 +230,7 @@ export default function createElement(
     y: props.pos.y,
     rotation: props.rotation ?? 0,
     ...(() => {
-      const color = (props.properties?.color || 'red').toLowerCase();
-      // Direct mapping: adjust numbers here (no need to compute deltas)
-      const nodePositionMap: Record<string, { cathode: {x:number;y:number}; anode:{x:number;y:number} }> = {
-        red:    { cathode: { x:14,  y:62 }, anode: { x:33,  y:62 } },
-        green:  { cathode: { x:14,  y:700 }, anode: { x:33,  y:61 } },
-        blue:   { cathode: { x:14,  y:62 }, anode: { x:33,  y:62 } },
-        yellow: { cathode: { x:20,  y:63 }, anode: { x:33,  y:63 } },
-        white:  { cathode: { x:14,  y:62 }, anode: { x:33,  y:62 } },
-        orange: { cathode: { x:14,  y:62 }, anode: { x:33,  y:62 } },
-      };
-      const pos = nodePositionMap[color] || nodePositionMap.red;
+      const pos = getLedNodePositions(props.properties?.color);
       return {
         nodes: [
           {

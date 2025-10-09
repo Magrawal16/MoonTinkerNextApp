@@ -31,6 +31,10 @@ interface RenderElementProps {
   isSimulationOn?: boolean;
   elements?: CircuitElement[];
   wires?: Wire[];
+  // Toggle node hit targets/tooltips (for external node overlay layer)
+  showNodes?: boolean;
+  // Toggle rendering of the element's visual body; when false, only nodes/labels render
+  showBody?: boolean;
 }
 
 export default function RenderElement({
@@ -60,11 +64,11 @@ export default function RenderElement({
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
       id={element.id}
-      // Elements are not draggable while simulation is running
-      draggable={!props.isSimulationOn}
+      // Only the body layer should be draggable, and not while simulation is running
+      draggable={props.showBody !== false && !props.isSimulationOn}
     >
-      {/* Render circuit elements */}
-      {element.type === "lightbulb" && (
+      {/* Render circuit elements (conditionally hidden in nodes-only overlay) */}
+      {props.showBody !== false && element.type === "lightbulb" && (
         <Lightbulb
           id={element.id}
           x={0}
@@ -73,7 +77,7 @@ export default function RenderElement({
           selected={props.selectedElementId === element.id}
         />
       )}
-      {element.type === "led" && (
+      {props.showBody !== false && element.type === "led" && (
         <Led
           id={element.id}
           x={0}
@@ -83,7 +87,7 @@ export default function RenderElement({
           color={element.properties?.color as string | undefined}
         />
       )}
-      {element.type === "battery" && (
+      {props.showBody !== false && element.type === "battery" && (
         <Battery
           id={element.id}
           x={0}
@@ -91,7 +95,7 @@ export default function RenderElement({
           selected={props.selectedElementId === element.id}
         />
       )}
-      {element.type === "resistor" && (
+      {props.showBody !== false && element.type === "resistor" && (
         <Resistor
           id={element.id}
           x={1}
@@ -100,7 +104,7 @@ export default function RenderElement({
           selected={props.selectedElementId === element.id}
         />
       )}
-      {element.type === "multimeter" && (
+      {props.showBody !== false && element.type === "multimeter" && (
         <Multimeter
           id={element.id}
           x={1}
@@ -111,7 +115,7 @@ export default function RenderElement({
           selected={props.selectedElementId === element.id}
         />
       )}
-      {element.type === "potentiometer" && (
+      {props.showBody !== false && element.type === "potentiometer" && (
         <Potentiometer
           id={element.id}
           x={1}
@@ -124,7 +128,7 @@ export default function RenderElement({
           selected={props.selectedElementId === element.id}
         />
       )}
-      {element.type === "microbit" && (
+      {props.showBody !== false && element.type === "microbit" && (
         <Microbit
           id={element.id}
           x={1}
@@ -146,7 +150,7 @@ export default function RenderElement({
           }
         />
       )}
-      {element.type === "microbitWithBreakout" && (
+      {props.showBody !== false && element.type === "microbitWithBreakout" && (
         <MicrobitWithBreakout
           id={element.id}
           x={1}
@@ -168,7 +172,7 @@ export default function RenderElement({
           }
         />
       )}
-      {element.type === "ultrasonicsensor4p" && (
+      {props.showBody !== false && element.type === "ultrasonicsensor4p" && (
         <UltraSonicSensor4P
           id={element.id}
           x={0}
@@ -201,8 +205,8 @@ export default function RenderElement({
         />
       )}
 
-      {/* Render nodes and tooltip */}
-      {element.nodes.map((node) => {
+      {/* Render nodes and tooltip (can be disabled) */}
+      {props.showNodes !== false && element.nodes.map((node) => {
         const isHovered = node.id === hoveredNodeId;
 
         return (

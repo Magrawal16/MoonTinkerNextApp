@@ -1070,6 +1070,83 @@ export default function CircuitCanvas() {
               onWheel={handleWheel}
             >
               <HighPerformanceGrid viewport={viewport} gridSize={25} />
+              {/* Elements layer (no nodes) so bodies render below wires */}
+              <Layer>
+                {elements.map((element) => (
+                  <RenderElement
+                    key={element.id}
+                    isSimulationOn={simulationRunning}
+                    element={element}
+                    wires={wires}
+                    elements={elements}
+                    onDragMove={handleElementDragMove}
+                    handleNodeClick={handleNodeClick}
+                    handleRatioChange={handleRatioChange}
+                    handleModeChange={handleModeChange}
+                    onDragStart={() => {
+                      pushToHistory(elements, wires);
+                      setDraggingElement(element.id);
+                      stageRef.current?.draggable(false);
+                      if (!creatingWireStartNode) {
+                        const current = getElementById(element.id) || element;
+                        setSelectedElement(current);
+                        setShowPropertiesPannel(true);
+                        setActiveControllerId(null);
+                        if (element.type === "microbit" || element.type === "microbitWithBreakout") {
+                          setActiveControllerId(element.id);
+                        }
+                      }
+                    }}
+                    onDragEnd={(e) => {
+                      setDraggingElement(null);
+                      stageRef.current?.draggable(true);
+                      const id = e.target.id();
+                      const x = e.target.x();
+                      const y = e.target.y();
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
+                          el.id === id ? { ...el, x, y } : el
+                        );
+                        pushToHistory(next, wires);
+                        return next;
+                      });
+                    }}
+                    onSelect={(id) => {
+                      if (creatingWireStartNode) return;
+                      const element = getElementById(id);
+                      setSelectedElement(element ?? null);
+                      setShowPropertiesPannel(true);
+                      setActiveControllerId(null);
+                      setOpenCodeEditor(false);
+                      if (element?.type === "microbit" || element?.type === "microbitWithBreakout") {
+                        setActiveControllerId(element.id);
+                      }
+                    }}
+                    selectedElementId={selectedElement?.id || null}
+                    onControllerInput={(elementId: string, input: any) => {
+  const sim = controllerMap[elementId];
+  if (!sim) return;
+  const anySim = sim as any;
+  if (input === "A" || input === "B" || input === "AB") {
+    anySim.simulateInput?.(input);
+    return;
+  }
+  if (typeof input === "object" && input?.type === "logo") {
+    if (input.state === "pressed") {
+      (anySim.pressLogo?.() ?? anySim.simulateInput?.(input));
+    } else if (input.state === "released") {
+      (anySim.releaseLogo?.() ?? anySim.simulateInput?.(input));
+    }
+  }
+}}
+                    // Hide node rendering in this layer
+                    showNodes={false}
+                    showBody={true}
+                  />
+                ))}
+              </Layer>
+
+              {/* Wires layer sits above element bodies */}
               <Layer ref={wireLayerRef}>
                 {wires.map((wire) => {
                   const points = getWirePoints(wire);
@@ -1197,10 +1274,11 @@ export default function CircuitCanvas() {
                 />
               </Layer>
 
+              {/* Nodes overlay layer on top for visibility and interactions */}
               <Layer>
                 {elements.map((element) => (
                   <RenderElement
-                    key={element.id}
+                    key={`nodes-${element.id}`}
                     isSimulationOn={simulationRunning}
                     element={element}
                     wires={wires}
@@ -1209,70 +1287,14 @@ export default function CircuitCanvas() {
                     handleNodeClick={handleNodeClick}
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
-                    onDragStart={() => {
-                      pushToHistory(elements, wires);
-                      setDraggingElement(element.id);
-                      stageRef.current?.draggable(false);
-                      // Select element on drag start (Tinkercad-like behavior)
-                      if (!creatingWireStartNode) {
-                        const current = getElementById(element.id) || element;
-                        setSelectedElement(current);
-                        setShowPropertiesPannel(true);
-                        setActiveControllerId(null);
-                        if (element.type === "microbit" || element.type === "microbitWithBreakout") {
-                          setActiveControllerId(element.id);
-                        }
-                      }
-                    }}
-                    onDragEnd={(e) => {
-                      setDraggingElement(null);
-                      stageRef.current?.draggable(true);
-                      const id = e.target.id();
-                      const x = e.target.x();
-                      const y = e.target.y();
-                      setElements((prev) => {
-                        const next = prev.map((el) =>
-                          el.id === id ? { ...el, x, y } : el
-                        );
-                        // Push snapshot AFTER move so undo returns to the prior position
-                        pushToHistory(next, wires);
-                        return next;
-                      });
-                    }}
-                    onSelect={(id) => {
-                      if (creatingWireStartNode) return;
-                      const element = getElementById(id);
-                      setSelectedElement(element ?? null);
-                      setShowPropertiesPannel(true);
-                      setActiveControllerId(null);
-                      setOpenCodeEditor(false);
-                      if (element?.type === "microbit" || element?.type === "microbitWithBreakout") {
-                        setActiveControllerId(element.id);
-                      }
-                    }}
+                    onDragStart={() => {}}
+                    onDragEnd={() => {}}
+                    onSelect={() => {}}
                     selectedElementId={selectedElement?.id || null}
-                    // @ts-ignore
-                    onControllerInput={(elementId: string, input: any) => { // NEW
-  const sim = controllerMap[elementId];
-  if (!sim) return;
-
-  const anySim = sim as any;
-
-  // Buttons
-  if (input === "A" || input === "B" || input === "AB") {
-    anySim.simulateInput?.(input);
-    return;
-  }
-
-  // Logo touch
-  if (typeof input === "object" && input?.type === "logo") {
-    if (input.state === "pressed") {
-      (anySim.pressLogo?.() ?? anySim.simulateInput?.(input));
-    } else if (input.state === "released") {
-      (anySim.releaseLogo?.() ?? anySim.simulateInput?.(input));
-    }
-  }
-}}
+                    onControllerInput={() => {}}
+                    // Only render nodes in this layer
+                    showNodes={true}
+                    showBody={false}
                   />
                 ))}
               </Layer>

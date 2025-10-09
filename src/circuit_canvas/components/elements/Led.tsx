@@ -14,6 +14,7 @@ interface LedProps extends BaseElementProps {
 export default function Led(props: LedProps) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [explosion, setExplosion] = useState<HTMLImageElement | null>(null);
+  const [isHovered, setIsHovered] = useState(false); // NEW: hover state
 
   useEffect(() => {
     const chosen = (props.color || 'red').toLowerCase();
@@ -63,8 +64,9 @@ export default function Led(props: LedProps) {
 
   // Normalized conduction (0..1) ignoring below knee
   let conduction = (iEstmA - I_KNEE_MA) / (I_FULL_MA - I_KNEE_MA);
-  if (conduction < 0) conduction = 0;
-  if (conduction > 1) conduction = 1;
+  conduction = Math.min(Math.max(conduction, 0), 1);
+  //if (conduction < 0) conduction = 0;
+  //if (conduction > 1) conduction = 1;
 
   // Apply gamma so low currents still noticeable but fade occurs smoothly
   const GAMMA = 0.55; // <1 => boosts low end slightly while still allowing fade
@@ -89,7 +91,11 @@ export default function Led(props: LedProps) {
   // Positions and sizes for glow effects per color (to align with LED image)
   const glowPositionMap: Record<
     string,
-    {Image: {x: number; y: number;};rect: { x: number; y: number; width: number; height: number }; arcTop: { x: number; y: number, outerRadius: number }; arcBottom: { x: number; y: number } }
+    {
+      Image: {x: number; y: number;};
+      rect: { x: number; y: number; width: number; height: number }; 
+      arcTop: { x: number; y: number, outerRadius: number }; 
+      arcBottom: { x: number; y: number } }
   > = {
     red: {
       Image: {x: -1, y: -2.5},
@@ -148,6 +154,8 @@ export default function Led(props: LedProps) {
             shadowOffset={{ x: 12, y: -12 }}
             shadowOpacity={props.selected ? 0.2 : 0}
             opacity={isOverloaded ? 0.8 : 1}
+            onMouseEnter={() => setIsHovered(true)}  // Hover start
+            onMouseLeave={() => setIsHovered(false)} // Hover end
           />
         )}
 
@@ -167,13 +175,17 @@ export default function Led(props: LedProps) {
                 shadowOffset={{ x: 1, y: -1 }}
                 shadowOpacity={2}
                 zIndex={1000}
+                onMouseEnter={() => setIsHovered(true)}  // Hover start
+                onMouseLeave={() => setIsHovered(false)} // Hover end
               />
             )}
-            {/* Notification overlay */}
+            {/* Show warning when hovered-Notification overlay */}
+            {isHovered && (
             <ShortCircuitNotification
-              show={isOverloaded}
+              show={true}
               message={`Approx current ${iEstmA.toFixed(2)} mA (over ${OVERLOAD_CURRENT_MA} mA)`}
             />
+            )}
           </>
         ) : (
           // Normal LED glow with physically-inspired fade: nothing rendered below threshold

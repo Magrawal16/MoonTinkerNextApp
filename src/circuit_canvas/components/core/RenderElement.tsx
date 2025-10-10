@@ -102,6 +102,9 @@ export default function RenderElement({
           y={22}
           resistance={element.properties?.resistance}
           selected={props.selectedElementId === element.id}
+          bandWidths={[2.6, 2.6, 2.6, 1.2]} // widths for each band
+          bandHeights={[12.4, 10, 10, 12.2]} // heights for each band
+          bandGaps={[3, 4, 6]} // gaps between bands
         />
       )}
       {props.showBody !== false && element.type === "multimeter" && (
@@ -186,87 +189,94 @@ export default function RenderElement({
             gnd: element.nodes.find((n) => n.placeholder === "GND")?.id,
           }}
           // Pass the complete connected microbit data with pin information
-          connectedMicrobit={connectedMicrobitData ? {
-            microbitId: connectedMicrobitData.microbit.id,
-            pins: (connectedMicrobitData.microbit.controller?.pins as Record<
-              string,
-              { digital?: number }
-            >) ?? {},
-            connections: {
-              vcc: connectedMicrobitData.connections.vcc,
-              gnd: connectedMicrobitData.connections.gnd,
-              trig: connectedMicrobitData.connections.trig,
-              echo: connectedMicrobitData.connections.echo,
-              allConnected: connectedMicrobitData.connections.allConnected,
-              trigPin: connectedMicrobitData.connections.trigPin,
-              echoPin: connectedMicrobitData.connections.echoPin,
-            }
-          } : undefined}
+          connectedMicrobit={
+            connectedMicrobitData
+              ? {
+                  microbitId: connectedMicrobitData.microbit.id,
+                  pins:
+                    (connectedMicrobitData.microbit.controller?.pins as Record<
+                      string,
+                      { digital?: number }
+                    >) ?? {},
+                  connections: {
+                    vcc: connectedMicrobitData.connections.vcc,
+                    gnd: connectedMicrobitData.connections.gnd,
+                    trig: connectedMicrobitData.connections.trig,
+                    echo: connectedMicrobitData.connections.echo,
+                    allConnected:
+                      connectedMicrobitData.connections.allConnected,
+                    trigPin: connectedMicrobitData.connections.trigPin,
+                    echoPin: connectedMicrobitData.connections.echoPin,
+                  },
+                }
+              : undefined
+          }
           isSimulation={props.isSimulationOn}
         />
       )}
 
       {/* Render nodes and tooltip (can be disabled) */}
-      {props.showNodes !== false && element.nodes.map((node) => {
-        const isHovered = node.id === hoveredNodeId;
+      {props.showNodes !== false &&
+        element.nodes.map((node) => {
+          const isHovered = node.id === hoveredNodeId;
 
-        return (
-          <Group key={node.id}>
-            <Rect
-              x={node.x - 2}
-              y={node.y - 2}
-              width={5.6}
-              height={5.6}
-              cornerRadius={0.3}
-              fill={
-                isHovered && node.fillColor ? node.fillColor : "transparent"
-              }
-              stroke={isHovered ? "black" : "transparent"}
-              strokeWidth={isHovered ? 1.4 : 0}
-              onClick={(e) => {
-                e.cancelBubble = true;
-                // Prevent starting wire creation while simulation is running
-                if (props.isSimulationOn) return;
-                props.handleNodeClick(node.id);
-              }}
-              hitStrokeWidth={10}
-              onMouseEnter={(e) => {
-                setHoveredNodeId(node.id);
-                const stage = e.target.getStage();
-                if (stage) stage.container().style.cursor = "pointer";
-              }}
-              onMouseLeave={(e) => {
-                setHoveredNodeId(null);
-                const stage = e.target.getStage();
-                if (stage) stage.container().style.cursor = "default";
-              }}
-            />
+          return (
+            <Group key={node.id}>
+              <Rect
+                x={node.x - 2}
+                y={node.y - 2}
+                width={5.6}
+                height={5.6}
+                cornerRadius={0.3}
+                fill={
+                  isHovered && node.fillColor ? node.fillColor : "transparent"
+                }
+                stroke={isHovered ? "black" : "transparent"}
+                strokeWidth={isHovered ? 1.4 : 0}
+                onClick={(e) => {
+                  e.cancelBubble = true;
+                  // Prevent starting wire creation while simulation is running
+                  if (props.isSimulationOn) return;
+                  props.handleNodeClick(node.id);
+                }}
+                hitStrokeWidth={10}
+                onMouseEnter={(e) => {
+                  setHoveredNodeId(node.id);
+                  const stage = e.target.getStage();
+                  if (stage) stage.container().style.cursor = "pointer";
+                }}
+                onMouseLeave={(e) => {
+                  setHoveredNodeId(null);
+                  const stage = e.target.getStage();
+                  if (stage) stage.container().style.cursor = "default";
+                }}
+              />
 
-            {/* Tooltip (conditionally rendered) */}
-            {isHovered && node.placeholder && (
-              <Label x={node.x + 8} y={node.y - 18} opacity={0.95}>
-                <Tag
-                  fill="#1f4060"
-                  stroke="black"
-                  strokeWidth={0.6}
-                  cornerRadius={4}
-                  shadowColor="black"
-                  shadowBlur={1}
-                  shadowOffset={{ x: 2, y: 2 }}
-                  shadowOpacity={0.2}
-                  opacity={0.5}
-                />
-                <Text
-                  text={node.placeholder}
-                  fontSize={10}
-                  padding={5}
-                  fill="white"
-                />
-              </Label>
-            )}
-          </Group>
-        );
-      })}
+              {/* Tooltip (conditionally rendered) */}
+              {isHovered && node.placeholder && (
+                <Label x={node.x + 8} y={node.y - 18} opacity={0.95}>
+                  <Tag
+                    fill="#1f4060"
+                    stroke="black"
+                    strokeWidth={0.6}
+                    cornerRadius={4}
+                    shadowColor="black"
+                    shadowBlur={1}
+                    shadowOffset={{ x: 2, y: 2 }}
+                    shadowOpacity={0.2}
+                    opacity={0.5}
+                  />
+                  <Text
+                    text={node.placeholder}
+                    fontSize={10}
+                    padding={5}
+                    fill="white"
+                  />
+                </Label>
+              )}
+            </Group>
+          );
+        })}
     </Group>
   );
 }

@@ -211,7 +211,7 @@ export default function Resistor(props: ResistorProps) {
               <Rect
                 key={idx}
                 x={bandXs[idx] + 7}
-                y={bandY - 2.5}
+                y={bandY - 2}
                 width={w}
                 height={rectHeight}
                 cornerRadius={1}

@@ -13,7 +13,7 @@ export type CircuitElement = {
     voltage?: number; // for power sources like batteries
     resistance?: number; // all components can have resistance
     ratio?: number; // for potentiometers, the ratio of resistance
-    mode?: "voltage" | "current"; // for multimeters, can be voltage or current mode
+  mode?: "voltage" | "current" | "resistance"; // multimeter modes: V, A, Ω
     distance?: number; // cm
     temperature?: number;
     brightness?: number;

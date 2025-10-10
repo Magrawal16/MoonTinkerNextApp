@@ -22,7 +22,7 @@ interface RenderElementProps {
   onDragMove: (e: KonvaEventObject<DragEvent>) => void;
   handleNodeClick: (nodeId: string) => void;
   handleRatioChange?: (elementId: string, ratio: number) => void;
-  handleModeChange: (elementId: string, mode: "voltage" | "current") => void;
+  handleModeChange: (elementId: string, mode: "voltage" | "current" | "resistance") => void;
   onSelect?: (elementId: string) => void;
   selectedElementId?: string | null;
   onDragStart: () => void;
@@ -102,9 +102,6 @@ export default function RenderElement({
           y={22}
           resistance={element.properties?.resistance}
           selected={props.selectedElementId === element.id}
-          bandWidths={[2.6, 2.6, 2.6, 1.2]}    // widths for each band
-          bandHeights={[12.4, 10, 10, 12.2]} // heights for each band
-          bandGaps={[3, 4, 6]}    // gaps between bands
         />
       )}
       {props.showBody !== false && element.type === "multimeter" && (
@@ -113,8 +110,9 @@ export default function RenderElement({
           x={1}
           y={22}
           measurement={element.computed?.measurement}
-          initialMode={"voltage"}
+          initialMode={(element.properties?.mode as any) ?? "voltage"}
           onModeChange={props.handleModeChange}
+          isSimulationOn={props.isSimulationOn}
           selected={props.selectedElementId === element.id}
         />
       )}

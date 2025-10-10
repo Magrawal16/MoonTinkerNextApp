@@ -472,7 +472,7 @@ export default function CircuitCanvas() {
     }
   }
 
-  function handleModeChange(elementId: string, mode: "voltage" | "current") {
+  function handleModeChange(elementId: string, mode: "voltage" | "current" | "resistance") {
     setElements((prev) =>
       prev.map((el) =>
         el.id === elementId

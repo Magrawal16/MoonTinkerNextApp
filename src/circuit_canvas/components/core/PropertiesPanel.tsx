@@ -89,17 +89,30 @@ export default function PropertiesPanel({
         onWireEdit({ ...wireToUpdate, color: selectedWireColor }, false);
       }
     } else {
+      // Build properties, but lock certain components (battery, lightbulb)
+      const nextProps: NonNullable<CircuitElement["properties"]> = {
+        ...selectedElement.properties,
+        resistance: resistance ?? undefined,
+        voltage: voltage ?? undefined,
+        ratio: ratio ?? undefined,
+        temperature: temperature ?? undefined,
+        brightness: brightness ?? undefined,
+        color: color ?? undefined,
+      };
+
+      if (selectedElement.type === "battery") {
+        // Enforce fixed battery values
+        nextProps.voltage = 9;
+        nextProps.resistance = 1.45;
+      }
+      if (selectedElement.type === "lightbulb") {
+        // Enforce fixed bulb resistance
+        nextProps.resistance = 48;
+      }
+
       let updatedElement: CircuitElement = {
         ...selectedElement,
-        properties: {
-          ...selectedElement.properties,
-          resistance: resistance ?? undefined,
-          voltage: voltage ?? undefined,
-          ratio: ratio ?? undefined,
-          temperature: temperature ?? undefined,
-          brightness: brightness ?? undefined,
-          color: color ?? undefined,
-        },
+        properties: nextProps,
       };
 
       // For resistor, update node positions inline  similar to LED mapping
@@ -213,7 +226,7 @@ export default function PropertiesPanel({
       )}
 
       {/* Numeric fields — never show for wires */}
-      {selectedElement.type !== "wire" && showProp("resistance") && (
+  {selectedElement.type !== "wire" && selectedElement.type !== "battery" && selectedElement.type !== "lightbulb" && showProp("resistance") && (
         <div className="flex flex-col text-xs">
           <label>Resistance:</label>
           <div className="flex items-stretch gap-1">
@@ -260,7 +273,7 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {selectedElement.type !== "wire" && showProp("voltage") && (
+  {selectedElement.type !== "wire" && selectedElement.type !== "battery" && showProp("voltage") && (
         <div className="flex flex-col text-xs">
           <label>Voltage (V):</label>
           <input

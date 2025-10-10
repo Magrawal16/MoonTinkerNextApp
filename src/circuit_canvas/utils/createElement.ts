@@ -33,13 +33,11 @@ export default function createElement(
       },
     ],
     properties: {
-      ...{
-        voltage: props.properties?.voltage ?? 20,
-        resistance: props.properties?.resistance ?? 1,
-      },
-      ...props.properties,
+      voltage: 9,
+      resistance: 1.45,
     },
-    displayProperties: ["voltage", "resistance"],
+    // Hide editable fields in the Properties Panel for battery
+    displayProperties: [],
   };
 
   const lightbulbElement = {
@@ -67,13 +65,11 @@ export default function createElement(
       },
     ],
     properties: {
-      ...{
-        voltage: props.properties?.voltage,
-        resistance: props.properties?.resistance ?? 1,
-      },
-      ...props.properties,
+      voltage: props.properties?.voltage,
+      resistance: 48,
     },
-    displayProperties: ["resistance"],
+    // Hide editable fields for the bulb's internal resistance
+    displayProperties: [],
   };
 
   const resistorElement = {
@@ -152,8 +148,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-2",
-        x: 30.6,
-        y: 14,
+        x: 95,
+        y: 90,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -161,8 +157,8 @@ export default function createElement(
       },
       {
         id: id + "-node-1",
-        x: 10.3,
-        y: 14,
+        x: 83.5,
+        y: 90,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",

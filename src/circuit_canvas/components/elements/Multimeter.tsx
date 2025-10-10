@@ -4,15 +4,16 @@ import {
   BaseElementProps,
 } from "@/circuit_canvas/components/core/BaseElement";
 import { useEffect, useState } from "react";
-import { Image, Text, Rect, Group, Line } from "react-konva";
+import { Image, Text, Group, Line, Circle } from "react-konva";
 
 interface MultimeterProps extends BaseElementProps {
   measurement?: number;
   initialMode?: Mode;
   onModeChange: (id: string, mode: Mode) => void;
+  isSimulationOn?: boolean;
 }
 
-type Mode = "voltage" | "current";
+type Mode = "voltage" | "current" | "resistance";
 
 export default function Multimeter(props: MultimeterProps) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
@@ -29,9 +30,23 @@ export default function Multimeter(props: MultimeterProps) {
     props.onModeChange(props.id, newMode);
   };
 
+  const formatOhms = (r: number) => {
+    if (Number.isNaN(r)) return "Error"; // powered circuit or invalid measurement
+    if (!isFinite(r)) return "OL"; // over-limit / open-loop
+    const ar = Math.abs(r);
+    if (ar >= 1_000_000) return `${(r / 1_000_000).toFixed(2)} MΩ`;
+    if (ar >= 1_000) return `${(r / 1_000).toFixed(2)} kΩ`;
+    return `${r.toFixed(2)} Ω`;
+  };
+
   const getDisplayValue = () => {
+    // Hide any cached value when simulation is off
+    if (!props.isSimulationOn) {
+      return "";
+    }
+
     if (props.measurement === undefined) {
-      return "---";
+      return "";
     }
 
     switch (mode) {
@@ -39,6 +54,8 @@ export default function Multimeter(props: MultimeterProps) {
         return `${props.measurement.toFixed(2)} V`;
       case "current":
         return `${props.measurement.toFixed(2)} A`;
+      case "resistance":
+        return formatOhms(props.measurement);
       default:
         return "---";
     }
@@ -46,17 +63,20 @@ export default function Multimeter(props: MultimeterProps) {
 
   useEffect(() => {
     const image = new window.Image();
-    image.src = "assets/circuit_canvas/elements/multimeter.svg";
+    image.src = "assets/circuit_canvas/elements/multimeter2.svg";
     image.onload = () => setImg(image);
     image.alt = "Multimeter";
   }, []);
 
   const SCALE = 180 / 240; // ~0.3333
 
+  // Circle button placement tuned to overlay multimeter2.svg right-side pads
+  const BTN_X = 211; // center X in the 240px-wide SVG space
+  const BTN_R = 7;  // circle radius
   const buttonDefs = [
-    { y: 10, label: "V", mode: "voltage" },
-    { y: 40, label: "A", mode: "current" },
-    { y: 70, label: "Ω", mode: "voltage" },
+    { cy: 27, label: "A", mode: "current" as const },
+    { cy: 46, label: "V", mode: "voltage" as const },
+    { cy: 64, label: "Ω", mode: "resistance" as const },
   ] as const;
 
   return (
@@ -73,7 +93,7 @@ export default function Multimeter(props: MultimeterProps) {
             shadowOpacity={props.selected ? 0.2 : 0}
           />
         )}
-        <Line
+        {/* <Line
           points={[0, 0, 0, -5]}
           stroke="red"
           strokeWidth={4}
@@ -92,10 +112,10 @@ export default function Multimeter(props: MultimeterProps) {
           x={40}
           y={-1}
           height={-1}
-        />
+        /> */}
         <Text
-          x={10}
-          y={40}
+          x={35}
+          y={35}
           width={150}
           align="center"
           fontSize={24}
@@ -104,36 +124,41 @@ export default function Multimeter(props: MultimeterProps) {
           strokeWidth={1}
           text={getDisplayValue()}
         />
-        {buttonDefs.map((btn) => (
-          <Group
-            key={btn.label}
-            onClick={() => handleModeChange(btn.mode)}
-            onTap={() => handleModeChange(btn.mode)}
-          >
-            <Rect
-              x={170}
-              y={btn.y}
-              width={60}
-              height={20}
-              cornerRadius={3}
-              fill={mode === btn.mode ? "#aaa" : "#ddd"}
-              stroke="black"
-            />
-            <Text
-              x={202}
-              y={btn.y + 12}
-              text={btn.label}
-              fontSize={14}
-              fill="black"
-              stroke="none"
-              align="center"
-              strokeWidth={0.5}
-              verticalAlign="middle"
-              offsetX={7}
-              offsetY={7}
-            />
-          </Group>
-        ))}
+        {buttonDefs.map((btn) => {
+          const selected = mode === btn.mode;
+          const FONT = Math.round(BTN_R * 1.2); // scale label with circle radius
+          return (
+            <Group
+              key={btn.label}
+              onClick={() => handleModeChange(btn.mode)}
+              onTap={() => handleModeChange(btn.mode)}
+            >
+              <Circle
+                x={BTN_X}
+                y={btn.cy}
+                radius={BTN_R}
+                fill={selected ? "#666" : "#ddd"}
+                stroke="black"
+                strokeWidth={1.5}
+                shadowEnabled={selected}
+                shadowColor={selected ? "#222" : undefined}
+                shadowBlur={selected ? 6 : 0}
+                shadowOpacity={selected ? 0.35 : 0}
+              />
+              <Text
+                x={BTN_X - BTN_R}
+                y={btn.cy - FONT / 2}
+                width={BTN_R * 2}
+                text={btn.label}
+                fontSize={FONT}
+                align="center"
+                fill={selected ? "#fff" : "#000"}
+                stroke="none"
+                strokeWidth={0}
+              />
+            </Group>
+          );
+        })}
       </Group>
     </BaseElement>
   );

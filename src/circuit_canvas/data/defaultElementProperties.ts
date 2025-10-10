@@ -10,7 +10,7 @@ export interface PaletteElement {
     resistance?: number;
     voltage?: number;
     ratio?: number;
-    mode?: "voltage" | "current"; // For multimeters
+  mode?: "voltage" | "current" | "resistance"; // For multimeters
   };
 }
 
@@ -19,13 +19,13 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     type: "lightbulb",
     label: "Lightbulb",
     iconPath: "assets/circuit_canvas/elements/bulb.svg",
-    defaultProps: { resistance: 81 },
+    defaultProps: { resistance: 48 },
   },
   {
     type: "battery",
     label: "Battery",
     iconPath: "assets/circuit_canvas/elements/battery.svg",
-    defaultProps: { voltage: 9, resistance: 1 },
+    defaultProps: { voltage: 9, resistance: 1.45 },
   },
   {
     type: "resistor",
@@ -36,7 +36,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "multimeter",
     label: "Multimeter",
-    iconPath: "assets/circuit_canvas/elements/Multimeter.svg",
+    iconPath: "assets/circuit_canvas/elements/Multimeter2.svg",
     defaultProps: { mode: "voltage" },
   },
   {

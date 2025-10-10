@@ -3,6 +3,14 @@ import { CircuitElement, Wire } from "../types/circuit";
 // DEBUG flag — set to true to console.log matrices and intermediate state
 const DEBUG = false;
 
+// Multimeter modeling constants
+// High input impedance for voltmeter (~10 MΩ)
+const VOLTMETER_R = 10_000_000; // ohms
+// Low shunt resistance for ammeter (~50 mΩ)
+const AMMETER_R = 0.05; // ohms
+// Ohmmeter applies a small known test voltage and measures current
+const OHMMETER_VTEST = 1; // volt
+
 /**
  * Main function to solve the entire circuit by dividing it into connected subcircuits.
  * Kept same signature for compatibility. Improved safety checks, better pivoting
@@ -43,10 +51,19 @@ function solveSingleSubcircuit(
 
   const n = nonGroundIds.length;
 
-  const elementsWithCurrent = getElementsWithCurrent(
-    elements,
-    nodeEquivalenceMap
+  // Determine which elements act as independent sources for this subcircuit
+  // Base set includes batteries, microbits, and multimeters in resistance mode
+  const baseSources = getElementsWithCurrent(elements, nodeEquivalenceMap);
+  const hasExternalSources = baseSources.some(
+    (e) => e.type !== "multimeter" || e.properties?.mode !== "resistance"
   );
+
+  // If any external source exists, exclude ohmmeters from acting as sources
+  const elementsWithCurrent = hasExternalSources
+    ? baseSources.filter(
+        (e) => !(e.type === "multimeter" && e.properties?.mode === "resistance")
+      )
+    : baseSources;
 
   const currentSourceIndexMap = mapCurrentSourceIndices(elementsWithCurrent);
 
@@ -304,7 +321,7 @@ function getElementsWithCurrent(
         e.nodes.length === 2) ||
       e.type === "microbit" ||
       e.type === "microbitWithBreakout" ||
-      (e.type === "multimeter" && e.properties?.mode === "current")
+      (e.type === "multimeter" && e.properties?.mode === "resistance")
     ) {
       result.push(e);
     }
@@ -384,7 +401,7 @@ function buildMNAMatrices(
       el.type === "resistor" ||
       el.type === "lightbulb"
     ) {
-      const R = el.properties?.resistance ?? 1;
+      const R = el.type === "lightbulb" ? 48 : (el.properties?.resistance ?? 1);
       const g = 1 / R;
       if (ai !== undefined) G[ai][ai] += g;
       if (bi !== undefined) G[bi][bi] += g;
@@ -451,8 +468,9 @@ function buildMNAMatrices(
       if (nIdx !== undefined) B[nIdx][idx] += 1;
       if (pIdx !== undefined) C[idx][pIdx] += 1;
       if (nIdx !== undefined) C[idx][nIdx] -= 1;
-      D[idx][idx] += el.properties?.resistance ?? 0;
-      E[idx] = el.properties?.voltage ?? 0;
+      // Fixed internal resistance and voltage for battery
+      D[idx][idx] += 1.45; // Ω
+      E[idx] = 9; // V
     } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
       // Collect all 3.3V and GND node ids in this element
       const posIds = el.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
@@ -509,15 +527,39 @@ function buildMNAMatrices(
           }
         }
       }
-    } else if (el.type === "multimeter" && el.properties?.mode === "current") {
-      const idx = safeCurrentIndex(el.id);
-      if (idx === undefined) continue;
-      if (ai !== undefined) B[ai][idx] -= 1;
-      if (bi !== undefined) B[bi][idx] += 1;
-      if (ai !== undefined) C[idx][ai] += 1;
-      if (bi !== undefined) C[idx][bi] -= 1;
-      D[idx][idx] -= 0;
-      E[idx] = 0;
+    } else if (el.type === "multimeter") {
+      const mode = el.properties?.mode;
+      if (mode === "voltage") {
+        // Stamp a very large resistor across probes to model input impedance
+        const R = VOLTMETER_R;
+        const g = 1 / R;
+        if (ai !== undefined) G[ai][ai] += g;
+        if (bi !== undefined) G[bi][bi] += g;
+        if (ai !== undefined && bi !== undefined) {
+          G[ai][bi] -= g;
+          G[bi][ai] -= g;
+        }
+      } else if (mode === "current") {
+        // Stamp a very small shunt resistor; current is V/Rshunt
+        const R = AMMETER_R;
+        const g = 1 / R;
+        if (ai !== undefined) G[ai][ai] += g;
+        if (bi !== undefined) G[bi][bi] += g;
+        if (ai !== undefined && bi !== undefined) {
+          G[ai][bi] -= g;
+          G[bi][ai] -= g;
+        }
+      } else if (mode === "resistance") {
+        // Stamp a known test voltage source across the probes
+        const idx = safeCurrentIndex(el.id);
+        if (idx === undefined) continue;
+        if (ai !== undefined) B[ai][idx] -= 1;
+        if (bi !== undefined) B[bi][idx] += 1;
+        if (ai !== undefined) C[idx][ai] += 1;
+        if (bi !== undefined) C[idx][bi] -= 1;
+        D[idx][idx] += 0; // ideal source
+        E[idx] = OHMMETER_VTEST;
+      }
     }
   }
 
@@ -586,6 +628,11 @@ function computeElementResults(
   currentMap: Map<string, number>,
   n: number
 ): CircuitElement[] {
+  // Detect if subcircuit is externally powered (battery or microbit present)
+  const externallyPowered = elements.some(
+    (e) => e.type === "battery" || e.type === "microbit" || e.type === "microbitWithBreakout"
+  );
+
   return elements.map((el) => {
     const a = nodeMap.get(el.nodes?.[0]?.id ?? "");
     const b = nodeMap.get(el.nodes?.[1]?.id ?? "");
@@ -642,12 +689,30 @@ function computeElementResults(
       if (idx !== undefined) current = x[n + idx] ?? 0;
       power = voltage * current;
     } else if (el.type === "multimeter") {
-      if (el.properties?.mode === "voltage") {
+      const mode = el.properties?.mode;
+      if (mode === "voltage") {
+        // Read differential voltage; high input impedance is stamped in G
         measurement = voltage;
-      } else if (el.properties?.mode === "current") {
-        const idx = currentMap.get(el.id);
-        if (idx !== undefined) measurement = x[n + idx] ?? 0;
+        power = 0; // assume negligible draw
+      } else if (mode === "current") {
+        // Current is the shunt current V/Rshunt
+        measurement = voltage / AMMETER_R;
         current = measurement;
+        power = (measurement * measurement) * AMMETER_R; // power dissipated in shunt
+      } else if (mode === "resistance") {
+        if (externallyPowered) {
+          // Powered circuit: real meters refuse measurement
+          measurement = Number.NaN; // UI will render as "Error"
+        } else {
+          // R = Vtest / |Isrc|
+          const idx = currentMap.get(el.id);
+          const isrc = idx !== undefined ? Math.abs(x[n + idx] ?? 0) : 0;
+          if (isrc > 1e-12) {
+            measurement = Math.abs(OHMMETER_VTEST) / isrc;
+          } else {
+            measurement = Number.POSITIVE_INFINITY; // open circuit
+          }
+        }
         power = 0;
       }
     }

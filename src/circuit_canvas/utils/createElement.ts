@@ -113,7 +113,7 @@ export default function createElement(
           {
             id: id + "-node-1",
             x: pos.left.x + 3.5,
-            y: pos.left.y + 13.5,
+            y: pos.left.y + 13,
             parentId: id,
             placeholder: "Terminal 1",
             fillColor: "red",
@@ -121,7 +121,7 @@ export default function createElement(
           {
             id: id + "-node-2",
             x: pos.right.x - 40,
-            y: pos.right.y + 13.5,
+            y: pos.right.y + 13,
             parentId: id,
             placeholder: "Terminal 1",
             fillColor: "red",

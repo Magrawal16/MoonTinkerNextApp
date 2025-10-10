@@ -144,7 +144,7 @@ function Potentiometer(props: PotentiometerProps) {
             e.cancelBubble = true;
             setIsDragging(true);
           }}
-          onTouchStart={(e) => {
+          onDragMove={(e) => {
             e.cancelBubble = true;
             setIsDragging(true);
           }}

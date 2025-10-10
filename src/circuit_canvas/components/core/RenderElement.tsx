@@ -102,6 +102,9 @@ export default function RenderElement({
           y={22}
           resistance={element.properties?.resistance}
           selected={props.selectedElementId === element.id}
+          bandWidths={[2.6, 2.6, 2.6, 1.2]}    // widths for each band
+          bandHeights={[12.4, 10, 10, 12.2]} // heights for each band
+          bandGaps={[3, 4, 6]}    // gaps between bands
         />
       )}
       {props.showBody !== false && element.type === "multimeter" && (

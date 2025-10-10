@@ -30,7 +30,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "resistor",
     label: "Resistor",
-    iconPath: "assets/circuit_canvas/elements/resistor_5ohm.svg",
+    iconPath: "assets/circuit_canvas/elements/resistor.svg",
     defaultProps: { resistance: 5 },
   },
   {

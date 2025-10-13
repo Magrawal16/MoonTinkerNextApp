@@ -303,6 +303,8 @@ export default function CircuitCanvas() {
     setStopDisabled(true);
 
     const interval = setInterval(() => {
+      // Recompute circuit continuously while running so controller state changes take effect
+      computeCircuit(wires);
       setStopTimeout((prev) => {
         if (prev <= 0) {
           clearInterval(interval);
@@ -323,6 +325,9 @@ export default function CircuitCanvas() {
         }
       }
     });
+
+    // Initial compute after starting simulation
+    computeCircuit(wires);
   }
 
   useCircuitShortcuts({
@@ -581,6 +586,10 @@ export default function CircuitCanvas() {
                     : el
                 )
               );
+              // Recompute after a controller state change while simulation is running
+              if (simulationRunningRef.current) {
+                computeCircuit(wires);
+              }
             }
           },
         });

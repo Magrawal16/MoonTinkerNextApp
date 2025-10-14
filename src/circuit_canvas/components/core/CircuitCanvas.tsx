@@ -28,7 +28,6 @@ import {
   FaRotateRight,
   FaRotateLeft,
 } from "react-icons/fa6";
-import { FaUndo, FaRedo } from "react-icons/fa";
 import { VscDebug } from "react-icons/vsc";
 import Loader from "@/circuit_canvas/utils/loadingCircuit";
 import {
@@ -38,7 +37,6 @@ import {
 import UnifiedEditor from "@/blockly_editor/components/UnifiedEditor";
 import { useViewport } from "@/circuit_canvas/hooks/useViewport";
 import HighPerformanceGrid from "./HighPerformanceGrid";
-import ElementRotationButtons from "../toolbar/customization/ElementRoationButtons";
 import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 import { useWireManagement } from "@/circuit_canvas/hooks/useWireManagement";
 import { useCircuitHistory } from "@/circuit_canvas/hooks/useCircuitHistory";
@@ -76,7 +74,6 @@ export default function CircuitCanvas() {
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationRunningRef = useRef(simulationRunning);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
-  const { showMessage } = useMessage();
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -138,7 +135,6 @@ export default function CircuitCanvas() {
   // Initialize wire management hook
   const {
     wires,
-    wireCounter,
     selectedWireColor,
     creatingWireStartNode,
     creatingWireJoints,
@@ -148,10 +144,8 @@ export default function CircuitCanvas() {
     inProgressWireRef,
     animatedCircleRef,
     setWires,
-    setWireCounter,
     setSelectedWireColor,
     setCreatingWireStartNode,
-    setCreatingWireJoints,
     setEditingWire,
     getWirePoints,
     updateWiresDirect,
@@ -162,7 +156,6 @@ export default function CircuitCanvas() {
     getWireColor,
     resetWireState,
     loadWires,
-    sanitizeWireIds,
   } = useWireManagement({
     elements,
     stageRef,
@@ -303,8 +296,6 @@ export default function CircuitCanvas() {
     setStopDisabled(true);
 
     const interval = setInterval(() => {
-      // Recompute circuit continuously while running so controller state changes take effect
-      computeCircuit(wires);
       setStopTimeout((prev) => {
         if (prev <= 0) {
           clearInterval(interval);
@@ -325,9 +316,6 @@ export default function CircuitCanvas() {
         }
       }
     });
-
-    // Initial compute after starting simulation
-    computeCircuit(wires);
   }
 
   useCircuitShortcuts({
@@ -586,10 +574,6 @@ export default function CircuitCanvas() {
                     : el
                 )
               );
-              // Recompute after a controller state change while simulation is running
-              if (simulationRunningRef.current) {
-                computeCircuit(wires);
-              }
             }
           },
         });

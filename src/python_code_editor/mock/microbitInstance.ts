@@ -61,11 +61,13 @@ export class MicrobitSimulator {
 
   public readonly pins = {
     digital_write_pin: (pin: string, value: number) => {
-      // Use the unified path that emits events and notifies listeners
-      this.digitalWritePin(pin, value);
+      // Only care about TRIG_PIN being set HIGH
       if (value === 1) {
+        // Simulate trigger event (for demo, you can emit an event or log)
         this.triggerPinHigh(pin);
       }
+      // Store pin state correctly
+      this.pinStates[pin].digital = value;
     },
     digital_read_pin: (pin: string) => {
       // Always return dummy value (simulate echo)

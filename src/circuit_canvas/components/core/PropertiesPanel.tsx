@@ -3,7 +3,7 @@ import {
   Wire,
   PropertiesPanelProps,
 } from "@/circuit_canvas/types/circuit";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   ColorPaletteDropdown,
   defaultColors,
@@ -58,22 +58,31 @@ export default function PropertiesPanel({
   useEffect(() => {
     if (!selectedElement) return;
     setResistance(selectedElement.properties?.resistance ?? null);
-    // Pick a sensible default unit based on stored ohms
+
+    // Only initialize the displayed unit and text input when the user selects
+    // a different element. This prevents the panel from overriding the user's
+    // chosen unit (Ω vs kΩ) when the same element is updated elsewhere.
+    const isNewSelection = lastSelectedIdRef.current !== selectedElement.id;
     const r = selectedElement.properties?.resistance;
-    if (r != null) {
-      setResistanceUnit(r >= 1000 ? "kohm" : "ohm");
-      // Initialize the input once based on the chosen unit
-      setResistanceInput((r >= 1000 ? (r / 1000) : r).toString());
-    } else {
-      setResistanceUnit("ohm");
-      setResistanceInput("");
+    if (isNewSelection) {
+      if (r != null) {
+        setResistanceUnit(r >= 1000 ? "kohm" : "ohm");
+        setResistanceInput((r >= 1000 ? r / 1000 : r).toString());
+      } else {
+        setResistanceUnit("ohm");
+        setResistanceInput("");
+      }
     }
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
     setTemperature(selectedElement.properties?.temperature ?? null);
     setBrightness(selectedElement.properties?.brightness ?? null);
     setColor(selectedElement.properties?.color ?? null);
+    lastSelectedIdRef.current = selectedElement.id;
   }, [selectedElement]);
+
+  // Track last selected element id so we don't reinitialize unit/input on prop updates
+  const lastSelectedIdRef = useRef<string | null>(null);
 
   // Keep wire color in sync with prop updates from parent
   useEffect(() => {

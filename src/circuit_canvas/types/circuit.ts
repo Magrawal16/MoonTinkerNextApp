@@ -91,6 +91,7 @@ export type CircuitElementProps = {
 export type PaletteElementType =
   | "lightbulb"
   | "battery"
+  | "powersupply"
   | "resistor"
   | "multimeter"
   | "potentiometer"

@@ -61,6 +61,8 @@ export function getElementCenter(element: CircuitElement): {
   switch (element.type) {
     case "battery":
       return { x: 80, y: 40 }; // Battery is 160x80, so center is 80x40
+    case "powersupply":
+      return { x: 80, y: 40 }; // Same footprint as battery asset
     case "lightbulb":
       return { x: 73, y: 70 }; // Approximate center of lightbulb
     case "resistor":
@@ -91,6 +93,8 @@ export function getElementDimensions(element: CircuitElement): {
 } {
   switch (element.type) {
     case "battery":
+      return { width: 160, height: 80 };
+    case "powersupply":
       return { width: 160, height: 80 };
     case "lightbulb":
       return { width: 146, height: 140 };

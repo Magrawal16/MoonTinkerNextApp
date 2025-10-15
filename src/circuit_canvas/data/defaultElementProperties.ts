@@ -27,6 +27,12 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     iconPath: "assets/circuit_canvas/elements/battery.svg",
     defaultProps: { voltage: 9, resistance: 1.45 },
   },
+  // {
+  //   type: "powersupply",
+  //   label: "Power Supply",
+  //   iconPath: "assets/circuit_canvas/elements/power_supply.svg",
+  //   defaultProps: { voltage: 5, resistance: 0.2 },
+  // },
   {
     type: "resistor",
     label: "Resistor",

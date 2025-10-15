@@ -316,7 +316,7 @@ function getElementsWithCurrent(
   for (const e of elements) {
     if (!e || !e.type) continue;
     if (
-      (e.type === "battery" &&
+      ((e.type === "battery" || e.type === "powersupply") &&
         Array.isArray(e.nodes) &&
         e.nodes.length === 2) ||
       e.type === "microbit" ||
@@ -453,7 +453,7 @@ function buildMNAMatrices(
         G[bi2][wi] -= gb;
         G[wi][bi2] -= gb;
       }
-    } else if (el.type === "battery") {
+    } else if (el.type === "battery" || el.type === "powersupply") {
       // find pos/neg mapped nodes
       const pos =
         el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1]?.id;
@@ -468,9 +468,14 @@ function buildMNAMatrices(
       if (nIdx !== undefined) B[nIdx][idx] += 1;
       if (pIdx !== undefined) C[idx][pIdx] += 1;
       if (nIdx !== undefined) C[idx][nIdx] -= 1;
-      // Fixed internal resistance and voltage for battery
-      D[idx][idx] += 1.45; // Ω
-      E[idx] = 9; // V
+      // Battery has fixed params; powersupply is configurable
+      if (el.type === "battery") {
+        D[idx][idx] += 1.45; // Ω
+        E[idx] = 9; // V
+      } else {
+        D[idx][idx] += el.properties?.resistance ?? 0.2;
+        E[idx] = el.properties?.voltage ?? 5;
+      }
     } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
       // Collect all 3.3V and GND node ids in this element
       const posIds = el.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
@@ -630,7 +635,7 @@ function computeElementResults(
 ): CircuitElement[] {
   // Detect if subcircuit is externally powered (battery or microbit present)
   const externallyPowered = elements.some(
-    (e) => e.type === "battery" || e.type === "microbit" || e.type === "microbitWithBreakout"
+    (e) => e.type === "battery" || e.type === "powersupply" || e.type === "microbit" || e.type === "microbitWithBreakout"
   );
 
   return elements.map((el) => {
@@ -684,7 +689,7 @@ function computeElementResults(
       current = totalCurrent;
       voltage = totalVoltage;
       power = totalPower;
-    } else if (el.type === "battery" || el.type === "microbit" || el.type === "microbitWithBreakout") {
+    } else if (el.type === "battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
       const idx = currentMap.get(el.id);
       if (idx !== undefined) current = x[n + idx] ?? 0;
       power = voltage * current;

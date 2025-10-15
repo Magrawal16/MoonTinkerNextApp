@@ -61,7 +61,10 @@ class MicrobitFlasher {
 :00000001FF`;
       
       const encoder = new TextEncoder();
-      return encoder.encode(hexContent).buffer;
+      const bytes = new TextEncoder().encode(hexContent);
+const buf = new ArrayBuffer(bytes.byteLength);
+new Uint8Array(buf).set(bytes);
+return buf;
     } catch (error) {
       console.error('Error converting Python to HEX:', error);
       throw new Error('Failed to convert Python code to HEX format');

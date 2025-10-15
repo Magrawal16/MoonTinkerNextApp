@@ -40,6 +40,39 @@ export default function createElement(
     displayProperties: [],
   };
 
+  const powerSupplyElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 72,
+        y: 117,
+        parentId: id,
+        polarity: "positive" as const,
+        placeholder: "Positive",
+        fillColor: "green",
+      },
+      {
+        id: id + "-node-2",
+        x: 86.5,
+        y: 117,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: props.properties?.voltage ?? 5,
+      resistance: props.properties?.resistance ?? 0.2,
+    },
+    displayProperties: ["voltage"],
+  };
+
   const lightbulbElement = {
     id,
     type: props.type,
@@ -566,6 +599,9 @@ export default function createElement(
   switch (props.type) {
     case "battery":
       element = batteryElement;
+      break;
+    case "powersupply":
+      element = powerSupplyElement;
       break;
     case "lightbulb":
       element = lightbulbElement;

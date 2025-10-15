@@ -15,6 +15,7 @@ import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
+import PowerSupply from "@/circuit_canvas/components/elements/PowerSupply";
 
 interface RenderElementProps {
   element: CircuitElement;
@@ -89,6 +90,14 @@ export default function RenderElement({
       )}
       {props.showBody !== false && element.type === "battery" && (
         <Battery
+          id={element.id}
+          x={0}
+          y={0}
+          selected={props.selectedElementId === element.id}
+        />
+      )}
+      {props.showBody !== false && element.type === "powersupply" && (
+        <PowerSupply
           id={element.id}
           x={0}
           y={0}

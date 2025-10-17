@@ -335,7 +335,7 @@ export default function PropertiesPanel({
           <label>Temperature (°C):</label>
           <input
             type="range"
-            min="0"
+            min="-5"
             max="50"
             value={temperature ?? 0}
             onChange={(e) => setTemperature(parseNumber(e.target.value) ?? 0)}

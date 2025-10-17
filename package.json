@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "tsx server.ts",
+    "start:prod": "powershell -Command \"$env:NODE_ENV='production'; pnpm start\"",
     "lint": "next lint"
   },
   "dependencies": {
@@ -37,6 +38,7 @@
     "tailwindcss": "^4.1.11",
     "ts-migrate": "^0.1.35",
     "ts-morph": "^26.0.0",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "worker-plugin": "^5.0.1"
   }

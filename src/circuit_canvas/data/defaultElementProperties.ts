@@ -42,7 +42,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "multimeter",
     label: "Multimeter",
-    iconPath: "assets/circuit_canvas/elements/Multimeter.svg",
+    iconPath: "assets/circuit_canvas/elements/multimeter.svg",
     defaultProps: { mode: "voltage" },
   },
   {

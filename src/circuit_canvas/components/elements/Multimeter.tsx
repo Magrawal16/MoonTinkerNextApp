@@ -63,14 +63,14 @@ export default function Multimeter(props: MultimeterProps) {
 
   useEffect(() => {
     const image = new window.Image();
-    image.src = "assets/circuit_canvas/elements/multimeter2.svg";
+    image.src = "assets/circuit_canvas/elements/multimeter.svg";
     image.onload = () => setImg(image);
     image.alt = "Multimeter";
   }, []);
 
   const SCALE = 180 / 240; // ~0.3333
 
-  // Circle button placement tuned to overlay multimeter2.svg right-side pads
+  // Circle button placement tuned to overlay multimeter.svg right-side pads
   const BTN_X = 211; // center X in the 240px-wide SVG space
   const BTN_R = 7;  // circle radius
   const buttonDefs = [

@@ -921,7 +921,7 @@ export default function CircuitCanvas() {
               <span>Debugger</span>
             </button>
 
-            <CircuitStorage
+            {/* <CircuitStorage
               onCircuitSelect={(circuitId) => {
                 const data = getCircuitById(circuitId);
                 if (!data) return;
@@ -941,7 +941,7 @@ export default function CircuitCanvas() {
               currentElements={elements}
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
-            />
+            /> */}
           </div>
         </div>
     {selectedElement && showPropertiesPannel ? (

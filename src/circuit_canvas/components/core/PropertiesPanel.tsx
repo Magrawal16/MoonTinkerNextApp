@@ -377,12 +377,15 @@ export default function PropertiesPanel({
       )}
 
       <div className="flex justify-between gap-2 text-xs">
-        <button
-          className="bg-blue-500 text-white px-3 py-1 rounded w-full"
-          onClick={handleUpdate}
-        >
-          Update
-        </button>
+        {Array.isArray(selectedElement.displayProperties) &&
+          selectedElement.displayProperties.length > 0 && (
+            <button
+              className="bg-blue-500 text-white px-3 py-1 rounded w-full"
+              onClick={handleUpdate}
+            >
+              Update
+            </button>
+        )}
         <button
           className="bg-red-500 text-white px-3 py-1 rounded w-full"
           onClick={handleDelete}

@@ -200,12 +200,12 @@ export default function createElement(
     ],
     properties: {
       ...{
-        voltage: props.properties?.voltage,
+        voltage: props.properties?.voltage ?? 1,
         resistance: props.properties?.resistance ?? 11,
       },
       ...props.properties,
     },
-    displayProperties: ["voltage", "resistance"],
+    displayProperties: [],
   };
 
   const potentiometerElement = {
@@ -588,10 +588,10 @@ export default function createElement(
     ],
     properties: {
       voltage: props.properties?.voltage ?? 3.3,
-      resistance: props.properties?.resistance ?? 0,
+      resistance: props.properties?.resistance ?? 1,
       ...props.properties,
     },
-    displayProperties: ["voltage", "resistance"],
+    displayProperties: [],
   };
 
   // switch based on type

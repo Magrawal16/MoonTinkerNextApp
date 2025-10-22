@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Stage, Layer, Line, Circle } from "react-konva";
 import type { KonvaEventObject } from "konva/lib/Node";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
@@ -99,11 +99,11 @@ export default function CircuitCanvas() {
 
   // (moved below where `wires` is declared)
 
-  function getNodeById(nodeId: string) {
+  const getNodeById = useCallback((nodeId: string) => {
     return elementsRef.current
       .flatMap((e) => e.nodes)
       .find((n) => n.id === nodeId);
-  }
+  }, []);
 
   const getElementById = React.useCallback(
     (elementId: string): CircuitElement | null => {
@@ -377,22 +377,19 @@ export default function CircuitCanvas() {
     disabledSimulationOnnOff: stopDisabled,
   });
 
-  function handleStageMouseMove(e: KonvaEventObject<PointerEvent>) {
+  const handleStageMouseMove = useCallback((e: KonvaEventObject<PointerEvent>) => {
     const pos = e.target.getStage()?.getPointerPosition();
-    if (pos) {
-      // Only update React state if we're NOT creating a wire to avoid re-renders
-      if (!creatingWireStartNode) {
-        setMousePos(pos);
-      }
-
+    if (!pos) return;
+    // Only update React state if we're NOT creating a wire to avoid re-renders
+    if (!creatingWireStartNode) {
+      setMousePos(pos);
+    } else {
       // If creating a wire, update in-progress wire directly without React re-render
-      if (creatingWireStartNode) {
-        updateInProgressWire(pos);
-      }
+      updateInProgressWire(pos);
     }
-  }
+  }, [creatingWireStartNode, updateInProgressWire]);
 
-  function handleStageClick(e: KonvaEventObject<MouseEvent>) {
+  const handleStageClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
@@ -416,10 +413,10 @@ export default function CircuitCanvas() {
     if (creatingWireStartNode) {
       handleStageClickForWire(pos);
     }
-  }
+  }, [creatingWireStartNode, editingWire, handleWireEdit, handleStageClickForWire]);
 
   // Optimized drag move handler - updates wires directly without React re-render
-  function handleElementDragMove(e: KonvaEventObject<DragEvent>) {
+  const handleElementDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
     const id = e.target.id();
     const x = e.target.x();
@@ -429,9 +426,9 @@ export default function CircuitCanvas() {
 
     // Directly update wires in Konva without triggering React re-render
     updateWiresDirect();
-  }
+  }, [updateWiresDirect]);
 
-  function computeCircuit(wiresSnapshot: Wire[]) {
+  const computeCircuit = useCallback((wiresSnapshot: Wire[]) => {
     setElements((prevElements) => {
       const solved = solveCircuit(prevElements, wiresSnapshot);
 
@@ -446,10 +443,10 @@ export default function CircuitCanvas() {
         };
       });
     });
-  }
+  }, []);
 
   // handle resistance change for potentiometer
-  function handleRatioChange(elementId: string, ratio: number) {
+  const handleRatioChange = useCallback((elementId: string, ratio: number) => {
     setElements((prev) =>
       prev.map((el) =>
         el.id === elementId
@@ -463,9 +460,9 @@ export default function CircuitCanvas() {
     if (simulationRunning) {
       computeCircuit(wires);
     }
-  }
+  }, [simulationRunning, computeCircuit, wires]);
 
-  function handleModeChange(elementId: string, mode: "voltage" | "current" | "resistance") {
+  const handleModeChange = useCallback((elementId: string, mode: "voltage" | "current" | "resistance") => {
     setElements((prev) =>
       prev.map((el) =>
         el.id === elementId
@@ -477,9 +474,9 @@ export default function CircuitCanvas() {
       )
     );
     if (simulationRunning) computeCircuit(wires);
-  }
+  }, [simulationRunning, computeCircuit, wires]);
 
-  async function handleDrop(e: React.DragEvent<HTMLDivElement>) {
+  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     if (simulationRunning) {
       stopSimulation();
@@ -609,7 +606,7 @@ export default function CircuitCanvas() {
         );
       })();
     }
-  }
+  }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, setElements, setActiveControllerId, setControllerMap, setElements]);
 
   // for canvas zoom in and zoom out
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {

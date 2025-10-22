@@ -151,7 +151,7 @@ export default function Microbit({
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
           />
         )}
         {imgOnnState && isSimulationOn && (
@@ -164,7 +164,7 @@ export default function Microbit({
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
           />
         )}
         {imgMicrobitWithBreakout && (
@@ -175,7 +175,7 @@ export default function Microbit({
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
           />
         )}
 

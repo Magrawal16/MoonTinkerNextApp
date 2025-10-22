@@ -269,7 +269,7 @@ useEffect(() => {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
           />
 
           {/* Connection Status Indicator */}
@@ -305,7 +305,7 @@ useEffect(() => {
                 strokeWidth={2}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 0.2 : 0}
+                shadowOpacity={0}
               />
 
               {/* Dashed lines from sensor eyes to ball */}
@@ -316,7 +316,7 @@ useEffect(() => {
                 dash={[8, 8]}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 0.2 : 0}
+                shadowOpacity={0}
               />
               <Line
                 points={[rightEye.x, rightEye.y, ball.x, ball.y]}
@@ -325,7 +325,7 @@ useEffect(() => {
                 dash={[8, 8]}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 0.2 : 0}
+                shadowOpacity={0}
               />
 
               {/* Distance annotation */}
@@ -337,7 +337,7 @@ useEffect(() => {
                 fill={canMeasure ? "#0684aa" : "#999"}
                 shadowBlur={props.selected ? 6 : 0}
                 shadowOffset={{ x: 15, y: -15 }}
-                shadowOpacity={props.selected ? 0.2 : 0}
+                shadowOpacity={0}
               />
 
               {/* Draggable ball */}
@@ -362,7 +362,7 @@ useEffect(() => {
                   strokeWidth={3}
                   shadowBlur={props.selected ? 6 : 0}
                   shadowOffset={{ x: 15, y: -15 }}
-                  shadowOpacity={props.selected ? 0.2 : 0}
+                  shadowOpacity={0}
                 />
               )}
 

@@ -103,7 +103,7 @@ function Potentiometer(props: PotentiometerProps) {
           shadowColor={props.selected ? "#000000" : undefined}
           shadowBlur={props.selected ? 10 : 0}
           shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={props.selected ? 0.2 : 0}
+          shadowOpacity={0}
         />
         <Line
           points={[0, 0, 0, -15]}
@@ -116,7 +116,7 @@ function Potentiometer(props: PotentiometerProps) {
           shadowColor={props.selected ? "#000000" : undefined}
           shadowBlur={props.selected ? 10 : 0}
           shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={props.selected ? 0.2 : 0}
+          shadowOpacity={0}
         />
         <Circle
           x={centerX}
@@ -128,7 +128,7 @@ function Potentiometer(props: PotentiometerProps) {
           shadowColor={props.selected ? "#000000" : undefined}
           shadowBlur={props.selected ? 10 : 0}
           shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={props.selected ? 0.2 : 0}
+          shadowOpacity={0}
         />
 
         <Line

@@ -90,7 +90,7 @@ export default function Multimeter(props: MultimeterProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 20, y: 20 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
           />
         )}
         {/* <Line
@@ -143,7 +143,7 @@ export default function Multimeter(props: MultimeterProps) {
                 shadowEnabled={selected}
                 shadowColor={selected ? "#222" : undefined}
                 shadowBlur={selected ? 6 : 0}
-                shadowOpacity={selected ? 0.35 : 0}
+                shadowOpacity={0}
               />
               <Text
                 x={BTN_X - BTN_R}

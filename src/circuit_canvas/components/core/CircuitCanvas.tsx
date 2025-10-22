@@ -1167,7 +1167,7 @@ export default function CircuitCanvas() {
                         opacity={0.18}
                         shadowColor={baseColor}
                         shadowBlur={10}
-                        shadowOpacity={0.6}
+                        shadowOpacity={0}
                         shadowEnabled
                         listening={false}
                       />
@@ -1192,7 +1192,7 @@ export default function CircuitCanvas() {
                       shadowColor={isSelected ? "blue" : baseColor}
                       shadowEnabled
                       shadowBlur={isSelected ? 5 : 2}
-                      shadowOpacity={isSelected ? 0.9 : 0.25}
+                      shadowOpacity={0}
                       opacity={0.95}
                       onClick={() => {
                         setSelectedElement({
@@ -1223,7 +1223,7 @@ export default function CircuitCanvas() {
                   radius={5}
                   fill="yellow"
                   shadowColor="yellow"
-                  shadowOpacity={2}
+                  shadowOpacity={0}
                   shadowForStrokeEnabled={true}
                   stroke="orange"
                   strokeWidth={3}
@@ -1262,7 +1262,7 @@ export default function CircuitCanvas() {
                   dash={[3, 3]}
                   shadowColor="blue"
                   shadowBlur={4}
-                  shadowOpacity={0.4}
+                  shadowOpacity={0}
                   visible={!!creatingWireStartNode}
                 />
               </Layer>

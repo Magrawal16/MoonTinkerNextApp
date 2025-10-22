@@ -197,7 +197,7 @@ export default function Resistor(props: ResistorProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 4 : 0}
             shadowOffset={{ x: 13, y: -13 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
             x={6.2}
             y={-2}
           />

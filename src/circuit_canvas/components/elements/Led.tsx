@@ -152,7 +152,7 @@ export default function Led(props: LedProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 7 : 0}
             shadowOffset={{ x: 12, y: -12 }}
-            shadowOpacity={props.selected ? 0.2 : 0}
+            shadowOpacity={0}
             opacity={isOverloaded ? 0.8 : 1}
             onMouseEnter={() => setIsHovered(true)}  // Hover start
             onMouseLeave={() => setIsHovered(false)} // Hover end
@@ -173,7 +173,7 @@ export default function Led(props: LedProps) {
                 shadowColor="#000000"
                 shadowBlur={12}
                 shadowOffset={{ x: 1, y: -1 }}
-                shadowOpacity={2}
+                shadowOpacity={0}
                 zIndex={1000}
                 onMouseEnter={() => setIsHovered(true)}  // Hover start
                 onMouseLeave={() => setIsHovered(false)} // Hover end
@@ -201,7 +201,7 @@ export default function Led(props: LedProps) {
                 cornerRadius={0} // slight curve
                 shadowColor={glow.shadow}
                 shadowBlur={30 + 60 * brightness}
-                shadowOpacity={0.7}
+                shadowOpacity={0}
                 listening={false}
                 globalCompositeOperation="lighten"
               />
@@ -218,7 +218,7 @@ export default function Led(props: LedProps) {
                 opacity={0.25 + 0.4 * brightness}
                 shadowColor={glow.shadow}
                 shadowBlur={30 + 60 * brightness}
-                shadowOpacity={0.7}
+                shadowOpacity={0}
                 listening={false}
                 globalCompositeOperation="lighten"
               />
@@ -234,7 +234,7 @@ export default function Led(props: LedProps) {
                   opacity={0.25 + 0.4 * brightness}
                   shadowColor={glow.shadow}
                   shadowBlur={30 + 60 * brightness}
-                  shadowOpacity={0.7}
+                  shadowOpacity={0}
                   listening={false}
                   globalCompositeOperation="lighten"
                 />

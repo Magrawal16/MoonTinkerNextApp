@@ -272,7 +272,7 @@ export default function RenderElement({
                     shadowColor="black"
                     shadowBlur={1}
                     shadowOffset={{ x: 2, y: 2 }}
-                    shadowOpacity={0.2}
+                    shadowOpacity={0}
                     opacity={0.5}
                   />
                   <Text

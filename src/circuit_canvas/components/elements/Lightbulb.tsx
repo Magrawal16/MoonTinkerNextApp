@@ -101,7 +101,7 @@ export default function Lightbulb(props: LightbulbProps) {
                 shadowColor="#000000"
                 shadowBlur={12}
                 shadowOffset={{ x: 1, y: -1 }}
-                shadowOpacity={2}
+                shadowOpacity={0}
                 zIndex={1000}
               />
             )}
@@ -127,7 +127,7 @@ export default function Lightbulb(props: LightbulbProps) {
                 opacity={outerOpacity}
                 shadowColor={tint}
                 shadowBlur={20 + 40 * displayBrightness}
-                shadowOpacity={0.5 + 0.4 * displayBrightness}
+                shadowOpacity={0}
               />
             </Group>
           )
@@ -142,7 +142,7 @@ export default function Lightbulb(props: LightbulbProps) {
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 12 : 0}
             shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={props.selected ? 2 : 0}
+            shadowOpacity={0}
             opacity={isOverloaded ? 0.8 : 1}
             // Hover handlers
             onMouseEnter={() => setIsHovered(true)}

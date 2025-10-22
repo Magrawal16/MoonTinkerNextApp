@@ -51,7 +51,7 @@ export function ShortCircuitNotification({
                 shadowColor="#111"
                 shadowBlur={8}
                 shadowOffset={{ x: 8, y: 6 }}
-                shadowOpacity={1}
+                shadowOpacity={0}
                 listening={false}
             />
             <Text
@@ -67,7 +67,7 @@ export function ShortCircuitNotification({
                 opacity={anim.opacity}
                 lineHeight={1.3}
                 listening={false}
-                shadowOpacity={1}
+                shadowOpacity={0}
                 shadowBlur={8}
                 shadowOffset={{ x: 3, y: 4 }}
                 shadowColor="#5C81A6"

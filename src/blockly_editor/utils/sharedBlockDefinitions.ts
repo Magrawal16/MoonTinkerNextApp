@@ -387,12 +387,14 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
 
   // input blocks
+
+  // --- NEW: on_button_pressed event block (A, B, A+B) ---
   {
-    type: "button_is_pressed",
+    type: "on_button_pressed",
     category: "Input",
     blockDefinition: {
-      type: "button_is_pressed",
-      message0: "button %1 is pressed",
+      type: "on_button_pressed",
+      message0: "on button %1 pressed %2",
       args0: [
         {
           type: "field_dropdown",
@@ -400,30 +402,39 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
           options: [
             ["A", "A"],
             ["B", "B"],
-            ["AB", "AB"],
+            ["A+B", "AB"],
           ],
         },
+        { type: "input_statement", name: "DO" },
       ],
-      output: "Boolean",
-      tooltip: "Check if button is pressed",
+      tooltip: "Run when a button is pressed",
+      nextStatement: null,
     },
-    pythonPattern: /button_([ab])\.is_pressed\(\)/gi,
+    // Matches a typical generated handler pattern like:
+    // def on_button_pressed_a():
+    //     ...
+    // input.on_button_pressed(Button.A, on_button_pressed_a)
+    pythonPattern: /def\s+on_button_pressed_(a|b|ab)\s*\(\s*\)\s*:([\s\S]*?)\n\s*input\.on_button_pressed\(\s*Button\.(A|B|AB)\s*,\s*([A-Za-z_]\w*)\s*\)/gi,
     pythonGenerator: (block, generator) => {
-      const button = block.getFieldValue("BUTTON").toLowerCase();
-      return [
-        `button_${button}.is_pressed()`,
-        (generator as any).ORDER_NONE || 0,
-      ];
+      const btn = block.getFieldValue("BUTTON");
+      const statements = generator.statementToCode(block, "DO");
+      const funcName = `on_button_pressed_${btn.toLowerCase()}`;
+      // Indent statements and register handler
+      const body = statements ? statements.replace(/^/gm, "    ") : "    pass\n";
+      return `def ${funcName}():\n${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
     },
     pythonExtractor: (match) => ({
-      BUTTON: match[1].toUpperCase(),
+      BUTTON: (match[3] || match[1]).toUpperCase(),
+      STATEMENTS: (match[2] || "").trim(),
     }),
     blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("button_is_pressed");
-      block.setFieldValue(values.BUTTON, "BUTTON");
+      const block = workspace.newBlock("on_button_pressed");
+      // default to A if value missing
+      block.setFieldValue(values.BUTTON || "A", "BUTTON");
       return block;
     },
   },
+  
   {
     type: "forever",
     blockDefinition: {

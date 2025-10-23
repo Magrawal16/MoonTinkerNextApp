@@ -248,6 +248,43 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     },
   },
   {
+    // Led: plot with brightness (0..255)
+    type: "plot_led_brightness",
+    category: "Led",
+    blockDefinition: {
+      type: "plot_led_brightness",
+      message0: "plot x %1 y %2 brightness %3",
+      args0: [
+        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
+        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
+        { type: "field_slider", name: "BRIGHTNESS", value: 255, min: 0, max: 255, precision: 1 },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Plot an LED at (x,y) with brightness 0-255",
+    },
+    // Custom Python mapping for our editor
+    pythonPattern: /led\.plot_brightness\((\d+),\s*(\d+),\s*(\d+)\)/g,
+    pythonGenerator: (block) => {
+      const x = block.getFieldValue("X");
+      const y = block.getFieldValue("Y");
+      const b = block.getFieldValue("BRIGHTNESS");
+      return `led.plot_brightness(${x}, ${y}, ${b})\n`;
+    },
+    pythonExtractor: (match) => ({
+      X: parseInt(match[1]),
+      Y: parseInt(match[2]),
+      BRIGHTNESS: parseInt(match[3]),
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("plot_led_brightness");
+      block.setFieldValue(values.X, "X");
+      block.setFieldValue(values.Y, "Y");
+      block.setFieldValue(values.BRIGHTNESS, "BRIGHTNESS");
+      return block;
+    },
+  },
+  {
     type: "toggle_led",
     category: "Led",
     blockDefinition: {

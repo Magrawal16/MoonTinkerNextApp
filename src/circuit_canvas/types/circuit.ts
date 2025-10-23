@@ -27,7 +27,7 @@ export type CircuitElement = {
   };
   controller?: {
     [key: string]: unknown;
-    leds?: boolean[][];
+    leds?: number[][];
     pins?: Record<string, { digital?: number; analog?: number }>; // <-- analog added
     temperature?: number;
     brightness?: number;
@@ -134,7 +134,7 @@ export interface MicrobitProps {
   // Accepts buttons and the logo touch sensor
   onControllerInput?: (input: ControllerInput) => void;
 
-  leds: boolean[][];
+  leds: number[][] [];
 
   // Allow analog alongside digital to match simulator capabilities
   pins: Record<string, { digital?: number; analog?: number }>;

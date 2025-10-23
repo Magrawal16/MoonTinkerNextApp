@@ -137,17 +137,21 @@ export const registerCompletionProvider = (
 
         // 2) Dot owner members
         if (dotCtx === "led") {
-          Object.entries(API.led).forEach(([name, meta]: any) =>
+          Object.entries(API.led).forEach(([name, meta]: any) => {
+            let insertText = `${name}(\${1:x}, \${2:y})`;
+            if (name === "plot_brightness") {
+              insertText = `${name}(\${1:x}, \${2:y}, \${3:255})`;
+            }
             items.push({
               label: name,
               kind: k.Method,
-              insertText: `${name}(\${1:x}, \${2:y})`,
+              insertText,
               insertTextRules:
                 monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
               documentation: meta.doc,
               detail: meta.sig,
-            })
-          );
+            });
+          });
         } else if (dotCtx === "input") {
           items.push(
             {

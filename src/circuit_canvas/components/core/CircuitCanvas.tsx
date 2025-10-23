@@ -287,6 +287,7 @@ export default function CircuitCanvas() {
   }
 
   function startSimulation() {
+    debugger;
     setSimulationRunning(true);
     computeCircuit(wires);
 
@@ -308,6 +309,7 @@ export default function CircuitCanvas() {
 
     // Run user code for all controllers
     elements.forEach((el) => {
+      debugger;
       if (el.type === "microbit" || el.type === "microbitWithBreakout") {
         const sim = controllerMap[el.id];
         const code = controllerCodeMap[el.id] ?? "";
@@ -548,7 +550,7 @@ export default function CircuitCanvas() {
                     ? {
                         ...el,
                         controller: {
-                          leds: Array(5).fill(Array(5).fill(false)),
+                          leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
                           pins: {},
                           logoTouched: false, // NEW
                         },

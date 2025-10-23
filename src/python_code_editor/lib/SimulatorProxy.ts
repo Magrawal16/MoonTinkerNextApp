@@ -15,7 +15,7 @@ export interface SimulatorOptions {
 
 type State = {
   pins: Record<string, { digital: number; analog: number }>;
-  leds: boolean[][];
+  leds: number[][];
   buttons: { A: boolean; B: boolean; AB: boolean }; // AB present in snapshot
   logo: boolean; // <- NEW: logo touch state
 };

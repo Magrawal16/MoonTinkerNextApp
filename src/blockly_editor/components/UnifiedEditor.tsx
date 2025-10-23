@@ -7,7 +7,7 @@
  * 3. Seamless user experience with preserved code content
  * 4. Integration with the circuit canvas controller system
  */
-
+// Test commit
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as Blockly from "blockly";
 import { pythonGenerator } from "blockly/python";

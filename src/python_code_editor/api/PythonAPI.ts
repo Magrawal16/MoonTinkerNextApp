@@ -9,6 +9,7 @@ export const API = {
     unplot: { sig: "led.unplot(x: int, y: int) -> None", doc: "Turn off LED at (x, y)." },
     toggle: { sig: "led.toggle(x: int, y: int) -> None", doc: "Toggle LED at (x, y)." },
     point: { sig: "led.point(x: int, y: int) -> bool", doc: "Return True if LED at (x, y) is on." },
+    plot_brightness: { sig: "led.plot_brightness(x: int, y: int, brightness: int) -> None", doc: "Turn on LED at (x, y) with brightness 0-255." },
   },
   input: {
     on_button_pressed: {

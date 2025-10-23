@@ -163,8 +163,8 @@ export class MicrobitSimulator {
 
   private pyodide: PyodideInterface;
   private eventEmitter = new MicrobitEventEmitter();
-  private ledMatrix: boolean[][] = Array.from({ length: 5 }, () =>
-    Array(5).fill(false)
+  private ledMatrix: number[][] = Array.from({ length: 5 }, () =>
+    Array(5).fill(0)
   );
   private pinStates: Record<string, { digital: number; analog: number }> = {};
   private buttonStates: Record<"A" | "B" | "AB", boolean> = {
@@ -192,6 +192,13 @@ export class MicrobitSimulator {
     unplot: this.unplot.bind(this),
     point: this.point.bind(this),
     toggle: this.toggle.bind(this),
+    // Compatibility shim for MakeCode-style brightness API used in our Blockly block.
+    // For now, we treat any brightness > 0 as ON. Future: store per-pixel brightness 0..255.
+    plot_brightness: (x: number, y: number, brightness: number) => {
+      const b = Math.max(0, Math.min(255, Math.floor(brightness || 0)));
+      this.ledMatrix[y][x] = b;
+      this.eventEmitter.emit({ type: "led-change", x, y, value: b });
+    },
   };
 
   public readonly input = {
@@ -332,7 +339,7 @@ export class MicrobitSimulator {
     }
     for (let y = 0; y < 5; y++) {
       for (let x = 0; x < 5; x++) {
-        this.ledMatrix[y][x] = false;
+        this.ledMatrix[y][x] = 0;
       }
     }
     this.buttonStates = { A: false, B: false, AB: false };
@@ -422,27 +429,27 @@ export class MicrobitSimulator {
   }
 
   private plot(x: number, y: number) {
-    this.ledMatrix[y][x] = true;
-    this.eventEmitter.emit({ type: "led-change", x, y, value: 1 });
+    this.ledMatrix[y][x] = 255;
+    this.eventEmitter.emit({ type: "led-change", x, y, value: 255 });
   }
 
   private unplot(x: number, y: number) {
-    this.ledMatrix[y][x] = false;
+    this.ledMatrix[y][x] = 0;
     this.eventEmitter.emit({ type: "led-change", x, y, value: 0 });
   }
 
   private toggle(x: number, y: number) {
-    this.ledMatrix[y][x] = !this.ledMatrix[y][x];
+    this.ledMatrix[y][x] = this.ledMatrix[y][x] > 0 ? 0 : 255;
     this.eventEmitter.emit({
       type: "led-change",
       x,
       y,
-      value: this.ledMatrix[y][x] ? 1 : 0,
+      value: this.ledMatrix[y][x],
     });
   }
 
   private point(x: number, y: number) {
-    return this.ledMatrix[y][x];
+    return this.ledMatrix[y][x] > 0;
   }
 
   // Fixed onButtonPressed method

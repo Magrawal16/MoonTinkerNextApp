@@ -150,8 +150,8 @@ export default function RenderElement({
             props.onControllerInput(element.id, input);
           }}
           leds={
-            (element.controller?.leds as boolean[][] | undefined) ??
-            Array(5).fill(Array(5).fill(false))
+            (element.controller?.leds as number[][] | undefined) ??
+            Array.from({ length: 5 }, () => Array(5).fill(0))
           }
           selected={props.selectedElementId === element.id}
           isSimulationOn={props.isSimulationOn}
@@ -172,8 +172,8 @@ export default function RenderElement({
             props.onControllerInput(element.id, input);
           }}
           leds={
-            (element.controller?.leds as boolean[][] | undefined) ??
-            Array(5).fill(Array(5).fill(false))
+            (element.controller?.leds as number[][] | undefined) ??
+            Array.from({ length: 5 }, () => Array(5).fill(0))
           }
           selected={props.selectedElementId === element.id}
           isSimulationOn={props.isSimulationOn}

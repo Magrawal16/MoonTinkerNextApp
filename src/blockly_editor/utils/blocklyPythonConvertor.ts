@@ -59,6 +59,7 @@ import {
   EnhancedPythonToBlocklyConverter,
   SharedBlockRegistry,
 } from "./sharedBlockDefinitions";
+import { registerSliderField } from "./fields/SliderField";
 
 /**
  * Integration utilities for adding Python-to-Blockly conversion to existing Blockly editors
@@ -88,6 +89,12 @@ export class BlocklyPythonIntegration {
    * This must be called once before using any conversion features
    */
   static initialize(): void {
+    // Register custom field types first (e.g., slider)
+    try {
+      registerSliderField();
+    } catch (e) {
+      // ignore double-registration in hot reload
+    }
     SharedBlockRegistry.registerBlocks();
   }
 

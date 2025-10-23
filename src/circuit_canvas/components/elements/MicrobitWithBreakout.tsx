@@ -181,17 +181,23 @@ export default function Microbit({
 
         {/* 5x5 LED Grid */}
         {leds[0].map((_, y) =>
-          leds.map((col, x) => (
-            <Rect
-              key={`${x}-${y}`}
-              x={85 + x * 11.8}
-              y={44.4 + y * 13}
-              width={4}
-              height={10.1}
-              fill={leds[x][y] ? "yellow" : "#333"}
-              cornerRadius={3}
-            />
-          ))
+          leds.map((col, x) => {
+            const b = Math.max(0, Math.min(255, Number(leds[x][y] || 0)));
+            const on = b > 0;
+            const opacity = b / 255;
+            return (
+              <Rect
+                key={`${x}-${y}`}
+                x={85 + x * 11.8}
+                y={44.4 + y * 13}
+                width={4}
+                height={10.1}
+                fill={on ? "yellow" : "#333"}
+                opacity={on ? opacity : 1}
+                cornerRadius={3}
+              />
+            );
+          })
         )}
 
         {/* Touch (Logo) Sensor Overlay */}

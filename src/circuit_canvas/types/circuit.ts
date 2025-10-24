@@ -18,6 +18,7 @@ export type CircuitElement = {
     temperature?: number;
     brightness?: number;
     color?: string;
+    gesture?: string; // for gestures
   };
   computed?: {
     current?: number; // computed current through the element

@@ -2,7 +2,7 @@
 import * as Comlink from "comlink";
 import { PythonInterpreter } from "../interpreter/PythonInterpreter";
 import { MicrobitSimulator } from "../mock/microbitInstance";
-import type { MicrobitEvent } from "../mock/microbitInstance";
+import type { MicrobitEvent } from "../mock//types";
 
 type SupportedLanguage = "python";
 type SupportedController = "microbit" | "microbitWithBreakout";
@@ -14,6 +14,7 @@ interface SimulatorOptions {
 
 type ButtonEvent = "A" | "B" | "AB";
 type LogoEvent = { type: "logo"; state: "pressed" | "released" };
+type ButtonObject = { type: "button"; button: ButtonEvent; state: "pressed" | "released" };
 
 class Simulator {
   private interpreter: PythonInterpreter | null = null;
@@ -101,15 +102,26 @@ class Simulator {
 
   // --- INPUT API ---
 
-  async simulateInput(event: ButtonEvent | LogoEvent) {
+  async simulateInput(event: ButtonEvent | LogoEvent | ButtonObject) {
     if (!this.microbit) {
       throw new Error(this.options.controller + " controller not initialized at simulate input.");
     }
+    try {
+      // Debug: log incoming input events
+      // eslint-disable-next-line no-console
+      console.debug("Simulator.simulateInput event:", event);
+    } catch (e) { }
 
     if (typeof event === "string") {
       // A / B / AB
       await this.microbit.pressButton(event);
       return;
+    }
+
+    if ((event as ButtonObject).type === "button") {
+      const be = event as ButtonObject;
+      if (be.state === "pressed") return this.microbit.pressButton(be.button);
+      if (be.state === "released") return this.microbit.releaseButton(be.button);
     }
 
     if (event.type === "logo") {
@@ -128,6 +140,11 @@ class Simulator {
   async releaseLogo() {
     if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at release logo.");
     return this.microbit.releaseLogo();
+  }
+
+  async pressButton(button: ButtonEvent) {
+    if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at press button.");
+    return this.microbit.pressButton(button);
   }
 }
 

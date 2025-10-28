@@ -248,6 +248,74 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     },
   },
   {
+    // Basic: show icon (predefined 5x5 patterns)
+    // We generate led.unplot for all pixels, then led.plot for the icon pixels
+    type: "show_icon",
+    category: "Basic",
+    blockDefinition: {
+      type: "show_icon",
+      message0: "show icon %1",
+      args0: [
+        {
+          type: "field_icon",
+          name: "ICON",
+          value: "HEART",
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Show a predefined icon on the LED matrix",
+    },
+    // Support parsing the MicroPython-like form: display.show(Image.ICON)
+    pythonPattern: /display\.show\(Image\.([A-Z_]+)\)/g,
+    pythonGenerator: (block) => {
+      const icon = (block.getFieldValue("ICON") || "HEART") as string;
+      const patterns: Record<string, string[]> = {
+        HEART: ["01010", "11111", "11111", "01110", "00100"],
+        SMALL_HEART: ["00000", "01010", "01110", "00100", "00000"],
+        HAPPY: ["00000", "01010", "00000", "10001", "01110"],
+        SAD: ["00000", "01010", "01110", "10001", "00000"],
+        YES: ["00001", "00010", "00100", "01000", "10000"],
+        NO: ["10001", "01010", "00100", "01010", "10001"],
+      };
+
+      const rows = patterns[icon] || patterns.HEART;
+      // Generate Python: clear entire 5x5 then plot icon pixels
+      const lines: string[] = [];
+      for (let y = 0; y < 5; y++) {
+        for (let x = 0; x < 5; x++) {
+          lines.push(`led.unplot(${x}, ${y})`);
+        }
+      }
+      for (let y = 0; y < 5; y++) {
+        const row = rows[y];
+        for (let x = 0; x < 5; x++) {
+          if (row.charAt(x) === "1") {
+            lines.push(`led.plot(${x}, ${y})`);
+          }
+        }
+      }
+      return lines.join("\n") + "\n";
+    },
+    pythonExtractor: (match) => ({
+      ICON: match[1]?.toUpperCase(),
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("show_icon");
+      const valid = new Set([
+        "HEART",
+        "SMALL_HEART",
+        "HAPPY",
+        "SAD",
+        "YES",
+        "NO",
+      ]);
+      const picked = valid.has(values.ICON) ? values.ICON : "HEART";
+      block.setFieldValue(picked, "ICON");
+      return block;
+    },
+  },
+  {
     // Led: plot with brightness (0..255)
     type: "plot_led_brightness",
     category: "Led",
@@ -347,42 +415,64 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
 
   // logic blocks
-  // if statement
+
+  // MakeCode-style if/else/else if with dynamic arms (uses Blockly's built-in mutator)
   {
-    type: "if_statement",
+    type: "controls_if",
     category: "Logic",
     blockDefinition: {
-      type: "if_statement",
+      type: "controls_if",
       message0: "if %1 %2",
       args0: [
-        {
-          type: "input_value",
-          name: "CONDITION",
-          check: "Boolean",
-        },
-        {
-          type: "input_statement",
-          name: "DO",
-        },
+        { type: "input_value", name: "IF0", check: "Boolean" },
+        { type: "input_statement", name: "DO0" },
       ],
       previousStatement: null,
       nextStatement: null,
-      tooltip: "If statement",
+      tooltip: "If / else if / else",
+      mutator: "controls_if_mutator",
     },
-    pythonPattern: /if\s+(.*?)\s*:\s*([\s\S]*?)(?=\n(?:\S|$))/g,
+    // Note: Parsing full Python if/elif/else into a single block line-by-line is non-trivial.
+    // We use a broad pattern so text->blocks can at least place an if block; edits remain block-first.
+    pythonPattern: /\bif\b[\s\S]*?:/g,
     pythonGenerator: (block, generator) => {
-      const condition = generator.valueToCode(block, "CONDITION", Order.NONE);
-      const statements = generator.statementToCode(block, "DO");
-      return `if ${condition}:\n${statements.replace(/^/gm, "    ")}`;
+      let n = 0;
+      let code = "";
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const ensureBody = (s: string) => {
+        // Use generator-provided indentation; do NOT re-indent existing lines.
+        if (s && s.trim().length > 0) return s;
+        return IND + "# your code here\n";
+      };
+
+      // First arm
+      const condition0 =
+        generator.valueToCode(block, "IF0", (generator as any).ORDER_NONE) ||
+        "True";
+      const branch0 = generator.statementToCode(block, "DO0");
+      code += `if ${condition0}:\n${ensureBody(branch0)}`;
+
+      // Else-if arms
+      for (n = 1; block.getInput("IF" + n); n++) {
+        const cond =
+          generator.valueToCode(block, "IF" + n, (generator as any).ORDER_NONE) ||
+          "False";
+        const branch = generator.statementToCode(block, "DO" + n);
+        code += `elif ${cond}:\n${ensureBody(branch)}`;
+      }
+
+      // Else arm
+      if (block.getInput("ELSE")) {
+        const elseBranch = generator.statementToCode(block, "ELSE");
+        code += `else:\n${ensureBody(elseBranch)}`;
+      }
+      // Ensure trailing newline for cleaner concatenation
+      if (!code.endsWith("\n")) code += "\n";
+      return code;
     },
-    pythonExtractor: (match) => ({
-      CONDITION: match[1].trim(),
-      STATEMENTS: match[2].trim(),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("if_statement");
-      block.setFieldValue(values.CONDITION, "CONDITION");
-      return block;
+    pythonExtractor: () => ({}),
+    blockCreator: (workspace) => {
+      return createAndInitializeBlock(workspace, "controls_if");
     },
   },
 
@@ -434,7 +524,42 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       return block;
     },
   },
-  
+  {
+    type: "button_is_pressed",
+    category: "Input",
+    blockDefinition: {
+      type: "button_is_pressed",
+      message0: "button %1 is pressed",
+      args0: [
+        {
+          type: "field_dropdown",
+          name: "BUTTON",
+          options: [
+            ["A", "A"],
+            ["B", "B"],
+            ["A+B", "AB"],
+          ],
+        },
+      ],
+      output: "Boolean",
+      tooltip: "Check whether a button is currently pressed",
+    },
+    // Matches calls like: input.button_is_pressed(Button.A)
+    pythonPattern: /input\.button_is_pressed\(\s*Button\.(A|B|AB)\s*\)/g,
+    pythonGenerator: (block) => {
+      const btn = block.getFieldValue("BUTTON") || "A";
+      return [`input.button_is_pressed(Button.${btn})`, (Order as any)?.NONE || 0];
+    },
+    pythonExtractor: (match) => ({
+      BUTTON: match[1].toUpperCase(),
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("button_is_pressed");
+      block.setFieldValue(values.BUTTON || "A", "BUTTON");
+      return block;
+    },
+  },
+
   {
     type: "forever",
     blockDefinition: {
@@ -445,13 +570,20 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       nextStatement: null,
       tooltip: "Runs code forever",
     },
-    pythonPattern: /while\s+True\s*:([\s\S]*?)(?=\n(?:\S|$))/g,
+    // Support recognizing either the classic while True: form or
+    // the handler registration style we generate below
+    // - def on_forever():\n    ...\n    basic.forever(on_forever)
+    pythonPattern: /(def\s+on_forever\(\s*\)\s*:|basic\.forever\(\s*on_forever\s*\)|while\s+True\s*:)/g,
     pythonGenerator: (block, generator) => {
       const statements = generator.statementToCode(block, "DO");
-      return `while True:\n${statements.replace(/^/gm, "    ")}\n`;
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const body = statements && statements.trim().length > 0
+        ? statements // already correctly indented by Blockly for a nested statement
+        : IND + "# your code here\n";
+      return `def on_forever():\n${body}basic.forever(on_forever)\n`;
     },
-    pythonExtractor: (match) => ({
-      STATEMENTS: match[1].trim(),
+    pythonExtractor: (_match) => ({
+      STATEMENTS: "",
     }),
     blockCreator: (workspace, values) => {
       const block = workspace.newBlock("forever");

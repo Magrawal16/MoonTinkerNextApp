@@ -1,6 +1,6 @@
 // src/lib/code/SimulatorProxy.ts
 import * as Comlink from "comlink";
-import type { MicrobitEvent } from "../mock/microbitInstance";
+import type { MicrobitEvent } from "../mock/types";
 import { Simulator } from "@/python_code_editor/lib/Simulator";
 
 type SupportedLanguage = "python";
@@ -22,6 +22,7 @@ type State = {
 
 type ButtonEvent = "A" | "B" | "AB";
 type LogoEvent = { type: "logo"; state: "pressed" | "released" };
+type ButtonObject = { type: "button"; button: ButtonEvent; state: "pressed" };
 
 export class SimulatorProxy {
   private worker: Worker;
@@ -88,12 +89,19 @@ export class SimulatorProxy {
 
   // --- INPUT API ---
 
-  async simulateInput(event: ButtonEvent | LogoEvent) {
+  async simulateInput(event: ButtonEvent | LogoEvent | ButtonObject) {
     if (!this.simulatorRemoteInstance) throw new Error("Not initialized.");
 
     if (typeof event === "string") {
       // Button A/B/AB
       return this.simulatorRemoteInstance.simulateInput(event);
+    }
+
+    // Button object event
+    if ((event as ButtonObject).type === "button") {
+      const be = event as ButtonObject;
+      if (be.state === "pressed") return this.simulatorRemoteInstance.simulateInput(be);
+      return this.simulatorRemoteInstance.simulateInput(be);
     }
 
     // Logo event
@@ -117,6 +125,12 @@ export class SimulatorProxy {
   async releaseLogo() {
     if (!this.simulatorRemoteInstance) throw new Error("Not initialized at release logo.");
     return this.simulatorRemoteInstance.releaseLogo();
+  }
+
+  // Convenience: press / release a button programmatically
+  async pressButton(button: ButtonEvent) {
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at press button.");
+    return this.simulatorRemoteInstance.simulateInput(button);
   }
 
   dispose() {

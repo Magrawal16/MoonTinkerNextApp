@@ -267,6 +267,24 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
       },
     ],
   },
+  {
+    id: "button_conditional_listener",
+    name: "Button Conditional",
+    description: "Listen for button is press",
+    code: "input.button_is_pressed(Button.{button})",
+    category: "Buttons",
+    parameters: [
+      {
+        id: "button",
+        name: "Button",
+        type: "dropdown",
+        options: ["A", "B", "AB"],
+        defaultValue: "A",
+        placeholder: "Button",
+      },
+    ],
+  },
+
   // Touch / Logo Sensor Section
   {
     id: "logo_pressed_listener",
@@ -343,7 +361,7 @@ while True:
     id: "forever_loop",
     name: "Forever Loop",
     description: "Run code continuously",
-    code: `basic.forever(lambda: None)`,
+    code: `def on_forever():\n    # your code\n\nbasic.forever(on_forever)`,
     category: "Loops",
   },
   {

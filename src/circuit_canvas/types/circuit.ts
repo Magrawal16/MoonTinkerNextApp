@@ -13,12 +13,12 @@ export type CircuitElement = {
     voltage?: number; // for power sources like batteries
     resistance?: number; // all components can have resistance
     ratio?: number; // for potentiometers, the ratio of resistance
-  mode?: "voltage" | "current" | "resistance"; // multimeter modes: V, A, Ω
+    mode?: "voltage" | "current" | "resistance"; // multimeter modes: V, A, Ω
     distance?: number; // cm
     temperature?: number;
     brightness?: number;
     color?: string;
-    gesture?: string; // for gestures
+    gesture?: string;
   };
   computed?: {
     current?: number; // computed current through the element
@@ -124,7 +124,8 @@ export type ControllerInput =
   | "A"
   | "B"
   | "AB"
-  | { type: "logo"; state: "pressed" | "released" };
+  | { type: "logo"; state: "pressed" | "released" }
+  | { type: "button"; button: "A" | "B" | "AB"; state: "pressed" | "released" };
 
 export interface MicrobitProps {
   id: string;
@@ -135,7 +136,7 @@ export interface MicrobitProps {
   // Accepts buttons and the logo touch sensor
   onControllerInput?: (input: ControllerInput) => void;
 
-  leds: number[][] [];
+  leds: number[][][];
 
   // Allow analog alongside digital to match simulator capabilities
   pins: Record<string, { digital?: number; analog?: number }>;

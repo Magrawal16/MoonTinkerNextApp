@@ -50,10 +50,14 @@ export default function Microbit({
     image.alt = "Microbit";
   }, []);
 
-  const handleButtonClick = (btn: "A" | "B" | "AB") => {
+  // Button press/release handlers for hold logic
+  const handleButtonDown = (btn: "A" | "B" | "AB") => {
     setBtnPressed(btn);
-    onControllerInput?.(btn);
-    setTimeout(() => setBtnPressed(null), 150);
+    onControllerInput?.({ type: "button", button: btn, state: "pressed" });
+  };
+  const handleButtonUp = (btn: "A" | "B" | "AB") => {
+    setBtnPressed(null);
+    onControllerInput?.({ type: "button", button: btn, state: "released" });
   };
 
   // Logo stroke color logic
@@ -96,7 +100,7 @@ export default function Microbit({
     setLogoState("pressed");
     setCursor("pointer", e);
 
-     // --- NEW: notify controller (pressed)
+    // --- NEW: notify controller (pressed)
     onControllerInput?.({ type: "logo", state: "pressed" });
   };
 
@@ -132,6 +136,22 @@ export default function Microbit({
       window.removeEventListener("touchend", handleWindowUp);
     };
   }, [enableLogoInteraction, onControllerInput]);
+
+  // Global mouseup to handle releasing a button if pointer leaves the hit area
+  useEffect(() => {
+    const handleGlobalUp = () => {
+      if (btnPressed) {
+        // send a release for whichever button was pressed
+        handleButtonUp(btnPressed);
+      }
+    };
+    window.addEventListener("mouseup", handleGlobalUp);
+    window.addEventListener("touchend", handleGlobalUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalUp);
+      window.removeEventListener("touchend", handleGlobalUp);
+    };
+  }, [btnPressed]);
 
   const onLogoClick = () => {
     // Hook for future logo touch event dispatch if needed
@@ -175,10 +195,10 @@ export default function Microbit({
           />
         )}
 
-        {/* 5x5 LED Grid */}
-        {leds[0].map((_, y) =>
-          leds.map((col, x) => {
-            const b = Math.max(0, Math.min(255, Number(leds[x][y] || 0)));
+        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
+        {leds.map((row, y) =>
+          row.map((_, x) => {
+            const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
             const opacity = b / 255;
             return (
@@ -235,12 +255,12 @@ export default function Microbit({
 
         {/* Button AB */}
         <Group
-          onClick={(e) => {
-            e.cancelBubble = true;
-            handleButtonClick("AB");
-          }}
           x={164}
           y={96}
+          onMouseDown={() => handleButtonDown("AB")}
+          onMouseUp={() => handleButtonUp("AB")}
+          onTouchStart={() => handleButtonDown("AB")}
+          onTouchEnd={() => handleButtonUp("AB")}
         >
           {btnPressed === "AB" && (
             <Rect
@@ -260,12 +280,12 @@ export default function Microbit({
 
         {/* Button A */}
         <Group
-          onClick={(e) => {
-            e.cancelBubble = true;
-            handleButtonClick("A");
-          }}
           x={35}
           y={130}
+          onMouseDown={() => handleButtonDown("A")}
+          onMouseUp={() => handleButtonUp("A")}
+          onTouchStart={() => handleButtonDown("A")}
+          onTouchEnd={() => handleButtonUp("A")}
         >
           {btnPressed === "A" && (
             <Rect
@@ -285,12 +305,12 @@ export default function Microbit({
 
         {/* Button B */}
         <Group
-          onClick={(e) => {
-            e.cancelBubble = true;
-            handleButtonClick("B");
-          }}
           x={165}
           y={130}
+          onMouseDown={() => handleButtonDown("B")}
+          onMouseUp={() => handleButtonUp("B")}
+          onTouchStart={() => handleButtonDown("B")}
+          onTouchEnd={() => handleButtonUp("B")}
         >
           {btnPressed === "B" && (
             <Rect

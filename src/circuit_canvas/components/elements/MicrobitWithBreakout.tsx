@@ -17,7 +17,9 @@ export default function Microbit({
   const [imgMicrobitWithBreakout, setImgMicrobitWithBreakout] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
-  const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
+  // Track button press state
+  const [buttonsPressed, setButtonsPressed] = useState<Set<"A" | "B" | "AB">>(new Set());
+  const isPressing = useRef<{ [key in "A" | "B" | "AB"]: boolean }>({ A: false, B: false, AB: false });
 
   // Logo (touch sensor) interaction state
   const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
@@ -51,11 +53,38 @@ export default function Microbit({
     image.alt = "MicrobitWithBreakout";
   }, []);
 
-  const handleButtonClick = (btn: "A" | "B" | "AB") => {
-    setBtnPressed(btn);
-    onControllerInput?.(btn);
-    setTimeout(() => setBtnPressed(null), 150);
+  const handleButtonDown = (btn: "A" | "B" | "AB") => {
+    isPressing.current[btn] = true;
+    setButtonsPressed(prev => new Set([...prev, btn]));
+    onControllerInput?.({ type: "button", button: btn, state: "pressed" });
   };
+
+  const handleButtonUp = (btn: "A" | "B" | "AB") => {
+    isPressing.current[btn] = false;
+    setButtonsPressed(prev => {
+      const next = new Set(prev);
+      next.delete(btn);
+      return next;
+    });
+    onControllerInput?.({ type: "button", button: btn, state: "released" });
+  };
+
+  // Handle global pointer up to catch releases outside buttons
+  useEffect(() => {
+    const handleGlobalUp = () => {
+      Object.entries(isPressing.current).forEach(([btn, isPressed]) => {
+        if (isPressed) {
+          handleButtonUp(btn as "A" | "B" | "AB");
+        }
+      });
+    };
+    window.addEventListener("mouseup", handleGlobalUp);
+    window.addEventListener("touchend", handleGlobalUp);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalUp);
+      window.removeEventListener("touchend", handleGlobalUp);
+    };
+  }, []);
 
   // Logo stroke color logic
   const logoStroke =
@@ -97,7 +126,7 @@ export default function Microbit({
     setLogoState("pressed");
     setCursor("pointer", e);
 
-     // --- NEW: notify controller (pressed)
+    // --- NEW: notify controller (pressed)
     onControllerInput?.({ type: "logo", state: "pressed" });
   };
 
@@ -179,10 +208,10 @@ export default function Microbit({
           />
         )}
 
-        {/* 5x5 LED Grid */}
-        {leds[0].map((_, y) =>
-          leds.map((col, x) => {
-            const b = Math.max(0, Math.min(255, Number(leds[x][y] || 0)));
+        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
+        {leds.map((row, y) =>
+          row.map((_, x) => {
+            const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
             const opacity = b / 255;
             return (
@@ -202,8 +231,8 @@ export default function Microbit({
 
         {/* Touch (Logo) Sensor Overlay */}
         <Group
-          x={LOGO_X-2}
-          y={LOGO_Y-63.2}
+          x={LOGO_X - 2}
+          y={LOGO_Y - 63.2}
           listening={true}
           onMouseEnter={onLogoEnter}
           onMouseLeave={onLogoLeave}
@@ -239,14 +268,26 @@ export default function Microbit({
 
         {/* Button AB */}
         <Group
-          onClick={(e : any) => {
+          onMouseDown={(e: any) => {
             e.cancelBubble = true;
-            handleButtonClick("AB");
+            handleButtonDown("AB");
+          }}
+          onMouseUp={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("AB");
+          }}
+          onTouchStart={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonDown("AB");
+          }}
+          onTouchEnd={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("AB");
           }}
           x={157.1}
           y={20}
         >
-          {btnPressed === "AB" && (
+          {buttonsPressed.has("AB") && (
             <Rect
               width={12}
               height={12}
@@ -264,14 +305,26 @@ export default function Microbit({
 
         {/* Button A */}
         <Group
-          onClick={(e : any) => {
+          onMouseDown={(e: any) => {
             e.cancelBubble = true;
-            handleButtonClick("A");
+            handleButtonDown("A");
+          }}
+          onMouseUp={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("A");
+          }}
+          onTouchStart={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonDown("A");
+          }}
+          onTouchEnd={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("A");
           }}
           x={39.4}
           y={60}
         >
-          {btnPressed === "A" && (
+          {buttonsPressed.has("A") && (
             <Rect
               width={16}
               height={16}
@@ -289,14 +342,26 @@ export default function Microbit({
 
         {/* Button B */}
         <Group
-          onClick={(e : any) => {
+          onMouseDown={(e: any) => {
             e.cancelBubble = true;
-            handleButtonClick("B");
+            handleButtonDown("B");
+          }}
+          onMouseUp={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("B");
+          }}
+          onTouchStart={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonDown("B");
+          }}
+          onTouchEnd={(e: any) => {
+            e.cancelBubble = true;
+            handleButtonUp("B");
           }}
           x={158.9}
           y={60}
         >
-          {btnPressed === "B" && (
+          {buttonsPressed.has("B") && (
             <Rect
               width={16}
               height={16}

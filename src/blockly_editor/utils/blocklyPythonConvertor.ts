@@ -60,6 +60,7 @@ import {
   SharedBlockRegistry,
 } from "./sharedBlockDefinitions";
 import { registerSliderField } from "./fields/SliderField";
+import { registerIconField } from "./fields/IconField";
 
 /**
  * Integration utilities for adding Python-to-Blockly conversion to existing Blockly editors
@@ -92,6 +93,11 @@ export class BlocklyPythonIntegration {
     // Register custom field types first (e.g., slider)
     try {
       registerSliderField();
+    } catch (e) {
+      // ignore double-registration in hot reload
+    }
+    try {
+      registerIconField();
     } catch (e) {
       // ignore double-registration in hot reload
     }

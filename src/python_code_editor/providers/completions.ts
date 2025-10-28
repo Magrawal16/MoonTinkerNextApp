@@ -164,6 +164,15 @@ export const registerCompletionProvider = (
               detail: API.input.on_button_pressed.sig,
             },
             {
+              label: "button_is_pressed",
+              kind: k.Method,
+              insertText: `button_is_pressed(Button.\${1|A,B,AB|})`,
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation: API.input.button_is_pressed.doc,
+              detail: API.input.button_is_pressed.sig,
+            },
+            {
               label: "on_logo_pressed",
               kind: k.Method,
               insertText: `on_logo_pressed(\${1:handler})`,
@@ -287,6 +296,16 @@ export const registerCompletionProvider = (
               documentation:
                 "Scaffold a button handler (define function, then register).",
               detail: API.input.on_button_pressed.sig,
+            },
+            {
+              label: "button_is_pressed scaffold",
+              kind: k.Snippet,
+              insertText: (API.input as any).button_is_pressed.snippet,
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              documentation:
+                "Scaffold a button handler (define function, then register).",
+              detail: API.input.button_is_pressed.sig,
             },
             {
               label: "on_logo_pressed scaffold",

@@ -5,7 +5,7 @@ export const addInlineDefLint = (monaco: any, editor: any) => {
 
   const run = () => {
     const matches = model.findMatches(
-      String.raw`(on_button_pressed\s*\(\s*Button\.(A|B|AB)\s*,\s*def\b)|(on_logo_(pressed|released)\s*\(\s*def\b)`,
+      String.raw`(on_button_pressed\s*\(\s*Button\.(A|B|AB)\s*,\s*def\b)|(on_logo_(pressed|released)\s*\(\s*def\b)|(button_is_pressed\s*\(\s*Button\.(A|B|AB)\s*\b)`,
       false,
       false,
       false,
@@ -16,7 +16,7 @@ export const addInlineDefLint = (monaco: any, editor: any) => {
     const markers = matches.map((m: any) => ({
       severity: monaco.MarkerSeverity.Error,
       message:
-        "Define the handler first, then pass its name:\n\ndef handler():\n    ...\n\ninput.on_button_pressed(Button.X, handler)",
+        "Define the handler first, then pass its name:\n\ndef handler():\n    ...\n\ninput.on_button_pressed(Button.X, handler)  ...\ninput.button_is_pressed(Button.X, handler)",
       startLineNumber: m.range.startLineNumber,
       startColumn: m.range.startColumn,
       endLineNumber: m.range.endLineNumber,

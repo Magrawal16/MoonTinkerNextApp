@@ -1,6 +1,8 @@
 // src/python_code_editor/lib/Simulator.ts
 import { PythonInterpreter } from "../interpreter/PythonInterpreter";
-import { MicrobitSimulator, MicrobitEvent } from "../mock/microbitInstance";
+import { MicrobitEvent } from "../mock/types";
+import { MicrobitSimulator } from "../mock/microbitInstance";
+
 
 type SupportedLanguage = "python";
 type SupportedController = "microbit" | "microbitWithBreakout";
@@ -63,7 +65,7 @@ export class Simulator {
   }
 
   getStates() {
-    if (!this.microbit) throw new Error(this.options.controller +" controller not initialized at get state.");
+    if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at get state.");
     return this.microbit.getStateSnapshot();
   }
 

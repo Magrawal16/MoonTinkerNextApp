@@ -20,6 +20,12 @@ export const API = {
         `\t\${2:# your code}\n\n` +
         `input.on_button_pressed(Button.\${3|A,B,AB|}, \${1})\n`,
     },
+    button_is_pressed: {
+      sig: "input.button_is_pressed(button: Button) -> bool",
+      doc: "Register a handler that runs if the button is pressed.",
+      snippet:
+        `button_is_pressed(Button.\${3|A,B,AB|})\n`,
+    },
     on_logo_pressed: {
       sig: "input.on_logo_pressed(on_logo_down: () -> None) -> None",
       doc: "Register a handler that runs when the logo is pressed.",
@@ -41,10 +47,11 @@ export const API = {
     forever: {
       sig: "basic.forever(handler: () -> None) -> None",
       doc: "Run the given handler repeatedly with a short pause.",
-      snippet: "def loop():\n\t# your code\n\nbasic.forever(loop)\n",
+      snippet: "def on_forever():\n\t# your code\n\nbasic.forever(on_forever)\n",
     },
     pause: { sig: "basic.pause(ms: int) -> None", doc: "Pause execution for ms milliseconds." },
   },
+
   pins: {
     digital_write_pin: {
       sig: "pins.digital_write_pin(pin: DigitalPin, value: int) -> None",

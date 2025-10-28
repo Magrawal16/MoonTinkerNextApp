@@ -27,7 +27,6 @@ export const inOnButtonPressedSecondArg = (model: any, pos: { lineNumber: number
   const commaCount = (afterOpen.match(/,/g) || []).length;
   return commaCount >= 1; // second arg or later
 };
-
 // Convenience to register and track disposables
 export const push = (arr: { dispose: () => void }[], d: { dispose: () => void }) => {
   arr.push(d);

@@ -15,7 +15,7 @@ type AuthContextType = {
 // in the client code. Note: this is still client-side only and can be inspected
 // by an attacker, but it's better than keeping plaintext credentials.
 const AUTH_EMAIL_HASH =
-  "afcc361482b08532d8292a7fb863bd7d97f773b9e060117c7c8417979c167cc4";
+  "8d67a51449ff17be99a7a557abb06baeee86b491272ce1eff71ed1aa0d431ba9";
 const AUTH_PASSWORD_HASH =
   "df5c9730e148062ac3d5f069609832d406ec0e326b5c4ed12445b548b0f247a0";
 

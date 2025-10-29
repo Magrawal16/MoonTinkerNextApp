@@ -61,6 +61,7 @@ import {
 } from "./sharedBlockDefinitions";
 import { registerSliderField } from "./fields/SliderField";
 import { registerIconField } from "./fields/IconField";
+import { registerLedMatrixField } from "./fields/LedMatrixField";
 
 /**
  * Integration utilities for adding Python-to-Blockly conversion to existing Blockly editors
@@ -98,6 +99,11 @@ export class BlocklyPythonIntegration {
     }
     try {
       registerIconField();
+    } catch (e) {
+      // ignore double-registration in hot reload
+    }
+    try {
+      registerLedMatrixField();
     } catch (e) {
       // ignore double-registration in hot reload
     }

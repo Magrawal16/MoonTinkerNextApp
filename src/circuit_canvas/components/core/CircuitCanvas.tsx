@@ -11,6 +11,7 @@ import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
 import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
 import Konva from "konva";
 import styles from "@/circuit_canvas/styles/CircuitCanvas.module.css";
+import AuthHeader from "@/components/AuthHeader";
 import CircuitStorage from "@/circuit_canvas/components/core/CircuitStorage";
 import useCircuitShortcuts from "@/circuit_canvas/hooks/useCircuitShortcuts";
 import { getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
@@ -867,6 +868,10 @@ export default function CircuitCanvas() {
 
           <div className="flex flex-row items-center gap-2">
             <div className="relative">
+              {/* Inline user menu (profile) placed left of Start Simulation */}
+              <div className="absolute top-0 right-[125px] z-[1001]">
+                <AuthHeader inline />
+              </div>
               <button
                 className={`rounded-sm border-2 border-gray-300 shadow-lg text-black px-1 py-1 text-sm cursor-pointer ${simulationRunning
                   ? "bg-red-300 hover:shadow-red-600"
@@ -913,7 +918,7 @@ export default function CircuitCanvas() {
 
             <button
               onClick={() => setShowDebugBox((prev) => !prev)}
-              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105 me-20"
             >
               <VscDebug />
               <span>Debugger</span>
@@ -940,6 +945,7 @@ export default function CircuitCanvas() {
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
             /> */}
+            {/* auth dropdown removed (use global AuthHeader component) */}
           </div>
         </div>
         {selectedElement && showPropertiesPannel ? (

@@ -123,6 +123,66 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     },
   },
   {
+    // Basic: show leds with a 5x5 clickable matrix (MakeCode-style)
+    type: "basic_show_leds",
+    category: "Basic",
+    blockDefinition: {
+      type: "basic_show_leds",
+      message0: "show leds %1",
+      args0: [
+        {
+          type: "field_led_matrix",
+          name: "MATRIX",
+          value: ".....\n.....\n.....\n.....\n.....",
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Draw a 5×5 image and show it on the LED screen",
+    },
+    // Matches: basic.show_leds("""\n# . . . .\n. . . . .\n...\n""")
+    // Note: Our converter is line-based; this pattern is primarily for documentation and future use.
+    pythonPattern: /basic\.show_leds\(\s*(["']){3}([\s\S]*?)\1{3}\s*\)/g,
+    pythonGenerator: (block) => {
+      // Retrieve matrix value as 5 lines of '#' and '.'
+      const raw = (block.getFieldValue("MATRIX") || "") as string;
+      // Normalize to 5 lines x 5 cols and format with spaces as MakeCode shows
+      const rows = raw
+        .toString()
+        .replace(/\r/g, "")
+        .split("\n")
+        .slice(0, 5)
+        .map((line: string) => {
+          const markers = (line.match(/[#.]/g) || []).slice(0, 5);
+          while (markers.length < 5) markers.push(".");
+          return markers.join(" ");
+        });
+      while (rows.length < 5) rows.push(". . . . .");
+      const body = rows.join("\n");
+      return `basic.show_leds("""\n${body}\n""")\n`;
+    },
+    pythonExtractor: (match) => {
+      // Extract inner triple-quoted content and normalize to 5 lines of '#'/'.'
+      const inner = match[2] || "";
+      const onlyMarkers = inner
+        .replace(/\r/g, "")
+        .split("\n");
+      const rows: string[] = [];
+      for (let y = 0; y < 5; y++) {
+        const line = onlyMarkers[y] ?? "";
+        const markers = (line.match(/[#.]/g) || []).slice(0, 5);
+        while (markers.length < 5) markers.push(".");
+        rows.push(markers.join(""));
+      }
+      return { MATRIX: rows.join("\n") };
+    },
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("basic_show_leds");
+      block.setFieldValue(values.MATRIX || ".....\n.....\n.....\n.....\n.....", "MATRIX");
+      return block;
+    },
+  },
+  {
     type: "pause",
     category: "Basic",
     blockDefinition: {

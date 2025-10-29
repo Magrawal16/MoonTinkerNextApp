@@ -68,6 +68,54 @@ export class BasicModule {
         this.ledModule.clearDisplay();
     }
 
+    
+    /**
+     * Show a 5x5 LED pattern from a triple-quoted string using '#' for on and '.' (or space) for off.
+     * Compatible with MakeCode's Python form:
+     *   basic.show_leds("""
+     *   . # . . .
+     *   . . # . .
+     *   . . . # .
+     *   . . . . #
+     *   # . . . .
+     *   """)
+     */
+    showLeds(pattern: string): void {
+        if (typeof pattern !== "string") return;
+        // Normalize line endings and extract only '#' and '.' markers
+        const markers = pattern
+            .replace(/\r/g, "")
+            // Remove anything that's not a marker or newline
+            .replace(/[^#.\n]/g, "")
+            .split("")
+            .filter((c) => c === "#" || c === ".");
+
+        // If we didn't get 25 markers, try a line-based approach (take first 5 lines with 5 markers each)
+        let cells: ("#" | ".")[] = [];
+        if (markers.length >= 25) {
+            cells = markers.slice(0, 25) as ("#" | ".")[];
+        } else {
+            const lines = pattern.replace(/\r/g, "").split(/\n/).filter(Boolean);
+            for (const line of lines.slice(0, 5)) {
+                const row = (line.match(/[#.]/g) || []).slice(0, 5) as ("#" | ".")[];
+                while (row.length < 5) row.push(".");
+                cells.push(...row);
+                if (cells.length >= 25) break;
+            }
+            while (cells.length < 25) cells.push(".");
+        }
+
+        // Apply to LED matrix, row-major order
+        this.ledModule.clearDisplay();
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 5; x++) {
+                const idx = y * 5 + x;
+                if (cells[idx] === "#") this.ledModule.plot(x, y);
+                else this.ledModule.unplot(x, y);
+            }
+        }
+    }
+
     forever(callback: () => void) {
         const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(callback);
         this.foreverCallbacks.add(proxy);
@@ -102,6 +150,7 @@ export class BasicModule {
     getAPI() {
         return {
             show_string: this.showString.bind(this),
+            show_leds: this.showLeds.bind(this),
             forever: this.forever.bind(this),
             pause: this.pause.bind(this),
         };

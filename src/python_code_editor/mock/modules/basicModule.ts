@@ -11,6 +11,21 @@ export class BasicModule {
     ) { }
 
     async showString(text: string, interval: number = 150): Promise<void> {
+        // If a single valid character was passed, render it statically (no scrolling)
+        if (typeof text === "string" && text.length === 1 && CHARACTER_PATTERNS[text]) {
+            const pattern = CHARACTER_PATTERNS[text];
+            this.ledModule.clearDisplay();
+            for (let row = 0; row < 5; row++) {
+                for (let col = 0; col < 5; col++) {
+                    const on = !!(pattern[row] && pattern[row][col]);
+                    if (on) this.ledModule.plot(col, row);
+                    else this.ledModule.unplot(col, row);
+                }
+            }
+            return;
+        }
+
+        // Existing scrolling implementation for strings (unchanged)
         const validChars = text
             .split("")
             .filter((char) => CHARACTER_PATTERNS[char]);

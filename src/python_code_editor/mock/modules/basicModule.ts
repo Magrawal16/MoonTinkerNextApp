@@ -83,7 +83,34 @@ export class BasicModule {
         this.ledModule.clearDisplay();
     }
 
-    
+    /**
+     * Show a number (integer or decimal). If the input string contains any alphabetic
+     * characters the value is treated as 0. The numeric value is converted to string
+     * and displayed using showString (single digit renders statically; longer values scroll).
+     */
+    async showNumber(value: string | number): Promise<void> {
+        let num: number;
+        if (typeof value === "string") {
+            // If any alphabetic characters are present, treat as 0
+            if (/[A-Za-z]/.test(value)) {
+                num = 0;
+            } else {
+                const cleaned = value.replace(/,/g, "").trim();
+                num = Number(cleaned);
+                if (!Number.isFinite(num)) num = 0;
+            }
+        } else if (typeof value === "number") {
+            num = value;
+            if (!Number.isFinite(num)) num = 0;
+        } else {
+            num = 0;
+        }
+
+        // Format number string: keep decimal for non-integers
+        const str = Number.isInteger(num) ? num.toString() : num.toString();
+        await this.showString(str);
+    }
+
     /**
      * Show a 5x5 LED pattern from a triple-quoted string using '#' for on and '.' (or space) for off.
      * Compatible with MakeCode's Python form:
@@ -165,6 +192,7 @@ export class BasicModule {
     getAPI() {
         return {
             show_string: this.showString.bind(this),
+            show_number: this.showNumber.bind(this),
             show_leds: this.showLeds.bind(this),
             forever: this.forever.bind(this),
             pause: this.pause.bind(this),

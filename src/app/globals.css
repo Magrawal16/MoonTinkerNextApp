@@ -41,6 +41,13 @@ body {
   animation: slide-in-up 0.3s ease-out;
 }
 
+/* Ensure disabled Blockly blocks visibly fade even across custom themes */
+.blocklyDisabled path.blocklyBlockBackground,
+.blocklyDisabled .blocklyPath,
+.blocklyDisabled {
+  opacity: 0.45 !important;
+}
+
 /* for text editor */
 /* Monaco Editor: Transparent glass, dark text with shadow */
 /* Monaco Editor: Transparent glass, LIGHT text with subtle shadow for clarity */

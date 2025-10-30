@@ -37,8 +37,14 @@ export default function UnifiedEditor({
   setControllerCodeMap,
   stopSimulation,
 }: UnifiedEditorProps) {
-  // State management
-  const [editorMode, setEditorMode] = useState<EditorMode>("text");
+  // State management - Load persisted editor mode from localStorage
+  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('editorMode');
+      return (savedMode === 'block' || savedMode === 'text') ? savedMode : 'text';
+    }
+    return 'text';
+  });
   const [bidirectionalConverter, setBidirectionalConverter] =
     useState<BidirectionalConverter | null>(null);
   const [isUpdatingFromBlocks, setIsUpdatingFromBlocks] = useState(false);
@@ -71,6 +77,7 @@ export default function UnifiedEditor({
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevControllerRef = useRef<string | null>(activeControllerId);
   const localCodeRef = useRef<string>("");
+  const prevEditorModeRef = useRef<EditorMode>(editorMode);
 
   // Get current code
   let currentCode = controllerCodeMap[activeControllerId ?? ""] ?? "";
@@ -82,6 +89,62 @@ export default function UnifiedEditor({
     }
     localCodeRef.current = currentCode;
   }, [currentCode, activeControllerId, isUpdatingFromBlocks]);
+
+  // Persist editor mode to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('editorMode', editorMode);
+    }
+  }, [editorMode]);
+
+  // Reload blocks when switching back to block mode or when controller changes in block mode
+  useEffect(() => {
+    const prevMode = prevEditorModeRef.current;
+    const prevController = prevControllerRef.current;
+    
+    if (
+      editorMode === "block" &&
+      activeControllerId &&
+      workspaceReady &&
+      bidirectionalConverter &&
+      !isUpdatingFromBlocks &&
+      !isUpdatingFromCode &&
+      !isConverting
+    ) {
+      const currentCode = controllerCodeMap[activeControllerId] || "";
+      
+      // Check if we're reopening (mode switched to block or controller changed while in block mode)
+      const isReopening = 
+        (prevMode !== "block" && editorMode === "block") || // Switched to block mode
+        (prevController !== activeControllerId && activeControllerId); // Controller changed
+      
+      if (isReopening && currentCode.trim()) {
+        ("🔄 Reloading blocks from saved code...");
+        setIsUpdatingFromCode(true);
+        try {
+          workspaceRef.current?.clear();
+          bidirectionalConverter.pythonToBlocks(currentCode);
+          lastCodeRef.current = currentCode;
+        } catch (error) {
+          console.warn("⚠️ Could not reload blocks:", error);
+        } finally {
+          setTimeout(() => setIsUpdatingFromCode(false), 100);
+        }
+      }
+    }
+
+    // Update refs for next comparison
+    prevEditorModeRef.current = editorMode;
+  }, [
+    editorMode,
+    activeControllerId,
+    workspaceReady,
+    bidirectionalConverter,
+    controllerCodeMap,
+    isUpdatingFromBlocks,
+    isUpdatingFromCode,
+    isConverting,
+  ]);
 
   // Save any pending changes when switching controllers
   useEffect(() => {
@@ -102,10 +165,19 @@ export default function UnifiedEditor({
           [prevController]: localCode,
         }));
       }
+
+      // Clear Blockly focus when controller changes (but keep the blocks)
+      if (workspaceRef.current && editorMode === "block") {
+        try {
+          Blockly.getSelected()?.unselect();
+        } catch (error) {
+          console.warn("⚠️ Error clearing focus on controller change:", error);
+        }
+      }
     }
 
     prevControllerRef.current = activeControllerId;
-  }, [activeControllerId, localCode, controllerCodeMap]);
+  }, [activeControllerId, localCode, controllerCodeMap, editorMode]);
 
   /**
    * Initialize Blockly workspace with proper error handling
@@ -168,7 +240,7 @@ export default function UnifiedEditor({
 
       let conversionTimeout: NodeJS.Timeout | null = null;
 
-      workspace.addChangeListener((event) => {
+      const changeListener = (event: any) => {
         // Skip UI events and updates from code conversion
         if (event.isUiEvent || isUpdatingFromCode) return;
 
@@ -212,7 +284,11 @@ export default function UnifiedEditor({
             }
           }
         }, 300); // Increased debounce time from 100ms to 300ms
-      });
+      };
+
+      workspace.addChangeListener(changeListener);
+      // Store reference to remove listener later
+      (workspace as any).changeListener = changeListener;
 
       // Step 5: Mark as ready
       setWorkspaceReady(true);
@@ -312,10 +388,30 @@ export default function UnifiedEditor({
         }));
       }
 
+      // Clear focus state before disposing workspace
       if (workspaceRef.current) {
-        workspaceRef.current.dispose();
+        try {
+          Blockly.getSelected()?.unselect();
+          workspaceRef.current.clearUndo();
+          // Remove change listener if it exists
+          if ((workspaceRef.current as any).changeListener) {
+            workspaceRef.current.removeChangeListener(
+              (workspaceRef.current as any).changeListener
+            );
+            delete (workspaceRef.current as any).changeListener;
+          }
+        } catch (error) {
+          console.warn("⚠️ Error clearing workspace state during cleanup:", error);
+        }
+        
+        try {
+          workspaceRef.current.dispose();
+        } catch (error) {
+          console.warn("⚠️ Error disposing workspace during cleanup:", error);
+        }
         workspaceRef.current = null;
       }
+      
       // Clean up debounce timeout
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
@@ -395,6 +491,17 @@ export default function UnifiedEditor({
     setIsUpdatingFromCode(true);
 
     try {
+      // Clear any existing focus/selection before clearing workspace
+      try {
+        if (workspaceRef.current) {
+          Blockly.getSelected()?.unselect();
+          // Clear all event listeners temporarily
+          workspaceRef.current.clearUndo();
+        }
+      } catch (e) {
+        console.warn("⚠️ Error clearing focus before conversion:", e);
+      }
+
       // Clear workspace
       workspaceRef.current?.clear();
 
@@ -534,6 +641,15 @@ export default function UnifiedEditor({
       setIsConverting(true);
       setConversionType("toText");
 
+      // Clear any Blockly selection/focus before converting
+      try {
+        if (workspaceRef.current) {
+          Blockly.getSelected()?.unselect();
+        }
+      } catch (error) {
+        console.warn("⚠️ Error clearing Blockly selection:", error);
+      }
+
       // Convert blocks to code before switching modes
       if (bidirectionalConverter && activeControllerId && workspaceReady) {
         try {
@@ -572,6 +688,34 @@ export default function UnifiedEditor({
       setShowBlockModeConfirm(false);
       return;
     }
+    
+    // Clear any Blockly selection/focus before disposal
+    try {
+      if (workspaceRef.current) {
+        Blockly.getSelected()?.unselect();
+        // Remove all change listeners
+        const workspace = workspaceRef.current;
+        (workspace as any).removeChangeListener((workspace as any).changeListener);
+        workspaceRef.current.clearUndo();
+      }
+    } catch (error) {
+      console.warn("⚠️ Error clearing workspace state:", error);
+    }
+
+    // Dispose existing workspace completely
+    setWorkspaceReady(false);
+    if (workspaceRef.current) {
+      try {
+        workspaceRef.current.dispose();
+      } catch (error) {
+        console.warn("⚠️ Error disposing workspace during confirm switch:", error);
+      }
+      workspaceRef.current = null;
+    }
+
+    // Clear converter reference
+    setBidirectionalConverter(null);
+
     // Clear code for this controller
     setControllerCodeMap((prev) => ({ ...prev, [activeControllerId]: "" }));
     setLocalCode("");
@@ -584,22 +728,14 @@ export default function UnifiedEditor({
     setEditorMode("block");
     setValidationError(null);
 
-    // Dispose existing workspace and re-init so a default block is shown
-    setWorkspaceReady(false);
-    if (workspaceRef.current) {
-      try {
-        workspaceRef.current.dispose();
-      } catch (error) {
-        console.warn("⚠️ Error disposing workspace during confirm switch:", error);
-      }
-      workspaceRef.current = null;
-    }
-    // Initialize fresh workspace; since code is empty, init will add the default block
+    // Initialize fresh workspace after a delay to ensure DOM is ready
     setTimeout(() => {
       initializeWorkspace();
-      setIsConverting(false);
-      setConversionType(null);
-    }, 100);
+      setTimeout(() => {
+        setIsConverting(false);
+        setConversionType(null);
+      }, 300);
+    }, 150);
 
     setShowBlockModeConfirm(false);
   }, [activeControllerId, initializeWorkspace, setControllerCodeMap]);
@@ -615,6 +751,13 @@ export default function UnifiedEditor({
       const resizeTimer = setTimeout(() => {
         try {
           if (workspaceRef.current && workspaceRef.current.rendered) {
+            // Clear any stale focus state before resizing
+            try {
+              Blockly.getSelected()?.unselect();
+            } catch (e) {
+              // Ignore focus clearing errors
+            }
+
             // Use proper Blockly API for resizing
             const workspace = workspaceRef.current as any;
             if (workspace.resizeContents) {

@@ -78,6 +78,12 @@ export default function UnifiedEditor({
   const prevControllerRef = useRef<string | null>(activeControllerId);
   const localCodeRef = useRef<string>("");
   const prevEditorModeRef = useRef<EditorMode>(editorMode);
+  
+  // Always call the latest stopSimulation from async listeners
+  const stopSimulationRef = useRef(stopSimulation);
+  useEffect(() => {
+    stopSimulationRef.current = stopSimulation;
+  }, [stopSimulation]);
 
   // Get current code
   let currentCode = controllerCodeMap[activeControllerId ?? ""] ?? "";
@@ -241,17 +247,57 @@ export default function UnifiedEditor({
       let conversionTimeout: NodeJS.Timeout | null = null;
 
       const changeListener = (event: any) => {
-        // Skip UI events and updates from code conversion
-        if (event.isUiEvent || isUpdatingFromCode) return;
+        // Don't react while we're programmatically updating blocks from code
+        if (isUpdatingFromCode) return;
 
-        // Skip certain types of events that don't affect code generation
+        // Skip explicit UI-only events (clicks, selection, viewport/theme changes)
         if (
-          event.type === Blockly.Events.VIEWPORT_CHANGE ||
-          event.type === Blockly.Events.THEME_CHANGE ||
-          event.type === Blockly.Events.CLICK ||
-          event.type === Blockly.Events.SELECTED
+          event.type === (Blockly as any).Events.VIEWPORT_CHANGE ||
+          event.type === (Blockly as any).Events.THEME_CHANGE ||
+          event.type === (Blockly as any).Events.CLICK ||
+          event.type === (Blockly as any).Events.SELECTED
         ) {
           return;
+        }
+
+        // Determine if this event actually affects generated code
+        const isCreate =
+          event.type === (Blockly as any).Events.BLOCK_CREATE ||
+          event.type === (Blockly as any).Events.CREATE;
+        const isDelete =
+          event.type === (Blockly as any).Events.BLOCK_DELETE ||
+          event.type === (Blockly as any).Events.DELETE;
+        const isChange =
+          event.type === (Blockly as any).Events.BLOCK_CHANGE ||
+          event.type === (Blockly as any).Events.CHANGE;
+        const isMove =
+          event.type === (Blockly as any).Events.BLOCK_MOVE ||
+          event.type === (Blockly as any).Events.MOVE;
+
+        let affectsCode = false;
+        if (isCreate || isDelete) {
+          affectsCode = true; // Adding/removing blocks always affects code
+        } else if (isChange) {
+          const e: any = event;
+          // Stop for field value or mutation changes; ignore UI-ish ones
+          affectsCode =
+            e?.element === "field" ||
+            e?.element === "mutation" ||
+            e?.element === "disabled"; // disabled can change emitted code
+        } else if (isMove) {
+          const e: any = event;
+          // Only stop if the parent/input connection changed (affects code order/structure)
+          const parentChanged = e?.oldParentId !== e?.newParentId;
+          const inputChanged = e?.oldInputName !== e?.newInputName;
+          affectsCode = Boolean(parentChanged || inputChanged);
+        }
+
+        if (affectsCode) {
+          try {
+            stopSimulationRef.current?.();
+          } catch (_) {
+            // ignore
+          }
         }
 
         // Clear existing timeout to debounce rapid changes
@@ -275,7 +321,8 @@ export default function UnifiedEditor({
                 }));
 
                 lastCodeRef.current = generatedCode;
-                stopSimulation();
+                // stopSimulation already called above for structural events; keep here for completeness
+                stopSimulationRef.current?.();
               }
             } catch (error) {
               console.error("❌ Error in change listener conversion:", error);
@@ -461,7 +508,7 @@ export default function UnifiedEditor({
           [activeControllerId]: generatedCode,
         }));
 
-        stopSimulation();
+        stopSimulationRef.current?.();
       } else {
         ("⚡ Code unchanged, skipping update");
       }
@@ -662,7 +709,7 @@ export default function UnifiedEditor({
           setLocalCode(generatedCode);
 
           lastCodeRef.current = generatedCode;
-          stopSimulation();
+          stopSimulationRef.current?.();
         } catch (error) {
           console.error(
             "❌ Error converting blocks to code during mode switch:",

@@ -237,6 +237,74 @@ export default function UnifiedEditor({
 
       workspaceRef.current = workspace;
 
+      // --- Runtime enable/disable rules for LED statement blocks ---
+      const LED_STATEMENT_BLOCKS = new Set<string>([
+        "plot_led",
+        "unplot_led",
+        "toggle_led",
+        "plot_led_brightness",
+        "show_leds",
+      ]);
+      const EVENT_CONTAINER_BLOCKS = new Set<string>([
+        "forever",
+        "on_start",
+        "on_button_pressed",
+      ]);
+
+      const disabledTooltip =
+        "This block is disabled and will not run. Attach this block to an event to enable it.";
+
+      const updateLedBlockRunState = (blk: Blockly.Block | null | undefined) => {
+        if (!blk) return;
+        if (!LED_STATEMENT_BLOCKS.has(blk.type)) return;
+        const root = blk.getRootBlock();
+        const enabled = !!root && EVENT_CONTAINER_BLOCKS.has(root.type);
+        try {
+          // Force the true disabled state so Blockly applies the faded style and behavior
+          const anyBlk: any = blk as any;
+          if (typeof anyBlk.setEnabled === "function") {
+            anyBlk.setEnabled(enabled);
+          } else if (typeof anyBlk.setDisabled === "function") {
+            anyBlk.setDisabled(!enabled);
+          }
+          // Ask Blockly to recompute disabled rendering if API exists
+          if (typeof anyBlk.updateDisabled === "function") {
+            anyBlk.updateDisabled();
+          }
+          if (typeof anyBlk.render === "function") {
+            anyBlk.render();
+          }
+          // Ensure SVG reflects state immediately (some themes require the class toggle)
+          if (typeof anyBlk.getSvgRoot === "function") {
+            const svg = anyBlk.getSvgRoot();
+            if (svg && svg.classList) {
+              svg.classList.toggle("blocklyDisabled", !enabled);
+            }
+          }
+        } catch (_) {}
+        try {
+          if (!enabled) {
+            blk.setTooltip(disabledTooltip);
+          } else {
+            const defaultTooltips: Record<string, string> = {
+              plot_led: "Turn on LED at (x, y)",
+              unplot_led: "Turn off LED at (x, y)",
+              toggle_led: "Toggle LED at (x, y)",
+              plot_led_brightness: "Plot an LED at (x,y) with brightness 0-255",
+              show_leds: "Display pattern on LEDs",
+            };
+            blk.setTooltip(defaultTooltips[blk.type] || "");
+          }
+        } catch (_) {}
+      };
+
+      const updateAllLedBlockStates = () => {
+        try {
+          const all = workspaceRef.current?.getAllBlocks(false) || [];
+          (all as any[]).forEach((b) => updateLedBlockRunState(b as any));
+        } catch (_) {}
+      };
+
       // Step 3: Create converter
       const converter = new BidirectionalConverter(workspace, pythonGenerator);
       setBidirectionalConverter(converter);
@@ -291,6 +359,37 @@ export default function UnifiedEditor({
           const inputChanged = e?.oldInputName !== e?.newInputName;
           affectsCode = Boolean(parentChanged || inputChanged);
         }
+
+        // Update LED enable/disable visuals on any structural event
+        try {
+          let blocksToUpdate: Blockly.Block[] = [];
+          const w = workspaceRef.current;
+          if (!w) {
+            // no workspace
+          } else if ((event as any).blockId) {
+            const b = w.getBlockById((event as any).blockId);
+            if (b) blocksToUpdate.push(b);
+          } else if ((event as any).ids && Array.isArray((event as any).ids)) {
+            // e.g., BLOCK_CREATE provides an array of ids
+            for (const id of (event as any).ids) {
+              const b = w.getBlockById(id);
+              if (b) blocksToUpdate.push(b);
+            }
+          }
+
+          if (blocksToUpdate.length > 0) {
+            for (const b of blocksToUpdate) {
+              updateLedBlockRunState(b);
+              const root = b.getRootBlock();
+              if (root) {
+                const descendants = root.getDescendants(false) || [];
+                (descendants as any[]).forEach((d) => updateLedBlockRunState(d as any));
+              }
+            }
+          } else {
+            updateAllLedBlockStates();
+          }
+        } catch (_) {}
 
         if (affectsCode) {
           try {
@@ -372,6 +471,7 @@ export default function UnifiedEditor({
         setTimeout(() => {
           setIsConverting(false);
           setConversionType(null);
+          updateAllLedBlockStates();
         }, 200);
       }, 500);
     } catch (error) {

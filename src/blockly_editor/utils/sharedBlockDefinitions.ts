@@ -830,8 +830,43 @@ export class SharedBlockRegistry {
    * @param pythonGenerator The Blockly Python generator instance
    */
   static registerPythonGenerators(pythonGenerator: any): void {
+    const LED_STATEMENT_BLOCKS = new Set<string>([
+      "plot_led",
+      "unplot_led",
+      "toggle_led",
+      "plot_led_brightness",
+      "show_leds",
+    ]);
+    const EVENT_CONTAINER_BLOCKS = new Set<string>([
+      "forever",
+      "on_start",
+      "on_button_pressed",
+    ]);
+
     SHARED_MICROBIT_BLOCKS.forEach((block) => {
-      pythonGenerator.forBlock[block.type] = block.pythonGenerator;
+      const originalGen = block.pythonGenerator;
+      // Wrap generators so disabled LED statement blocks emit no code
+      pythonGenerator.forBlock[block.type] = (blk: any, gen: any) => {
+        try {
+          if (LED_STATEMENT_BLOCKS.has(blk?.type)) {
+            // Gate by enable state
+            const isDisabled = typeof blk.getInheritedDisabled === "function"
+              ? blk.getInheritedDisabled()
+              : (typeof blk.isEnabled === "function" ? !blk.isEnabled() : false);
+            if (isDisabled) return "";
+
+            // Gate by structural context: must be under an event container
+            const root = typeof blk.getRootBlock === "function" ? blk.getRootBlock() : null;
+            const rootType = root?.type as string | undefined;
+            if (!rootType || !EVENT_CONTAINER_BLOCKS.has(rootType)) {
+              return "";
+            }
+          }
+        } catch (_) {
+          // Fall through to generation on any unexpected error
+        }
+        return originalGen(blk, gen);
+      };
     });
   }
 

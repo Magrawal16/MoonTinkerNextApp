@@ -129,15 +129,19 @@ export class LedMatrixField extends Blockly.Field {
     foreignObject.setAttribute("pointer-events", "all");
     foreignObject.style.pointerEvents = "all";
 
-    // Create the inline preview container
+    // Create the inline preview container with modern styling
     this.previewEl = document.createElement("div");
     this.previewEl.style.display = "grid";
-    this.previewEl.style.gridTemplateColumns = "repeat(5, 16px)";
-    this.previewEl.style.gridTemplateRows = "repeat(5, 16px)";
+    this.previewEl.style.gridTemplateColumns = "repeat(5, 18px)";
+    this.previewEl.style.gridTemplateRows = "repeat(5, 18px)";
     this.previewEl.style.gap = "3px";
-    this.previewEl.style.padding = "4px";
+    this.previewEl.style.padding = "6px";
+    this.previewEl.style.backgroundColor = "rgba(15, 23, 42, 0.4)";
+    this.previewEl.style.borderRadius = "6px";
+    this.previewEl.style.border = "1px solid rgba(255, 255, 255, 0.1)";
     this.previewEl.style.cursor = "pointer";
     this.previewEl.style.userSelect = "none";
+    this.previewEl.style.boxShadow = "inset 0 2px 4px rgba(0, 0, 0, 0.2)";
 
     foreignObject.appendChild(this.previewEl);
     this.updateInlinePreview();
@@ -145,11 +149,11 @@ export class LedMatrixField extends Blockly.Field {
 
   // Override getSize to provide proper dimensions for the LED matrix
   getSize(): { width: number; height: number } {
-    // 5 LEDs × 16px + 4 gaps × 3px + padding 4px × 2 = 80 + 12 + 8 = 100px
-    return { width: 100, height: 100 };
+    // 5 LEDs × 18px + 4 gaps × 3px + padding 6px × 2 = 90 + 12 + 12 = 114px
+    return { width: 114, height: 114 };
   }
 
-  // Recreate child squares based on current pattern - no click handlers, just display
+  // Recreate child squares based on current pattern with modern styling
   private updateInlinePreview() {
     if (!this.previewEl) return;
     
@@ -165,12 +169,17 @@ export class LedMatrixField extends Blockly.Field {
       for (let x = 0; x < 5; x++) {
         const cell = document.createElement("div");
         const on = this.pattern[y]?.charAt(x) === "#";
-        cell.style.width = "16px";
-        cell.style.height = "16px";
-        cell.style.borderRadius = "2px";
-        cell.style.background = on ? "#ffd54f" : "#4848cbff";
-        cell.style.opacity = on ? "1" : "0.5";
-        cell.style.border = "1px solid #666";
+        cell.style.width = "18px";
+        cell.style.height = "18px";
+        cell.style.borderRadius = "3px";
+        cell.style.background = on 
+          ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 100%)" 
+          : "linear-gradient(135deg, #475569 0%, #334155 100%)";
+        cell.style.boxShadow = on 
+          ? "0 0 12px rgba(255, 193, 7, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.3)" 
+          : "inset 0 2px 4px rgba(0,0,0,0.4)";
+        cell.style.border = on ? "1px solid #FFE082" : "1px solid #1E293B";
+        cell.style.transition = "all 0.2s ease";
         
         this.previewEl.appendChild(cell);
       }
@@ -181,43 +190,59 @@ export class LedMatrixField extends Blockly.Field {
   protected override showEditor_(): void {
     const DropDownDiv = (Blockly as any).DropDownDiv;
     
-    // Create editor container
+    // Create editor container with blue theme and transparency to match block
     const editor = document.createElement("div");
-    editor.style.padding = "12px";
-    editor.style.backgroundColor = "#2a2a2a";
-    editor.style.borderRadius = "8px";
-    editor.style.boxShadow = "0 4px 12px rgba(0,0,0,0.3)";
+    editor.style.padding = "16px";
+    editor.style.backgroundColor = "rgba(72, 72, 203, 0.7)"; // Blue theme matching block - more transparent
+    editor.style.backdropFilter = "blur(12px)";
+    (editor.style as any).webkitBackdropFilter = "blur(12px)"; // Safari support
+    editor.style.borderRadius = "12px";
+    editor.style.boxShadow = "0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.2)";
+    editor.style.border = "1px solid rgba(255,255,255,0.3)";
     
-    // Title
+    // Title with modern styling
     const title = document.createElement("div");
-    title.textContent = "Click LEDs to toggle";
-    title.style.color = "#fff";
-    title.style.fontSize = "12px";
-    title.style.marginBottom = "8px";
+    title.textContent = "� LED Matrix Editor";
+    title.style.color = "#FFFFFF";
+    title.style.fontSize = "14px";
+    title.style.fontWeight = "600";
+    title.style.marginBottom = "12px";
     title.style.textAlign = "center";
+    title.style.letterSpacing = "0.5px";
+    title.style.textShadow = "0 2px 4px rgba(0,0,0,0.3)";
     editor.appendChild(title);
     
-    // LED Grid
+    // LED Grid with blue-themed glassmorphic design
     const grid = document.createElement("div");
     grid.style.display = "grid";
-    grid.style.gridTemplateColumns = "repeat(5, 32px)";
-    grid.style.gridTemplateRows = "repeat(5, 32px)";
-    grid.style.gap = "4px";
-    grid.style.marginBottom = "10px";
+    grid.style.gridTemplateColumns = "repeat(5, 36px)";
+    grid.style.gridTemplateRows = "repeat(5, 36px)";
+    grid.style.gap = "5px";
+    grid.style.marginBottom = "14px";
+    grid.style.padding = "10px";
+    grid.style.backgroundColor = "rgba(50, 50, 180, 0.3)"; // Blue background - more transparent
+    grid.style.borderRadius = "10px";
+    grid.style.border = "1px solid rgba(255,255,255,0.2)";
+    grid.style.boxShadow = "inset 0 2px 8px rgba(0,0,0,0.3)";
     
-    // Create LED cells
+    // Create LED cells with premium styling
     const cells: HTMLDivElement[] = [];
     for (let y = 0; y < 5; y++) {
       for (let x = 0; x < 5; x++) {
         const cell = document.createElement("div");
         const on = this.pattern[y]?.charAt(x) === "#";
-        cell.style.width = "32px";
-        cell.style.height = "32px";
-        cell.style.borderRadius = "4px";
-        cell.style.background = on ? "#ffd54f" : "#1a1a1a";
-        cell.style.border = "2px solid #555";
+        cell.style.width = "36px";
+        cell.style.height = "36px";
+        cell.style.borderRadius = "6px";
+        cell.style.background = on 
+          ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 50%, #FFB300 100%)" 
+          : "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)"; // Brighter blue when off
+        cell.style.boxShadow = on 
+          ? "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
+          : "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
+        cell.style.border = on ? "2px solid #FFE082" : "2px solid rgba(255,255,255,0.2)";
         cell.style.cursor = "pointer";
-        cell.style.transition = "all 0.1s";
+        cell.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
         
         // Click to toggle
         cell.addEventListener("click", () => {
@@ -228,9 +253,15 @@ export class LedMatrixField extends Blockly.Field {
           row[x] = row[x] === "#" ? "." : "#";
           this.pattern[y] = row.join("");
           
-          // Update visual
+          // Update visual with gradient
           const newState = row[x] === "#";
-          cell.style.background = newState ? "#ffd54f" : "#1a1a1a";
+          cell.style.background = newState 
+            ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 50%, #FFB300 100%)" 
+            : "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)"; // Brighter blue when off
+          cell.style.boxShadow = newState 
+            ? "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
+            : "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
+          cell.style.border = newState ? "2px solid #FFE082" : "2px solid rgba(255,255,255,0.2)";
           
           const newValue = this.pattern.join("\n");
           
@@ -254,15 +285,27 @@ export class LedMatrixField extends Blockly.Field {
           this.updateInlinePreview();
         });
         
-        // Hover effect
+        // Enhanced hover effect with smooth animations
         cell.addEventListener("mouseenter", () => {
-          cell.style.transform = "scale(1.05)";
-          cell.style.borderColor = "#ffd54f";
+          const isOn = this.pattern[y]?.charAt(x) === "#";
+          cell.style.transform = "scale(1.08) translateY(-1px)";
+          cell.style.filter = "brightness(1.25)";
+          if (!isOn) {
+            cell.style.background = "linear-gradient(135deg, #7A7AFF 0%, #6868FF 100%)"; // Even brighter blue on hover
+          } else {
+            cell.style.boxShadow = "0 0 25px rgba(255, 193, 7, 1), 0 6px 16px rgba(255, 193, 7, 0.6), inset 0 1px 3px rgba(255, 255, 255, 0.4)";
+          }
         });
         
         cell.addEventListener("mouseleave", () => {
-          cell.style.transform = "scale(1)";
-          cell.style.borderColor = "#555";
+          const isOn = this.pattern[y]?.charAt(x) === "#";
+          cell.style.transform = "scale(1) translateY(0)";
+          cell.style.filter = "brightness(1)";
+          if (!isOn) {
+            cell.style.background = "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)";
+          } else {
+            cell.style.boxShadow = "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)";
+          }
         });
         
         cells.push(cell);
@@ -271,21 +314,38 @@ export class LedMatrixField extends Blockly.Field {
     }
     editor.appendChild(grid);
     
-    // Action buttons
+    // Action buttons with blue-themed glassmorphic design
     const actions = document.createElement("div");
     actions.style.display = "flex";
-    actions.style.gap = "8px";
+    actions.style.gap = "10px";
     actions.style.justifyContent = "center";
     
     const clearBtn = document.createElement("button");
-    clearBtn.textContent = "Clear";
-    clearBtn.style.padding = "6px 16px";
-    clearBtn.style.backgroundColor = "#444";
-    clearBtn.style.color = "#fff";
-    clearBtn.style.border = "none";
-    clearBtn.style.borderRadius = "4px";
+    clearBtn.textContent = "🗑️ Clear";
+    clearBtn.style.padding = "8px 18px";
+    clearBtn.style.backgroundColor = "rgba(72, 72, 203, 0.6)"; // Matching blue theme - more transparent
+    clearBtn.style.color = "#FFFFFF";
+    clearBtn.style.border = "1px solid rgba(255,255,255,0.3)";
+    clearBtn.style.borderRadius = "8px";
     clearBtn.style.cursor = "pointer";
     clearBtn.style.fontSize = "12px";
+    clearBtn.style.fontWeight = "600";
+    clearBtn.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
+    clearBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+    clearBtn.style.backdropFilter = "blur(4px)";
+    clearBtn.style.textShadow = "0 1px 2px rgba(0,0,0,0.3)";
+    
+    // Hover effects for Clear button
+    clearBtn.addEventListener("mouseenter", () => {
+      clearBtn.style.backgroundColor = "rgba(90, 90, 220, 0.8)";
+      clearBtn.style.transform = "translateY(-2px)";
+      clearBtn.style.boxShadow = "0 4px 12px rgba(0,0,0,0.4)";
+    });
+    clearBtn.addEventListener("mouseleave", () => {
+      clearBtn.style.backgroundColor = "rgba(72, 72, 203, 0.6)";
+      clearBtn.style.transform = "translateY(0)";
+      clearBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
+    });
     clearBtn.addEventListener("click", () => {
       const oldValue = this.pattern.join("\n");
       this.pattern = LedMatrixField.normalizeToRows(LedMatrixField.defaultPattern());
@@ -307,9 +367,11 @@ export class LedMatrixField extends Blockly.Field {
         );
       }
       
-      // Refresh cells
+      // Refresh cells with blue gradient styling
       for (let i = 0; i < 25; i++) {
-        cells[i].style.background = "#1a1a1a";
+        cells[i].style.background = "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)";
+        cells[i].style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
+        cells[i].style.border = "2px solid rgba(255,255,255,0.2)";
       }
       
       // Update inline preview
@@ -317,14 +379,31 @@ export class LedMatrixField extends Blockly.Field {
     });
     
     const invertBtn = document.createElement("button");
-    invertBtn.textContent = "Invert";
-    invertBtn.style.padding = "6px 16px";
-    invertBtn.style.backgroundColor = "#444";
-    invertBtn.style.color = "#fff";
-    invertBtn.style.border = "none";
-    invertBtn.style.borderRadius = "4px";
+    invertBtn.textContent = "🔄 Invert";
+    invertBtn.style.padding = "8px 18px";
+    invertBtn.style.backgroundColor = "rgba(255, 193, 7, 0.7)";
+    invertBtn.style.color = "#000000";
+    invertBtn.style.border = "1px solid rgba(255,255,255,0.25)";
+    invertBtn.style.borderRadius = "8px";
     invertBtn.style.cursor = "pointer";
     invertBtn.style.fontSize = "12px";
+    invertBtn.style.fontWeight = "600";
+    invertBtn.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
+    invertBtn.style.boxShadow = "0 2px 8px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)";
+    invertBtn.style.backdropFilter = "blur(4px)";
+    invertBtn.style.textShadow = "0 1px 2px rgba(255,255,255,0.3)";
+    
+    // Hover effects for Invert button
+    invertBtn.addEventListener("mouseenter", () => {
+      invertBtn.style.backgroundColor = "rgba(255, 214, 51, 0.9)";
+      invertBtn.style.transform = "translateY(-2px)";
+      invertBtn.style.boxShadow = "0 4px 16px rgba(255, 193, 7, 0.6), 0 0 30px rgba(255, 193, 7, 0.3)";
+    });
+    invertBtn.addEventListener("mouseleave", () => {
+      invertBtn.style.backgroundColor = "rgba(255, 193, 7, 0.7)";
+      invertBtn.style.transform = "translateY(0)";
+      invertBtn.style.boxShadow = "0 2px 8px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)";
+    });
     invertBtn.addEventListener("click", () => {
       const oldValue = this.pattern.join("\n");
       this.pattern = this.pattern.map(row =>
@@ -348,12 +427,18 @@ export class LedMatrixField extends Blockly.Field {
         );
       }
       
-      // Refresh cells
+      // Refresh cells with gradient styling
       for (let i = 0; i < 25; i++) {
         const y = Math.floor(i / 5);
         const x = i % 5;
         const on = this.pattern[y]?.charAt(x) === "#";
-        cells[i].style.background = on ? "#ffd54f" : "#1a1a1a";
+        cells[i].style.background = on 
+          ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 50%, #FFB300 100%)" 
+          : "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)"; // Brighter blue when off
+        cells[i].style.boxShadow = on 
+          ? "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
+          : "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
+        cells[i].style.border = on ? "2px solid #FFE082" : "2px solid rgba(255,255,255,0.2)";
       }
       
       // Update inline preview
@@ -364,10 +449,14 @@ export class LedMatrixField extends Blockly.Field {
     actions.appendChild(invertBtn);
     editor.appendChild(actions);
     
-    // Show the editor
+    // Show the editor with blue-themed transparent background
     DropDownDiv.clearContent();
-    DropDownDiv.getContentDiv().appendChild(editor);
-    DropDownDiv.setColour("#2a2a2a", "#2a2a2a");
+    const contentDiv = DropDownDiv.getContentDiv();
+    contentDiv.appendChild(editor);
+    
+    // Set blue transparent background color to match block theme - more transparent
+    DropDownDiv.setColour("rgba(72, 72, 203, 0.7)", "rgba(72, 72, 203, 0.7)");
+    
     DropDownDiv.showPositionedByField(this, () => {
       // On close, update the inline preview
       this.updateInlinePreview();

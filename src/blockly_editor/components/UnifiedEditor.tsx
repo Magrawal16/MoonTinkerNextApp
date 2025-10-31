@@ -248,6 +248,7 @@ export default function UnifiedEditor({
         "show_leds",
         // BASIC
         "show_string",
+        "show_number",
         "basic_show_leds",
         "pause",
         "show_icon",
@@ -302,6 +303,7 @@ export default function UnifiedEditor({
               plot_led_brightness: "Plot an LED at (x,y) with brightness 0-255",
               show_leds: "Display pattern on LEDs",
               show_string: "Show a string on the display",
+              show_number: "Show a number on the display",
               basic_show_leds: "Draw a 5×5 image and show it on the LED screen",
               pause: "Pause execution",
               show_icon: "Show a predefined icon on the LED matrix",

@@ -110,7 +110,7 @@ export class PythonInterpreter {
 
   private transformCode(code: string): string {
     // List of blocking functions to insert `await` before
-    const awaitFunctions = ["basic.show_string", "basic.pause"];
+    const awaitFunctions = ["basic.show_string", "basic.show_number", "basic.pause"];
 
     const lines = code.split("\n");
     const transformedLines = lines.map((line) => {

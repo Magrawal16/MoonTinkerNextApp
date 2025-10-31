@@ -22,6 +22,8 @@ export class BasicModule {
                     else this.ledModule.unplot(col, row);
                 }
             }
+            // Add a small delay so single characters are visible before next operation
+            await new Promise((resolve) => setTimeout(resolve, 400));
             return;
         }
 
@@ -173,7 +175,8 @@ export class BasicModule {
             }
             setTimeout(runCallback, 20);
         };
-        setTimeout(runCallback, 20);
+        // Start after a delay to allow on_start() to complete
+        setTimeout(runCallback, 100);
     }
 
     async pause(ms: number) {

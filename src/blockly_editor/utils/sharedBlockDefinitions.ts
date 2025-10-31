@@ -123,6 +123,37 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     },
   },
   {
+    type: "show_number",
+    category: "Basic",
+    blockDefinition: {
+      type: "show_number",
+      message0: "show number %1",
+      args0: [
+        {
+          type: "field_number",
+          name: "NUM",
+          value: 0,
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Show a number on the display",
+    },
+    pythonPattern: /basic\.show_number\((-?\d+(?:\.\d+)?)\)/g,
+    pythonGenerator: (block) => {
+      const num = block.getFieldValue("NUM");
+      return `basic.show_number(${num})\n`;
+    },
+    pythonExtractor: (match) => ({
+      NUM: parseFloat(match[1]),
+    }),
+    blockCreator: (workspace, values) => {
+      return createAndInitializeBlock(workspace, "show_number", {
+        NUM: values.NUM,
+      });
+    },
+  },
+  {
     // Basic: show leds with a 5x5 clickable matrix (MakeCode-style)
     type: "basic_show_leds",
     category: "Basic",
@@ -839,6 +870,7 @@ export class SharedBlockRegistry {
       "show_leds",
       // BASIC
       "show_string",
+      "show_number",
       "basic_show_leds",
       "pause",
       "show_icon",

@@ -237,13 +237,22 @@ export default function UnifiedEditor({
 
       workspaceRef.current = workspace;
 
-      // --- Runtime enable/disable rules for LED statement blocks ---
-      const LED_STATEMENT_BLOCKS = new Set<string>([
+      // --- Runtime enable/disable rules for blocks that must live under an event ---
+      // Led + Basic + Logic statement blocks
+      const GATED_BLOCK_TYPES = new Set<string>([
+        // LED
         "plot_led",
         "unplot_led",
         "toggle_led",
         "plot_led_brightness",
         "show_leds",
+        // BASIC
+        "show_string",
+        "basic_show_leds",
+        "pause",
+        "show_icon",
+        // LOGIC
+        "controls_if",
       ]);
       const EVENT_CONTAINER_BLOCKS = new Set<string>([
         "forever",
@@ -256,7 +265,7 @@ export default function UnifiedEditor({
 
       const updateLedBlockRunState = (blk: Blockly.Block | null | undefined) => {
         if (!blk) return;
-        if (!LED_STATEMENT_BLOCKS.has(blk.type)) return;
+        if (!GATED_BLOCK_TYPES.has(blk.type)) return;
         const root = blk.getRootBlock();
         const enabled = !!root && EVENT_CONTAINER_BLOCKS.has(root.type);
         try {
@@ -292,6 +301,11 @@ export default function UnifiedEditor({
               toggle_led: "Toggle LED at (x, y)",
               plot_led_brightness: "Plot an LED at (x,y) with brightness 0-255",
               show_leds: "Display pattern on LEDs",
+              show_string: "Show a string on the display",
+              basic_show_leds: "Draw a 5×5 image and show it on the LED screen",
+              pause: "Pause execution",
+              show_icon: "Show a predefined icon on the LED matrix",
+              controls_if: "If / else if / else",
             };
             blk.setTooltip(defaultTooltips[blk.type] || "");
           }
@@ -360,33 +374,36 @@ export default function UnifiedEditor({
           affectsCode = Boolean(parentChanged || inputChanged);
         }
 
-        // Update LED enable/disable visuals on any structural event
+        // Update LED enable/disable visuals
         try {
-          let blocksToUpdate: Blockly.Block[] = [];
           const w = workspaceRef.current;
           if (!w) {
             // no workspace
-          } else if ((event as any).blockId) {
-            const b = w.getBlockById((event as any).blockId);
-            if (b) blocksToUpdate.push(b);
-          } else if ((event as any).ids && Array.isArray((event as any).ids)) {
-            // e.g., BLOCK_CREATE provides an array of ids
-            for (const id of (event as any).ids) {
-              const b = w.getBlockById(id);
-              if (b) blocksToUpdate.push(b);
+          } else if (isCreate || isDelete) {
+            // Creation or deletion can change roots -> recompute all
+            updateAllLedBlockStates();
+          } else if (isMove) {
+            const e: any = event;
+            const parentChanged = e?.oldParentId !== e?.newParentId;
+            const inputChanged = e?.oldInputName !== e?.newInputName;
+            if (parentChanged || inputChanged) {
+              // Connections changed -> recompute all so we don't miss blocks that left a root
+              updateAllLedBlockStates();
+            } else if ((event as any).blockId) {
+              // Pure XY move; update just this block (safe but optional)
+              const b = w.getBlockById((event as any).blockId);
+              if (b) updateLedBlockRunState(b);
             }
-          }
-
-          if (blocksToUpdate.length > 0) {
-            for (const b of blocksToUpdate) {
-              updateLedBlockRunState(b);
-              const root = b.getRootBlock();
-              if (root) {
-                const descendants = root.getDescendants(false) || [];
-                (descendants as any[]).forEach((d) => updateLedBlockRunState(d as any));
-              }
+          } else if (isChange) {
+            const e: any = event;
+            if (e?.element === "disabled" || e?.element === "mutation") {
+              updateAllLedBlockStates();
+            } else if ((event as any).blockId) {
+              const b = w.getBlockById((event as any).blockId);
+              if (b) updateLedBlockRunState(b);
             }
           } else {
+            // Fallback
             updateAllLedBlockStates();
           }
         } catch (_) {}

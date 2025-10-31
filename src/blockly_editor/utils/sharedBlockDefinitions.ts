@@ -830,12 +830,20 @@ export class SharedBlockRegistry {
    * @param pythonGenerator The Blockly Python generator instance
    */
   static registerPythonGenerators(pythonGenerator: any): void {
-    const LED_STATEMENT_BLOCKS = new Set<string>([
+    const GATED_BLOCKS = new Set<string>([
+      // LED
       "plot_led",
       "unplot_led",
       "toggle_led",
       "plot_led_brightness",
       "show_leds",
+      // BASIC
+      "show_string",
+      "basic_show_leds",
+      "pause",
+      "show_icon",
+      // LOGIC
+      "controls_if",
     ]);
     const EVENT_CONTAINER_BLOCKS = new Set<string>([
       "forever",
@@ -848,7 +856,7 @@ export class SharedBlockRegistry {
       // Wrap generators so disabled LED statement blocks emit no code
       pythonGenerator.forBlock[block.type] = (blk: any, gen: any) => {
         try {
-          if (LED_STATEMENT_BLOCKS.has(blk?.type)) {
+          if (GATED_BLOCKS.has(blk?.type)) {
             // Gate by enable state
             const isDisabled = typeof blk.getInheritedDisabled === "function"
               ? blk.getInheritedDisabled()

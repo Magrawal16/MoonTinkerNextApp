@@ -50,8 +50,9 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: "Input", color: 290 },
   { name: "Led", color: 300 },
   { name: "Logic", color: 180.72 },
-  { name: "Math", color: "#F06292" },
+  // Place Variables directly after Logic (to match MakeCode ordering)
   { name: "Variables", color: "#BA68C8" },
+  { name: "Math", color: "#F06292" },
 ];
 
 /**
@@ -600,9 +601,42 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       const btn = block.getFieldValue("BUTTON");
       const statements = generator.statementToCode(block, "DO");
       const funcName = `on_button_pressed_${btn.toLowerCase()}`;
-      // Indent statements and register handler
-      const body = statements ? statements.replace(/^/gm, "    ") : "    pass\n";
-      return `def ${funcName}():\n${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
+      // Collect variables used in this handler
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const used = new Set<string>();
+      const assigned = new Set<string>();
+      try {
+        const getName = (ws: any, id: string) => {
+          try {
+            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
+            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
+          } catch { return "x"; }
+        };
+        const doInput = block.getInputTargetBlock("DO");
+        if (doInput) {
+          const desc = doInput.getDescendants(false);
+          for (const d of desc) {
+            if (!d || !d.type) continue;
+            if (d.type === "variables_get") {
+              const id = d.getFieldValue("VAR");
+              used.add(getName(block.workspace, id));
+            } else if (d.type === "variables_set") {
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+              assigned.add(name);
+            } else if (d.type === "math_change") {
+              // change requires a prior value -> treat as usage, not a defining assignment
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+            }
+          }
+        }
+      } catch (_) {}
+      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
+      const body = statements ? statements.replace(/^/gm, IND) : `${IND}pass\n`;
+      return `def ${funcName}():\n${initLines}${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
     },
     pythonExtractor: (match) => ({
       BUTTON: (match[3] || match[1]).toUpperCase(),
@@ -668,10 +702,44 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     pythonGenerator: (block, generator) => {
       const statements = generator.statementToCode(block, "DO");
       const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      // Collect variables used in this container
+      const used = new Set<string>();
+      const assigned = new Set<string>();
+      try {
+        const getName = (ws: any, id: string) => {
+          try {
+            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
+            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
+          } catch { return "x"; }
+        };
+        const doInput = block.getInputTargetBlock("DO");
+        if (doInput) {
+          const desc = doInput.getDescendants(false);
+          for (const d of desc) {
+            if (!d || !d.type) continue;
+            if (d.type === "variables_get") {
+              const id = d.getFieldValue("VAR");
+              used.add(getName(block.workspace, id));
+            } else if (d.type === "variables_set") {
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+              assigned.add(name);
+            } else if (d.type === "math_change") {
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+            }
+          }
+        }
+      } catch (_) {}
+      // Initialize variables that are used but not explicitly set
+      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
+
       const body = statements && statements.trim().length > 0
         ? statements // already correctly indented by Blockly for a nested statement
         : IND + "# your code here\n";
-      return `def on_forever():\n${body}basic.forever(on_forever)\n`;
+      return `def on_forever():\n${initLines}${body}basic.forever(on_forever)\n`;
     },
     pythonExtractor: (_match) => ({
       STATEMENTS: "",
@@ -694,10 +762,41 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     pythonPattern: /def\s+on_start\(\s*\)\s*:([\s\S]*?)(?=\n(?:\S|$))/g,
     pythonGenerator: (block, generator) => {
       const statements = generator.statementToCode(block, "DO");
-      return `def on_start():\n${statements.replace(
-        /^/gm,
-        "    "
-      )}\non_start()\n`;
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      // Collect variables used in on_start
+      const used = new Set<string>();
+      const assigned = new Set<string>();
+      try {
+        const getName = (ws: any, id: string) => {
+          try {
+            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
+            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
+          } catch { return "x"; }
+        };
+        const doInput = block.getInputTargetBlock("DO");
+        if (doInput) {
+          const desc = doInput.getDescendants(false);
+          for (const d of desc) {
+            if (!d || !d.type) continue;
+            if (d.type === "variables_get") {
+              const id = d.getFieldValue("VAR");
+              used.add(getName(block.workspace, id));
+            } else if (d.type === "variables_set") {
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+              assigned.add(name);
+            } else if (d.type === "math_change") {
+              const id = d.getFieldValue("VAR");
+              const name = getName(block.workspace, id);
+              used.add(name);
+            }
+          }
+        }
+      } catch (_) {}
+      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
+      const bodyIndented = statements ? statements.replace(/^/gm, IND) : `${IND}pass\n`;
+      return `def on_start():\n${initLines}${bodyIndented}\non_start()\n`;
     },
     pythonExtractor: (match) => ({
       STATEMENTS: match[1].trim(),
@@ -908,6 +1007,42 @@ export class SharedBlockRegistry {
         return originalGen(blk, gen);
       };
     });
+
+    // --- Built-in Variables blocks (not part of SHARED_MICROBIT_BLOCKS) ---
+    const resolveVarName = (workspace: any, varIdOrName: string): string => {
+      try {
+        const model = typeof workspace?.getVariableById === "function"
+          ? workspace.getVariableById(varIdOrName)
+          : null;
+        if (model && model.name) return model.name;
+      } catch (_) {}
+      // If varIdOrName already looks like a readable name, use it; else default
+      if (varIdOrName && !/^[a-f0-9-]{8,}$/i.test(varIdOrName)) return varIdOrName;
+      return "x";
+    };
+
+    // variables_set: name = value
+    pythonGenerator.forBlock["variables_set"] = (block: any, generator: any) => {
+      const varId = block.getFieldValue("VAR");
+      const name = resolveVarName(block.workspace, varId);
+      const rhs = generator.valueToCode(block, "VALUE", generator.ORDER_NONE) || "0";
+      return `${name} = ${rhs}\n`;
+    };
+
+    // math_change: name += delta
+    pythonGenerator.forBlock["math_change"] = (block: any, generator: any) => {
+      const varId = block.getFieldValue("VAR");
+      const name = resolveVarName(block.workspace, varId);
+      const delta = generator.valueToCode(block, "DELTA", generator.ORDER_NONE) || "1";
+      return `${name} += ${delta}\n`;
+    };
+
+    // variables_get: expression use
+    pythonGenerator.forBlock["variables_get"] = (block: any, generator: any) => {
+      const varId = block.getFieldValue("VAR");
+      const name = resolveVarName(block.workspace, varId);
+      return [name, generator.ORDER_ATOMIC || 0];
+    };
   }
 
   /**
@@ -1160,32 +1295,86 @@ export function createToolboxXmlFromBlocks(): string {
     return `<block type="${block.type}">${fieldsXml}\n    </block>`;
   }
 
-  // Compose category XML blocks
+  // Compose category XML blocks following BLOCK_CATEGORIES order
   let xml = `<xml xmlns="https://developers.google.com/blockly/xml">\n`;
 
-  // Sort categories alphabetically or keep order as in BLOCK_CATEGORIES
-  const categoriesInOrder = Object.keys(blocksByCategory).sort((a, b) => {
-    const aIndex = BLOCK_CATEGORIES.findIndex((c) => c.name === a);
-    const bIndex = BLOCK_CATEGORIES.findIndex((c) => c.name === b);
-    if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
-    if (aIndex === -1) return 1;
-    if (bIndex === -1) return -1;
-    return aIndex - bIndex;
-  });
-
-  for (const categoryName of categoriesInOrder) {
+  const emitted: Set<string> = new Set();
+  for (const { name: categoryName } of BLOCK_CATEGORIES) {
     const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
-    xml += `  <category name="${categoryName}" colour="${color}">\n`;
+    if (categoryName === "Variables") {
+      // Explicit Variables category matching MakeCode with button + shadows
+      xml += `  <category name="${categoryName}" colour="${color}">\n`;
+      // Make a Variable button (callback registered during workspace init)
+      xml += `    <button text="Make a Variable..." callbackKey="CREATE_VARIABLE"/>\n`;
+      // set x to 0 (VALUE shadow)
+      xml += `    <block type="variables_set">\n`;
+      xml += `      <field name="VAR">x</field>\n`;
+      xml += `      <value name="VALUE">\n`;
+      xml += `        <shadow type="math_number">\n`;
+      xml += `          <field name="NUM">0</field>\n`;
+      xml += `        </shadow>\n`;
+      xml += `      </value>\n`;
+      xml += `    </block>\n`;
+      // change x by 1 (DELTA shadow)
+      xml += `    <block type="math_change">\n`;
+      xml += `      <field name="VAR">x</field>\n`;
+      xml += `      <value name="DELTA">\n`;
+      xml += `        <shadow type="math_number">\n`;
+      xml += `          <field name="NUM">1</field>\n`;
+      xml += `        </shadow>\n`;
+      xml += `      </value>\n`;
+      xml += `    </block>\n`;
+      // variable reporter
+      xml += `    <block type="variables_get">\n`;
+      xml += `      <field name="VAR">x</field>\n`;
+      xml += `    </block>\n`;
+      xml += `  </category>\n`;
+      emitted.add(categoryName);
+      continue;
+    }
 
     const blocks = blocksByCategory[categoryName];
+    if (blocks && blocks.length > 0) {
+      xml += `  <category name="${categoryName}" colour="${color}">\n`;
+      for (const block of blocks) {
+        xml += `    ${generateBlockXml(block)}\n`;
+      }
+      // Include a couple of essential built-in blocks for better usability
+      if (categoryName === "Logic") {
+        // Comparison block for conditions (e.g., X == 0) with number shadows, like MakeCode
+        xml += `    <block type="logic_compare">\n`;
+        xml += `      <field name="OP">EQ</field>\n`;
+        xml += `      <value name="A">\n`;
+        xml += `        <shadow type="math_number">\n`;
+        xml += `          <field name="NUM">0</field>\n`;
+        xml += `        </shadow>\n`;
+        xml += `      </value>\n`;
+        xml += `      <value name="B">\n`;
+        xml += `        <shadow type="math_number">\n`;
+        xml += `          <field name="NUM">0</field>\n`;
+        xml += `        </shadow>\n`;
+        xml += `      </value>\n`;
+        xml += `    </block>\n`;
+        
+      }
+      xml += `  </category>\n`;
+      emitted.add(categoryName);
+    }
+  }
+
+  // Emit any remaining categories (including Uncategorized) that weren't listed explicitly
+  for (const categoryName of Object.keys(blocksByCategory)) {
+    if (emitted.has(categoryName)) continue;
+    const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
+    const blocks = blocksByCategory[categoryName];
+    if (!blocks || blocks.length === 0) continue;
+    xml += `  <category name="${categoryName}" colour="${color}">\n`;
     for (const block of blocks) {
       xml += `    ${generateBlockXml(block)}\n`;
     }
-
     xml += `  </category>\n`;
   }
 
   xml += `</xml>`;
-  (xml);
   return xml;
 }

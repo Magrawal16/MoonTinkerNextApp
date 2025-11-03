@@ -108,6 +108,11 @@ export class BlocklyPythonIntegration {
       // ignore double-registration in hot reload
     }
     SharedBlockRegistry.registerBlocks();
+
+    // Enhance the built-in Variables flyout to include a default 0 shadow on
+    // the "set <var> to" block, matching MakeCode UX. This keeps the dynamic
+    // list and button behavior, while making the set block usable immediately.
+    // No flyout overrides needed: Variables category is explicitly defined in the toolbox
   }
 
   /**

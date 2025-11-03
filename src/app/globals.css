@@ -41,7 +41,15 @@ body {
   animation: slide-in-up 0.3s ease-out;
 }
 
+/* Ensure disabled Blockly blocks visibly fade even across custom themes */
+.blocklyDisabled path.blocklyBlockBackground,
+.blocklyDisabled .blocklyPath,
+.blocklyDisabled {
+  opacity: 0.45 !important;
+}
+
 /* for text editor */
+/* Monaco Editor: Transparent glass, dark text with shadow */
 /* Monaco Editor: Transparent glass, LIGHT text with subtle shadow for clarity */
 .monaco-transparent .monaco-editor,
 .monaco-transparent .monaco-editor-background,
@@ -60,6 +68,12 @@ body {
   color: #ecf2fd !important;
   text-shadow: 0 0 4px rgba(30, 60, 230, 0.12);
 }
+
+/* blockly fix */
+svg[display="none"] {
+  display: none;
+}
+
 
 .glass-popup {
   transition: background-color 0.3s ease, transform 0.2s ease;

@@ -323,6 +323,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "show_leds",
+    category: "Led",
     blockDefinition: {
       type: "show_leds",
       message0: "show leds %1",
@@ -699,6 +700,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
 
   {
     type: "forever",
+    category: "Basic",
     blockDefinition: {
       type: "forever",
       message0: "forever %1 %2",
@@ -764,6 +766,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "on_start",
+    category: "Basic",
     blockDefinition: {
       type: "on_start",
       message0: "on start %1 %2",

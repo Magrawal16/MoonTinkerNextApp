@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, ReactNode } from "react";
+import { FaRegLightbulb, FaRegDotCircle, FaRegKeyboard, FaRegPlayCircle, FaRegClock, FaRegListAlt, FaRegHandPointer, FaThLarge } from "react-icons/fa";
 import { CODE_SNIPPETS, CATEGORIES, CodeSnippet, CommandPaletteProps } from "@/blockly_editor/types/PythonCodeSnippet";
 
 export default function PythonCodePalette({
@@ -120,24 +121,24 @@ export default function PythonCodePalette({
   };
 
 
-  const getCategoryIcon = (category: string) => {
+  const getCategoryIcon = (category: string): ReactNode => {
     switch (category) {
-      case "Display":
-        return "📱";
-      case "Pins": 
-        return "🔌";
+      case "Basic":
+        return <FaRegLightbulb size={22} title="Basic" />;
+      case "Pins":
+        return <FaRegDotCircle size={22} title="Pins" />;
       case "Buttons":
-        return "🔘";
+        return <FaRegKeyboard size={22} title="Buttons" />;
       case "Loops":
-        return "🔄";
+        return <FaRegPlayCircle size={22} title="Loops" />;
       case "Timing":
-        return "⏱️";
+        return <FaRegClock size={22} title="Timing" />;
       case "Imports":
-        return "📦";
+        return <FaRegListAlt size={22} title="Imports" />;
       case "Sensor":
-        return "👆";
+        return <FaRegHandPointer size={22} title="Sensor" />;
       default:
-        return "📋";
+        return <FaThLarge size={22} title="Other" />;
     }
   };
 
@@ -269,7 +270,7 @@ interface CategoriesListViewProps {
   categories: readonly string[];
   snippets: CodeSnippet[];
   onCategoryClick: (category: string) => void;
-  getCategoryIcon: (category: string) => string;
+  getCategoryIcon: (category: string) => ReactNode;
   getCategoryColor: (category: string) => string;
   isAnimating?: boolean;
 }
@@ -336,7 +337,7 @@ interface CategoryViewProps {
   category: string;
   snippets: CodeSnippet[];
   onDragStart: (e: React.DragEvent, snippet: CodeSnippet) => void;
-  getCategoryIcon: (category: string) => string;
+  getCategoryIcon: (category: string) => ReactNode;
   getCategoryColor: (category: string) => string;
   parameterValues: Record<string, Record<string, string>>;
   onParameterChange: (
@@ -345,7 +346,7 @@ interface CategoryViewProps {
     value: string
   ) => void;
   generateCode: (snippet: CodeSnippet) => string;
-  onCodeInsert?: (code: string) => void; // Add this line
+  onCodeInsert?: (code: string) => void;
 }
 
 function CategoryView({

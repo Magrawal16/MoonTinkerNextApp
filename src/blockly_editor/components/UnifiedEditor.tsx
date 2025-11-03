@@ -19,6 +19,7 @@ import {
 import CodeEditor from "@/python_code_editor/components/PythonCodeEditor";
 import { createToolboxXmlFromBlocks } from "../utils/sharedBlockDefinitions";
 import PythonCodePalette from "./PythonCodeBlockSnippetPalette";
+import "../styles/blockly-custom.css";
 
 type EditorMode = "block" | "text";
 

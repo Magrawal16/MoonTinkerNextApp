@@ -227,6 +227,16 @@ export default function UnifiedEditor({
 
       workspaceRef.current = workspace;
 
+      // Register Variables button to open standard variable dialog
+      try {
+        workspace.registerButtonCallback("CREATE_VARIABLE", (btn: any) => {
+          const targetWs = typeof btn?.getTargetWorkspace === "function" ? btn.getTargetWorkspace() : workspace;
+          (Blockly as any).Variables?.createVariableButtonHandler?.(targetWs);
+        });
+      } catch (e) {
+        console.warn("⚠️ Failed to register CREATE_VARIABLE button callback", e);
+      }
+
       // --- Runtime enable/disable rules for blocks that must live under an event ---
       // Led + Basic + Logic statement blocks
       const GATED_BLOCK_TYPES = new Set<string>([

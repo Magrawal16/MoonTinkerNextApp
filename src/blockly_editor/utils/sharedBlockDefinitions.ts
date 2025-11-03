@@ -41,23 +41,18 @@ export interface SharedBlockDefinition {
 export interface BlockCategory {
   name: string;
   color: string | number; // color can be a string (hex) or number (hue)
-  iconClass?: string;  // Optional CSS class for custom icon
-  iconText?: string;   // Optional text/emoji icon fallback
 }
 
 type CategoryName = (typeof BLOCK_CATEGORIES)[number]["name"];
 
 export const BLOCK_CATEGORIES: BlockCategory[] = [
-  { name: "Basic", color: "#0078D7", iconClass: "blockly-basic-icon" },
-  { name: "Input", color: "#C724B1", iconClass: "blockly-input-icon" },
-  { name: "Music", color: "#EB4437", iconClass: "blockly-music-icon" },
-  { name: "Led", color: "#6A1B9A", iconClass: "blockly-led-icon" },
-  { name: "Radio", color: "#E91E63", iconClass: "blockly-radio-icon" },
-  { name: "Loops", color: "#37AB41", iconClass: "blockly-loops-icon" },
-  { name: "Logic", color: "#00BCD4", iconClass: "blockly-logic-icon" },
-  { name: "Variables", color: "#DC3545", iconClass: "blockly-variables-icon" },
-  { name: "Math", color: "#7B2D8F", iconClass: "blockly-math-icon" },
-  { name: "Advanced", color: "#5C5C5C", iconClass: "blockly-advanced-icon" },
+  { name: "Basic", color: 220 },
+  { name: "Input", color: 290 },
+  { name: "Led", color: 300 },
+  { name: "Logic", color: 180.72 },
+  // Place Variables directly after Logic (to match MakeCode ordering)
+  { name: "Variables", color: "#BA68C8" },
+  { name: "Math", color: "#F06292" },
 ];
 
 /**
@@ -316,7 +311,6 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "show_leds",
-    category: "Led",
     blockDefinition: {
       type: "show_leds",
       message0: "show leds %1",
@@ -693,7 +687,6 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
 
   {
     type: "forever",
-    category: "Loops",
     blockDefinition: {
       type: "forever",
       message0: "forever %1 %2",
@@ -759,7 +752,6 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "on_start",
-    category: "Basic",
     blockDefinition: {
       type: "on_start",
       message0: "on start %1 %2",
@@ -1307,18 +1299,11 @@ export function createToolboxXmlFromBlocks(): string {
   let xml = `<xml xmlns="https://developers.google.com/blockly/xml">\n`;
 
   const emitted: Set<string> = new Set();
-  for (const category of BLOCK_CATEGORIES) {
-    const { name: categoryName, iconClass } = category;
+  for (const { name: categoryName } of BLOCK_CATEGORIES) {
     const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
-    
-    // Build category opening tag with CSS class for icons
-    const categoryTag = iconClass 
-      ? `  <category name="${categoryName}" colour="${color}" categorystyle="${iconClass}">\n`
-      : `  <category name="${categoryName}" colour="${color}">\n`;
-    
     if (categoryName === "Variables") {
       // Explicit Variables category matching MakeCode with button + shadows
-      xml += categoryTag;
+      xml += `  <category name="${categoryName}" colour="${color}">\n`;
       // Make a Variable button (callback registered during workspace init)
       xml += `    <button text="Make a Variable..." callbackKey="CREATE_VARIABLE"/>\n`;
       // set x to 0 (VALUE shadow)
@@ -1350,7 +1335,7 @@ export function createToolboxXmlFromBlocks(): string {
 
     const blocks = blocksByCategory[categoryName];
     if (blocks && blocks.length > 0) {
-      xml += categoryTag;
+      xml += `  <category name="${categoryName}" colour="${color}">\n`;
       for (const block of blocks) {
         xml += `    ${generateBlockXml(block)}\n`;
       }

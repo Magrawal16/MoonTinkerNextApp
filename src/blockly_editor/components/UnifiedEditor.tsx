@@ -38,13 +38,8 @@ export default function UnifiedEditor({
   stopSimulation,
 }: UnifiedEditorProps) {
   // State management - Load persisted editor mode from localStorage
-  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
-    if (typeof window !== 'undefined') {
-      const savedMode = localStorage.getItem('editorMode');
-      return (savedMode === 'block' || savedMode === 'text') ? savedMode : 'text';
-    }
-    return 'text';
-  });
+  // Always start in Text mode when the editor mounts (do not persist last used mode)
+  const [editorMode, setEditorMode] = useState<EditorMode>('text');
   const [bidirectionalConverter, setBidirectionalConverter] =
     useState<BidirectionalConverter | null>(null);
   const [isUpdatingFromBlocks, setIsUpdatingFromBlocks] = useState(false);
@@ -96,12 +91,7 @@ export default function UnifiedEditor({
     localCodeRef.current = currentCode;
   }, [currentCode, activeControllerId, isUpdatingFromBlocks]);
 
-  // Persist editor mode to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('editorMode', editorMode);
-    }
-  }, [editorMode]);
+  // Intentionally do not persist editorMode; requirement: reopen should always default to Text mode
 
   // Reload blocks when switching back to block mode or when controller changes in block mode
   useEffect(() => {

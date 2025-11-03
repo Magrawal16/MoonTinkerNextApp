@@ -51,9 +51,21 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: "Led", color: 300 },
   { name: "Logic", color: 180.72 },
   // Place Variables directly after Logic (to match MakeCode ordering)
-  { name: "Variables", color: "#BA68C8" },
-  { name: "Math", color: "#F06292" },
+  { name: "Variables", color: "#A64D79" }, // Purple color matching MakeCode
+  { name: "Math", color: "#F06292" }, // Pink color matching MakeCode
+  { name: "Uncategorized", color: "#999999" }, // Gray for uncategorized
 ];
+
+// Category icons mapping for toolbox UI enhancement
+export const CATEGORY_ICONS: Record<string, string> = {
+  "Basic": "⚡", // Lightning bolt for basic functions
+  "Input": "🎮", // Game controller for input
+  "Led": "💡", // Light bulb for LED
+  "Logic": "🔀", // Flow for logic
+  "Variables": "📦", // Box for variables
+  "Math": "🔢", // Numbers for math
+  "Uncategorized": "📋", // Clipboard for uncategorized
+};
 
 /**
  * Helper function to safely create and initialize a block
@@ -311,6 +323,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "show_leds",
+    category: "Led",
     blockDefinition: {
       type: "show_leds",
       message0: "show leds %1",
@@ -687,6 +700,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
 
   {
     type: "forever",
+    category: "Basic",
     blockDefinition: {
       type: "forever",
       message0: "forever %1 %2",
@@ -752,6 +766,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   },
   {
     type: "on_start",
+    category: "Basic",
     blockDefinition: {
       type: "on_start",
       message0: "on start %1 %2",
@@ -1245,7 +1260,7 @@ export function createUpdatedBlocklyEditor() {
 export function createToolboxXmlFromBlocks(): string {
   // Default category name and color if not specified
   const DEFAULT_CATEGORY = "Uncategorized";
-  const DEFAULT_COLOR = "#999999";
+  const DEFAULT_COLOR = "#999999ff";
 
   // Helper: map category name -> color
   const categoryColorMap: Record<string, string> = {};
@@ -1295,15 +1310,22 @@ export function createToolboxXmlFromBlocks(): string {
     return `<block type="${block.type}">${fieldsXml}\n    </block>`;
   }
 
+  // Helper: get category icon
+  function getCategoryIcon(categoryName: string): string {
+    return CATEGORY_ICONS[categoryName] || "📋";
+  }
+
   // Compose category XML blocks following BLOCK_CATEGORIES order
-  let xml = `<xml xmlns="https://developers.google.com/blockly/xml">\n`;
+  let xml = `<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox-categories" style="display: none">\n`;
 
   const emitted: Set<string> = new Set();
   for (const { name: categoryName } of BLOCK_CATEGORIES) {
     const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
+    const icon = getCategoryIcon(categoryName);
+    
     if (categoryName === "Variables") {
       // Explicit Variables category matching MakeCode with button + shadows
-      xml += `  <category name="${categoryName}" colour="${color}">\n`;
+      xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
       // Make a Variable button (callback registered during workspace init)
       xml += `    <button text="Make a Variable..." callbackKey="CREATE_VARIABLE"/>\n`;
       // set x to 0 (VALUE shadow)
@@ -1335,7 +1357,7 @@ export function createToolboxXmlFromBlocks(): string {
 
     const blocks = blocksByCategory[categoryName];
     if (blocks && blocks.length > 0) {
-      xml += `  <category name="${categoryName}" colour="${color}">\n`;
+      xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
       for (const block of blocks) {
         xml += `    ${generateBlockXml(block)}\n`;
       }
@@ -1366,9 +1388,10 @@ export function createToolboxXmlFromBlocks(): string {
   for (const categoryName of Object.keys(blocksByCategory)) {
     if (emitted.has(categoryName)) continue;
     const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
+    const icon = getCategoryIcon(categoryName);
     const blocks = blocksByCategory[categoryName];
     if (!blocks || blocks.length === 0) continue;
-    xml += `  <category name="${categoryName}" colour="${color}">\n`;
+    xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
     for (const block of blocks) {
       xml += `    ${generateBlockXml(block)}\n`;
     }

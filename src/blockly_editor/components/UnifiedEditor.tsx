@@ -12,6 +12,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import * as Blockly from "blockly";
 import { pythonGenerator } from "blockly/python";
 import { FaArrowRight } from "react-icons/fa";
+import { FaCubes, FaCode } from "react-icons/fa6";
 import {
   BlocklyPythonIntegration,
   BidirectionalConverter,
@@ -1078,7 +1079,7 @@ export default function UnifiedEditor({
               transition: "margin-left 300ms",
             }}
           >
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               {/* Code Palette Toggle Button */}
               <button
                 onClick={() => setShowCodePalette((prev) => !prev)}
@@ -1100,54 +1101,22 @@ export default function UnifiedEditor({
                   <FaArrowRight className="w-3 h-3" />
                 </span>
               </button>
-
-              <span className="text-sm text-gray-700 font-medium">
-                Editor Mode
-              </span>
-            </div>
-
-            {/* Toggle */}
-            <div className="flex items-center gap-3">
-              <span
-                className={`text-sm transition-colors ${editorMode === "text"
-                    ? "font-semibold text-blue-600"
-                    : isConverting
-                      ? "text-gray-400"
-                      : "text-gray-500"
-                  }`}
-              >
-                Text
-              </span>
               <button
-                onClick={() =>
-                  handleModeChange(editorMode === "text" ? "block" : "text")
-                }
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors duration-200 font-medium text-base ${editorMode === 'block' ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => handleModeChange('block')}
+                aria-pressed={editorMode === 'block'}
                 disabled={isConverting}
-                className={`relative w-10 h-5 flex items-center rounded-full p-1 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-400 ${isConverting
-                    ? "bg-gray-300 cursor-not-allowed opacity-60"
-                    : editorMode === "block"
-                      ? "bg-blue-600"
-                      : "bg-gray-300"
-                  }`}
-                role="switch"
-                aria-checked={editorMode === "block"}
-                aria-disabled={isConverting}
               >
-                <span
-                  className={`h-4 w-4 bg-white rounded-full shadow-md transform transition-transform duration-200 ${editorMode === "block" ? "translate-x-5" : "translate-x-0"
-                    }`}
-                />
+                <FaCubes className="text-xl" /> Block Mode
               </button>
-              <span
-                className={`text-sm transition-colors ${editorMode === "block"
-                    ? "font-semibold text-blue-600"
-                    : isConverting
-                      ? "text-gray-400"
-                      : "text-gray-500"
-                  }`}
+              <button
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors duration-200 font-medium text-base ${editorMode === 'text' ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}
+                onClick={() => handleModeChange('text')}
+                aria-pressed={editorMode === 'text'}
+                disabled={isConverting}
               >
-                Block
-              </span>
+                <FaCode className="text-xl" /> Text Mode
+              </button>
             </div>
           </div>
 

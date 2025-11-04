@@ -32,14 +32,33 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const wrapperClass = inline ? styles.inlineWrapper : styles.headerContainer;
+  // For inline mode we prefer stable Tailwind utility classes (global stylesheet)
+  // so HMR of CSS modules can’t momentarily “unstylize” the control.
+  const wrapperClass = inline
+    ? "inline-flex items-center gap-2"
+    : styles.headerContainer;
+  const innerClass = inline
+    ? "inline-flex items-center gap-2"
+    : styles.inlineWrapperInner;
+  const profileIconClass = inline
+    ? "w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white flex-shrink-0"
+    : styles.profileIcon;
+  const chevronBtnClass = inline
+    ? "w-8 h-8 inline-flex items-center justify-center bg-white border border-gray-200 rounded-lg cursor-pointer"
+    : styles.chevronButton;
+  const dropdownInlineClass =
+    "absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg py-2 min-w-[180px] z-[10000]";
+  const dropdownHeaderClass =
+    "px-4 py-2 text-[13px] text-gray-500 border-b border-gray-100 whitespace-nowrap";
+  const signOutBtnClass =
+    "w-full px-4 py-2 flex items-center gap-2 bg-transparent text-red-600 text-[13px] text-left hover:bg-red-50";
 
   return (
     <div className={wrapperClass}>
       {auth.isAuthenticated ? (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
-          <div className={styles.inlineWrapperInner}>
-            <div className={styles.profileIcon} aria-hidden>
+          <div className={innerClass}>
+            <div className={profileIconClass} aria-hidden>
               <svg 
                 width="16" 
                 height="16" 
@@ -57,7 +76,7 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               aria-expanded={isDropdownOpen}
               aria-label="Open user menu"
-              className={styles.chevronButton}
+              className={chevronBtnClass}
             >
               <svg
                 width="12"
@@ -77,13 +96,15 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
           </div>
 
           {isDropdownOpen && (
-            <div className={inline ? styles.dropdownInline : styles.dropdown}>
-              <div className={styles.dropdownHeader}>
+            <div
+              className={inline ? dropdownInlineClass : styles.dropdown}
+            >
+              <div className={inline ? dropdownHeaderClass : styles.dropdownHeader}>
                 Signed in as <strong>{auth.userEmail}</strong>
               </div>
               <button
                 onClick={handleSignOut}
-                className={styles.signOutButton}
+                className={inline ? signOutBtnClass : styles.signOutButton}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

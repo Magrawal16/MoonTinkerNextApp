@@ -143,27 +143,42 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       message0: "show number %1",
       args0: [
         {
-          type: "field_number",
+          // Switch to an input so users can plug variables/expressions like MakeCode
+          type: "input_value",
           name: "NUM",
-          value: 0,
+          check: "Number",
         },
       ],
       previousStatement: null,
       nextStatement: null,
       tooltip: "Show a number on the display",
     },
+    // Keep a simple numeric pattern; general expressions are handled via blocks
     pythonPattern: /basic\.show_number\((-?\d+(?:\.\d+)?)\)/g,
-    pythonGenerator: (block) => {
-      const num = block.getFieldValue("NUM");
-      return `basic.show_number(${num})\n`;
+    pythonGenerator: (block, generator?: any) => {
+      const gen = generator || ({} as any);
+      const numCode = gen.valueToCode
+        ? gen.valueToCode(block, "NUM", gen.ORDER_NONE) || "0"
+        : "0";
+      return `basic.show_number(${numCode})\n`;
     },
     pythonExtractor: (match) => ({
       NUM: parseFloat(match[1]),
     }),
     blockCreator: (workspace, values) => {
-      return createAndInitializeBlock(workspace, "show_number", {
-        NUM: values.NUM,
-      });
+      // Create block and plug a number value into the NUM input
+      const block = workspace.newBlock("show_number");
+      if (workspace.rendered && (block as any).initSvg) (block as any).initSvg();
+      // Create shadow number with the parsed value (or 0)
+      const num = workspace.newBlock("math_number");
+      (num as any).setShadow(true);
+      (num as any).setFieldValue(String(Number.isFinite(values.NUM) ? values.NUM : 0), "NUM");
+      if ((num as any).initSvg) (num as any).initSvg();
+      if ((num as any).render) (num as any).render();
+      const input = block.getInput("NUM");
+      input?.connection?.connect((num as any).outputConnection);
+      if ((block as any).render) (block as any).render();
+      return block;
     },
   },
   {
@@ -1283,6 +1298,7 @@ export function createToolboxXmlFromBlocks(): string {
     // Look for fields with default values in blockDefinition.args0
     const args = block.blockDefinition.args0 || [];
     let fieldsXml = "";
+    let valuesXml = "";
     for (const arg of args) {
       if ("name" in arg) {
         // Only generate fields for these arg types: field_input, field_number, field_dropdown, field_multilinetext
@@ -1304,10 +1320,19 @@ export function createToolboxXmlFromBlocks(): string {
             defaultValue = arg.options[0][1];
           }
           fieldsXml += `\n      <field name="${arg.name}">${defaultValue}</field>`;
+        } else if (arg.type === "input_value") {
+          // Provide sensible default shadows in the toolbox for numeric inputs
+          // Specifically: show_number's NUM should have a math_number 0 shadow (MakeCode-like)
+          const wantsNumberShadow =
+            (block.type === "show_number" && arg.name === "NUM") ||
+            (arg.check && (Array.isArray(arg.check) ? arg.check.includes("Number") : arg.check === "Number"));
+          if (wantsNumberShadow) {
+            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">0</field>\n        </shadow>\n      </value>`;
+          }
         }
       }
     }
-    return `<block type="${block.type}">${fieldsXml}\n    </block>`;
+    return `<block type="${block.type}">${fieldsXml}${valuesXml}\n    </block>`;
   }
 
   // Helper: get category icon

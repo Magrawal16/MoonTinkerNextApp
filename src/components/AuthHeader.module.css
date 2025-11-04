@@ -89,11 +89,11 @@
 }
 
 .inlineWrapper {
-  position: absolute;
+  /* Inline placement within parent flex row; avoid absolute positioning */
+  position: static;
   display: inline-flex;
   align-items: center;
-  margin-left: 315px;
-  margin-top: -1.5px;
+  gap: 6px;
 }
 
 .inlineWrapperInner {

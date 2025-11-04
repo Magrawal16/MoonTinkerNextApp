@@ -228,14 +228,235 @@ export default function UnifiedEditor({
 
       workspaceRef.current = workspace;
 
-      // Register Variables button to open standard variable dialog
+      // Pop-up that handles variable creation properly within the editor
       try {
-        workspace.registerButtonCallback("CREATE_VARIABLE", (btn: any) => {
-          const targetWs = typeof btn?.getTargetWorkspace === "function" ? btn.getTargetWorkspace() : workspace;
-          (Blockly as any).Variables?.createVariableButtonHandler?.(targetWs);
-        });
+        const dialog: any = (Blockly as any).dialog || ((Blockly as any).dialog = {});
+        if (typeof dialog.setPrompt !== "function") {
+          dialog.setPrompt = (fn: any) => {
+            dialog.showPrompt = fn;
+          };
+        }
+
+        // Set a custom prompt UI if not already set
+        if (!dialog.showPrompt) {
+          dialog.setPrompt((message: string, defaultValue: string, callback: (val: string | null) => void) => {
+            const overlay = document.createElement("div");
+            overlay.style.position = "fixed";
+            overlay.style.inset = "0";
+            overlay.style.background = "rgba(0,0,0,0.3)";
+            overlay.style.zIndex = "9999";
+
+            const modal = document.createElement("div");
+            modal.style.position = "absolute";
+            modal.style.top = "50%";
+            modal.style.left = "50%";
+            modal.style.transform = "translate(-50%, -50%)";
+            modal.style.background = "#fff";
+            modal.style.border = "1px solid #e5e7eb";
+            modal.style.borderRadius = "8px";
+            modal.style.boxShadow = "0 10px 25px rgba(0,0,0,0.15)";
+            modal.style.minWidth = "360px";
+            modal.style.maxWidth = "90vw";
+            modal.style.padding = "16px";
+
+            const title = document.createElement("div");
+            title.textContent = message || "New variable name:";
+            title.style.fontSize = "16px";
+            title.style.fontWeight = "600";
+            title.style.marginBottom = "10px";
+            modal.appendChild(title);
+
+            const input = document.createElement("input");
+            input.type = "text";
+            input.value = defaultValue || "";
+            input.style.width = "100%";
+            input.style.padding = "10px";
+            input.style.border = "1px solid #cbd5e1";
+            input.style.borderRadius = "6px";
+            input.style.outline = "none";
+            input.addEventListener("keydown", (e) => {
+              if (e.key === "Enter") ok();
+              if (e.key === "Escape") cancel();
+            });
+            modal.appendChild(input);
+
+            const actions = document.createElement("div");
+            actions.style.display = "flex";
+            actions.style.gap = "8px";
+            actions.style.justifyContent = "flex-end";
+            actions.style.marginTop = "14px";
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.textContent = "Cancel";
+            cancelBtn.style.padding = "8px 12px";
+            cancelBtn.style.border = "1px solid #e5e7eb";
+            cancelBtn.style.borderRadius = "6px";
+            cancelBtn.style.background = "#fff";
+            cancelBtn.onclick = () => cancel();
+
+            const okBtn = document.createElement("button");
+            okBtn.textContent = "OK";
+            okBtn.style.padding = "8px 12px";
+            okBtn.style.borderRadius = "6px";
+            okBtn.style.background = "#2563eb";
+            okBtn.style.color = "#fff";
+            okBtn.onclick = () => ok();
+
+            actions.appendChild(cancelBtn);
+            actions.appendChild(okBtn);
+            modal.appendChild(actions);
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            setTimeout(() => input.focus(), 0);
+
+            const cleanup = () => {
+              if (overlay.parentElement) overlay.parentElement.removeChild(overlay);
+            };
+            const ok = () => { const val = input.value.trim(); cleanup(); callback(val || null); };
+            const cancel = () => { cleanup(); callback(null); };
+          });
+        }
       } catch (e) {
-        console.warn("⚠️ Failed to register CREATE_VARIABLE button callback", e);
+        console.warn("⚠️ Failed to install custom Blockly prompt dialog", e);
+      }
+
+      // Ensure Variables category blocks have number shadows when variables exist
+      try {
+        const enhanceFlyout = (host: any) => {
+          if (!host || typeof host.flyoutCategory !== "function") return;
+          const original = host.flyoutCategory.bind(host);
+          const ensureJsonShadows = (items: any[]) => {
+            items.forEach((item) => {
+              if (item?.kind !== "block") return;
+              if (item.type === "variables_set") {
+                item.inputs = item.inputs || {};
+                const v = item.inputs["VALUE"];
+                if (!v || !v.shadow) {
+                  item.inputs["VALUE"] = { shadow: { type: "math_number", fields: { NUM: 0 } } };
+                }
+              } else if (item.type === "math_change") {
+                item.inputs = item.inputs || {};
+                const d = item.inputs["DELTA"];
+                if (!d || !d.shadow) {
+                  item.inputs["DELTA"] = { shadow: { type: "math_number", fields: { NUM: 1 } } };
+                }
+              }
+            });
+          };
+          const ensureXmlShadow = (el: Element, inputName: string, def: number) => {
+            let valueEl = Array.from(el.children).find(
+              (c) => c.tagName.toLowerCase() === "value" && c.getAttribute("name") === inputName
+            ) as Element | undefined;
+            if (!valueEl) {
+              valueEl = document.createElement("value");
+              valueEl.setAttribute("name", inputName);
+              el.appendChild(valueEl);
+            } else {
+              while (valueEl.firstChild) valueEl.removeChild(valueEl.firstChild);
+            }
+            const shadow = document.createElement("shadow");
+            shadow.setAttribute("type", "math_number");
+            const field = document.createElement("field");
+            field.setAttribute("name", "NUM");
+            field.textContent = String(def);
+            shadow.appendChild(field);
+            valueEl.appendChild(shadow);
+          };
+
+          host.flyoutCategory = function (ws: any, ...rest: any[]) {
+            let items: any;
+            try {
+              items = original(ws, false);
+            } catch (_) {
+              items = original(ws);
+            }
+            if (Array.isArray(items)) {
+              ensureJsonShadows(items);
+            } else if (items && typeof items.length === "number") {
+              for (let i = 0; i < items.length; i++) {
+                const node = items[i] as any;
+                if (node?.nodeType === 1 && node.tagName?.toLowerCase() === "block") {
+                  const type = node.getAttribute("type");
+                  if (type === "variables_set") ensureXmlShadow(node, "VALUE", 0);
+                  else if (type === "math_change") ensureXmlShadow(node, "DELTA", 1);
+                }
+              }
+            }
+            return items;
+          };
+        };
+        enhanceFlyout((Blockly as any).Variables);
+        enhanceFlyout((Blockly as any).VariablesDynamic);
+      } catch (e) {
+        console.warn("⚠️ Failed to enhance Variables flyout", e);
+      }
+
+      const ensureVariableShadowsOnBlock = (blk: Blockly.Block | null | undefined) => {
+        if (!blk) return;
+        try {
+          if (blk.type === "variables_set") {
+            const input = blk.getInput("VALUE");
+            const conn = input?.connection || null;
+            if (conn && !conn.targetConnection) {
+              const num = blk.workspace.newBlock("math_number");
+              (num as any).setShadow(true);
+              (num as any).setFieldValue("0", "NUM");
+              (num as any).initSvg?.();
+              (num as any).render?.();
+              (num as any).outputConnection?.connect(conn);
+            }
+          } else if (blk.type === "math_change") {
+            const input = blk.getInput("DELTA");
+            const conn = input?.connection || null;
+            if (conn && !conn.targetConnection) {
+              const num = blk.workspace.newBlock("math_number");
+              (num as any).setShadow(true);
+              (num as any).setFieldValue("1", "NUM");
+              (num as any).initSvg?.();
+              (num as any).render?.();
+              (num as any).outputConnection?.connect(conn);
+            }
+          }
+        } catch (_) {
+          // ignore shadow-injection issues
+        }
+      };
+
+      // Additionally, patch the flyout after it renders to ensure the Variables
+      // "set" block shows the number bubble inside the flyout tray itself.
+      // Some Blockly builds return XML that drops our pre-show shadows; this
+      // guarantees the shadow exists by mutating the flyout workspace blocks.
+      try {
+        const tryPatchFlyoutShow = () => {
+          const ws: any = workspaceRef.current;
+          if (!ws) return;
+          const toolbox = typeof ws.getToolbox === "function" ? ws.getToolbox() : null;
+          const flyout: any = toolbox?.getFlyout?.() || (typeof ws.getFlyout === "function" ? ws.getFlyout() : null);
+          if (!flyout || typeof flyout.show !== "function") return;
+          if ((flyout as any).__moontinkerPatched) return;
+
+          const originalShow = flyout.show.bind(flyout);
+          flyout.show = function (...args: any[]) {
+            // Call original to build the flyout contents
+            originalShow(...args);
+            try {
+              const fws: any = typeof flyout.getWorkspace === "function" ? flyout.getWorkspace() : flyout.workspace_;
+              const blocks: any[] = fws?.getAllBlocks?.(false) || [];
+              blocks.forEach((b: any) => ensureVariableShadowsOnBlock(b));
+            } catch (_) {
+              // ignore flyout shadow issues
+            }
+          };
+          (flyout as any).__moontinkerPatched = true;
+        };
+
+        // Patch now and also schedule a retry after a tick in case toolbox initializes later
+        tryPatchFlyoutShow();
+        setTimeout(tryPatchFlyoutShow, 0);
+        setTimeout(tryPatchFlyoutShow, 200);
+      } catch (_) {
+        // ignore flyout patching issues
       }
 
       // --- Runtime enable/disable rules for blocks that must live under an event ---
@@ -410,6 +631,17 @@ export default function UnifiedEditor({
             updateAllLedBlockStates();
           }
         } catch (_) {}
+
+        // On block create, ensure default shadows for variable blocks
+        if (isCreate) {
+          try {
+            const w = workspaceRef.current;
+            if (w) {
+              const ids: string[] = (event.ids || (event.blockId ? [event.blockId] : [])) as any;
+              ids.forEach((id) => ensureVariableShadowsOnBlock(w.getBlockById(id)));
+            }
+          } catch (_) {}
+        }
 
         if (affectsCode) {
           try {

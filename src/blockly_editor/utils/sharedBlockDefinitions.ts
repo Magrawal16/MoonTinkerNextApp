@@ -1324,33 +1324,9 @@ export function createToolboxXmlFromBlocks(): string {
     const icon = getCategoryIcon(categoryName);
     
     if (categoryName === "Variables") {
-      // Explicit Variables category matching MakeCode with button + shadows
-      xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
-      // Make a Variable button (callback registered during workspace init)
-      xml += `    <button text="Make a Variable..." callbackKey="CREATE_VARIABLE"/>\n`;
-      // set x to 0 (VALUE shadow)
-      xml += `    <block type="variables_set">\n`;
-      xml += `      <field name="VAR">x</field>\n`;
-      xml += `      <value name="VALUE">\n`;
-      xml += `        <shadow type="math_number">\n`;
-      xml += `          <field name="NUM">0</field>\n`;
-      xml += `        </shadow>\n`;
-      xml += `      </value>\n`;
-      xml += `    </block>\n`;
-      // change x by 1 (DELTA shadow)
-      xml += `    <block type="math_change">\n`;
-      xml += `      <field name="VAR">x</field>\n`;
-      xml += `      <value name="DELTA">\n`;
-      xml += `        <shadow type="math_number">\n`;
-      xml += `          <field name="NUM">1</field>\n`;
-      xml += `        </shadow>\n`;
-      xml += `      </value>\n`;
-      xml += `    </block>\n`;
-      // variable reporter
-      xml += `    <block type="variables_get">\n`;
-      xml += `      <field name="VAR">x</field>\n`;
-      xml += `    </block>\n`;
-      xml += `  </category>\n`;
+      // Use Blockly's dynamic variables category; include icon for visual parity
+      // Blocks appear only after the user creates a variable.
+      xml += `  <category name="${icon} ${categoryName}" colour="${color}" custom="VARIABLE"></category>\n`;
       emitted.add(categoryName);
       continue;
     }

@@ -265,7 +265,7 @@ export default function Microbit({
                   y={centerY - 2.5}
                   width={5}
                   height={5}
-                  fill={on ? "#FF3333" : "#CCCCCC"}
+                  fill={on ? "#FF3333" : "#545050ff"}
                   opacity={on ? 0.9 : 0.5}
                   cornerRadius={1.5}
                   shadowColor={on ? "#FF6666" : "#000000"}

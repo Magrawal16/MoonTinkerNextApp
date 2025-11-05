@@ -112,9 +112,9 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       message0: "show string %1",
       args0: [
         {
-          type: "field_input",
+          type: "input_value",
           name: "TEXT",
-          text: "Hello!",
+          check: "String",
         },
       ],
       previousStatement: null,
@@ -122,9 +122,9 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       tooltip: "Show a string on the display",
     },
     pythonPattern: /basic\.show_string\((['"])(.+?)\1\)/g,
-    pythonGenerator: (block) => {
-      const text = block.getFieldValue("TEXT");
-      return `basic.show_string(${JSON.stringify(text)})\n`;
+    pythonGenerator: (block, generator) => {
+      const text = generator.valueToCode(block, "TEXT", (generator as any).ORDER_NONE) || '""';
+      return `basic.show_string(${text})\n`;
     },
     pythonExtractor: (match) => ({
       TEXT: match[2],
@@ -950,6 +950,38 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       return block;
     },
   },
+  {
+    type: "text",
+    category: "Math",
+    blockDefinition: {
+      type: "text",
+      message0: "%1",
+      args0: [
+        {
+          type: "field_input",
+          name: "TEXT",
+          text: "",
+        },
+      ],
+      output: "String",
+      tooltip: "A text value",
+      helpUrl: "",
+    },
+    pythonPattern: /(['"])(.+?)\1/g,
+    pythonGenerator: (block, generator) => {
+      const text = block.getFieldValue("TEXT");
+      const code = JSON.stringify(text);
+      return [code, (generator as any).ORDER_ATOMIC || 0];
+    },
+    pythonExtractor: (match) => ({
+      TEXT: match[2],
+    }),
+    blockCreator: (workspace, values) => {
+      return createAndInitializeBlock(workspace, "text", {
+        TEXT: values.TEXT || "",
+      });
+    },
+  },
 ];
 
 /**
@@ -1321,13 +1353,18 @@ export function createToolboxXmlFromBlocks(): string {
           }
           fieldsXml += `\n      <field name="${arg.name}">${defaultValue}</field>`;
         } else if (arg.type === "input_value") {
-          // Provide sensible default shadows in the toolbox for numeric inputs
-          // Specifically: show_number's NUM should have a math_number 0 shadow (MakeCode-like)
+          // Provide sensible default shadows in the toolbox for numeric and string inputs
           const wantsNumberShadow =
             (block.type === "show_number" && arg.name === "NUM") ||
             (arg.check && (Array.isArray(arg.check) ? arg.check.includes("Number") : arg.check === "Number"));
+          const wantsTextShadow =
+            (block.type === "show_string" && arg.name === "TEXT") ||
+            (arg.check && (Array.isArray(arg.check) ? arg.check.includes("String") : arg.check === "String"));
+          
           if (wantsNumberShadow) {
             valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">0</field>\n        </shadow>\n      </value>`;
+          } else if (wantsTextShadow) {
+            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="text">\n          <field name="TEXT">Hello!</field>\n        </shadow>\n      </value>`;
           }
         }
       }
@@ -1352,6 +1389,25 @@ export function createToolboxXmlFromBlocks(): string {
       // Use Blockly's dynamic variables category; include icon for visual parity
       // Blocks appear only after the user creates a variable.
       xml += `  <category name="${icon} ${categoryName}" colour="${color}" custom="VARIABLE"></category>\n`;
+      emitted.add(categoryName);
+      continue;
+    }
+    
+    if (categoryName === "Math") {
+      // Add Math category with number and text blocks
+      xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
+      // Add our custom text block first
+      const mathBlocks = blocksByCategory[categoryName];
+      if (mathBlocks && mathBlocks.length > 0) {
+        for (const block of mathBlocks) {
+          xml += `    ${generateBlockXml(block)}\n`;
+        }
+      }
+      // Add built-in math_number block
+      xml += `    <block type="math_number">\n`;
+      xml += `      <field name="NUM">0</field>\n`;
+      xml += `    </block>\n`;
+      xml += `  </category>\n`;
       emitted.add(categoryName);
       continue;
     }

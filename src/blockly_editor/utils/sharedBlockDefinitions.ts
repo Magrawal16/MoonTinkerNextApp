@@ -53,6 +53,7 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   // Place Variables directly after Logic (to match MakeCode ordering)
   { name: "Variables", color: "#A64D79" }, // Purple color matching MakeCode
   { name: "Math", color: "#F06292" }, // Pink color matching MakeCode
+  { name: "Music", color: "#D32F2F" }, //  Music category
   { name: "Uncategorized", color: "#999999" }, // Gray for uncategorized
 ];
 
@@ -64,6 +65,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Logic": "🔀", // Flow for logic
   "Variables": "📦", // Box for variables
   "Math": "🔢", // Numbers for math
+  "Music": "🎵", // Play Music
   "Uncategorized": "📋", // Clipboard for uncategorized
 };
 
@@ -973,6 +975,149 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       return block;
     },
   },
+
+  // --- MUSIC BLOCKS ---
+  {
+    type: "music_play_tone",
+    category: "Music",
+    blockDefinition: {
+      type: "music_play_tone",
+      message0: "play tone %1 for %2 beat %3",
+      args0: [
+        {
+          type: "field_dropdown",
+          name: "NOTE",
+          options: [
+            ["Middle C", "262"],
+            ["Middle D", "294"],
+            ["Middle E", "330"],
+            ["Middle F", "349"],
+            ["Middle G", "392"],
+            ["Middle A", "440"],
+            ["Middle B", "494"],
+          ],
+        },
+        {
+          type: "field_dropdown",
+          name: "DURATION",
+          options: [
+            ["1", "1"],
+            ["1/2", "0.5"],
+            ["1/4", "0.25"],
+            ["1/8", "0.125"],
+            ["2", "2"],
+            ["4", "4"],
+          ],
+        },
+        {
+          type: "field_dropdown",
+          name: "MODE",
+          options: [
+            ["until done", "until_done"],
+            ["in background", "background"],
+            ["looping in background", "loop"],
+          ],
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Play a tone of specific frequency and duration",
+    },
+    pythonPattern: /music\.play_tone\((\d+),\s*(\d+(?:\.\d+)?)\)/g,
+    pythonGenerator: (block) => {
+      const freq = block.getFieldValue("NOTE");
+      const duration = block.getFieldValue("DURATION");
+      const mode = block.getFieldValue("MODE");
+      // Mode affects how the tone is played but for basic implementation we'll just generate the play_tone call
+      // In a full implementation, you might use different methods based on mode
+      return `music.play_tone(${freq}, ${duration})\n`;
+    },
+    pythonExtractor: (match) => ({
+      NOTE: match[1],
+      DURATION: match[2],
+      MODE: "until_done",
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("music_play_tone");
+      block.setFieldValue(values.NOTE || "262", "NOTE");
+      block.setFieldValue(values.DURATION || "1", "DURATION");
+      block.setFieldValue(values.MODE || "until_done", "MODE");
+      return block;
+    },
+  },
+  {
+    type: "music_ring_tone",
+    category: "Music",
+    blockDefinition: {
+      type: "music_ring_tone",
+      message0: "ring tone (Hz) %1",
+      args0: [
+        {
+          type: "field_number",
+          name: "FREQ",
+          value: 262,
+          min: 100,
+          max: 10000,
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Continuously play a tone at the given frequency",
+    },
+    pythonPattern: /music\.ring_tone\((\d+)\)/g,
+    pythonGenerator: (block) => {
+      const freq = block.getFieldValue("FREQ");
+      return `music.ring_tone(${freq})\n`;
+    },
+    pythonExtractor: (match) => ({
+      FREQ: parseInt(match[1]),
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("music_ring_tone");
+      block.setFieldValue(values.FREQ || 262, "FREQ");
+      return block;
+    },
+  },
+  {
+    type: "music_rest",
+    category: "Music",
+    blockDefinition: {
+      type: "music_rest",
+      message0: "rest for %1 beat",
+      args0: [
+        {
+          type: "field_dropdown",
+          name: "DURATION",
+          options: [
+            ["1", "1"],
+            ["1/2", "0.5"],
+            ["1/4", "0.25"],
+            ["1/8", "0.125"],
+            ["2", "2"],
+            ["4", "4"],
+          ],
+        },
+      ],
+      previousStatement: null,
+      nextStatement: null,
+      tooltip: "Pause playback for a number of beats",
+    },
+    pythonPattern: /music\.rest\((\d+(?:\.\d+)?)\)/g,
+    pythonGenerator: (block) => {
+      const duration = block.getFieldValue("DURATION");
+      return `music.rest(${duration})\n`;
+    },
+    pythonExtractor: (match) => ({
+      DURATION: match[1],
+    }),
+    blockCreator: (workspace, values) => {
+      const block = workspace.newBlock("music_rest");
+      block.setFieldValue(values.DURATION || "1", "DURATION");
+      return block;
+    },
+  },
+  // --- END MUSIC BLOCKS ---
+
   {
     type: "text",
     category: "Math",
@@ -1005,7 +1150,13 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
       });
     },
   },
+
+  
+
+
 ];
+
+
 
 /**
  * Utility functions for working with shared block definitions
@@ -1481,3 +1632,4 @@ export function createToolboxXmlFromBlocks(): string {
   xml += `</xml>`;
   return xml;
 }
+

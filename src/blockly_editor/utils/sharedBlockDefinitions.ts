@@ -68,6 +68,26 @@ export const CATEGORY_ICONS: Record<string, string> = {
 };
 
 /**
+ * Indent a container body by one level if it isn't indented already.
+ * - Preserves existing indentation if present.
+ * - Ensures a trailing newline.
+ * - Returns an IND + 'pass' line when code is empty.
+ */
+function indentBodyIfNeeded(code: string, IND: string): string {
+  if (!code || code.trim().length === 0) return `${IND}pass\n`;
+  const normalized = code.replace(/\r/g, "");
+  const lines = normalized.split("\n");
+  const firstContent = lines.find((l) => l.trim().length > 0) ?? "";
+  const startsIndented = /^\s+/.test(firstContent);
+  const processed = startsIndented
+    ? lines
+    : lines.map((l) => (l.trim().length === 0 ? l : IND + l));
+  let out = processed.join("\n");
+  if (!out.endsWith("\n")) out += "\n";
+  return out;
+}
+
+/**
  * Helper function to safely create and initialize a block
  * Handles both headless and rendered workspaces properly
  */
@@ -627,10 +647,10 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     pythonPattern: /def\s+on_button_pressed_(a|b|ab)\s*\(\s*\)\s*:([\s\S]*?)\n\s*input\.on_button_pressed\(\s*Button\.(A|B|AB)\s*,\s*([A-Za-z_]\w*)\s*\)/gi,
     pythonGenerator: (block, generator) => {
       const btn = block.getFieldValue("BUTTON");
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
       const statements = generator.statementToCode(block, "DO");
       const funcName = `on_button_pressed_${btn.toLowerCase()}`;
       // Collect variables used in this handler
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
       const used = new Set<string>();
       const assigned = new Set<string>();
       try {
@@ -662,9 +682,11 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
           }
         }
       } catch (_) {}
-      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
-      const body = statements ? statements.replace(/^/gm, IND) : `${IND}pass\n`;
-      return `def ${funcName}():\n${initLines}${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
+      const globals = Array.from(used);
+      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
+      // Ensure body is indented one level when needed
+      const body = indentBodyIfNeeded(statements, IND);
+      return `def ${funcName}():\n${globalLine}${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
     },
     pythonExtractor: (match) => ({
       BUTTON: (match[3] || match[1]).toUpperCase(),
@@ -729,8 +751,8 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     // - def on_forever():\n    ...\n    basic.forever(on_forever)
     pythonPattern: /(def\s+on_forever\(\s*\)\s*:|basic\.forever\(\s*on_forever\s*\)|while\s+True\s*:)/g,
     pythonGenerator: (block, generator) => {
-      const statements = generator.statementToCode(block, "DO");
       const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const statements = generator.statementToCode(block, "DO");
       // Collect variables used in this container
       const used = new Set<string>();
       const assigned = new Set<string>();
@@ -762,13 +784,12 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
           }
         }
       } catch (_) {}
-      // Initialize variables that are used but not explicitly set
-      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
+      const globals = Array.from(used);
+      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
 
-      const body = statements && statements.trim().length > 0
-        ? statements // already correctly indented by Blockly for a nested statement
-        : IND + "# your code here\n";
-      return `def on_forever():\n${initLines}${body}basic.forever(on_forever)\n`;
+      // Ensure body is indented one level when needed
+      const body = indentBodyIfNeeded(statements, IND);
+      return `def on_forever():\n${globalLine}${body}basic.forever(on_forever)\n`;
     },
     pythonExtractor: (_match) => ({
       STATEMENTS: "",
@@ -791,8 +812,8 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
     },
     pythonPattern: /def\s+on_start\(\s*\)\s*:([\s\S]*?)(?=\n(?:\S|$))/g,
     pythonGenerator: (block, generator) => {
-      const statements = generator.statementToCode(block, "DO");
       const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const statements = generator.statementToCode(block, "DO");
       // Collect variables used in on_start
       const used = new Set<string>();
       const assigned = new Set<string>();
@@ -824,9 +845,11 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
           }
         }
       } catch (_) {}
-      const initLines = Array.from(used).filter((n) => !assigned.has(n)).map((n) => `${IND}${n} = 0\n`).join("");
-      const bodyIndented = statements ? statements.replace(/^/gm, IND) : `${IND}pass\n`;
-      return `def on_start():\n${initLines}${bodyIndented}\non_start()\n`;
+      const globals = Array.from(new Set<string>([...used]));
+      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
+      // Ensure body is indented one level when needed
+      const bodyIndented = indentBodyIfNeeded(statements, IND);
+      return `def on_start():\n${globalLine}${bodyIndented}\non_start()\n`;
     },
     pythonExtractor: (match) => ({
       STATEMENTS: match[1].trim(),

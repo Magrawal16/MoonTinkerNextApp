@@ -4,6 +4,10 @@ import { CHARACTER_PATTERNS } from "../characterPatterns";
 
 export class BasicModule {
     private foreverCallbacks: Set<any> = new Set();
+    // Serialize long-running display animations to avoid spamming from forever()
+    private currentDisplayToken = 0;
+    private displayPromise: Promise<void> | null = null;
+    private displayPromiseResolve: (() => void) | null = null;
 
     constructor(
         private pyodide: PyodideInterface,
@@ -11,6 +15,13 @@ export class BasicModule {
     ) { }
 
     async showString(text: string, interval: number = 150): Promise<void> {
+        // Start a new display session; cancel previous by advancing the token
+        const myToken = ++this.currentDisplayToken;
+        // Create/replace the display completion promise for the scheduler
+        this.displayPromise = new Promise<void>((resolve) => {
+            this.displayPromiseResolve = resolve;
+        });
+
         // If a single valid character was passed, render it statically (no scrolling)
         if (typeof text === "string" && text.length === 1 && CHARACTER_PATTERNS[text]) {
             const pattern = CHARACTER_PATTERNS[text];
@@ -24,6 +35,8 @@ export class BasicModule {
             }
             // Add a small delay so single characters are visible before next operation
             await new Promise((resolve) => setTimeout(resolve, 400));
+            // Resolve if this is still the active display
+            if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
             return;
         }
 
@@ -62,6 +75,11 @@ export class BasicModule {
         const maxOffset = scrollPattern[0].length;
 
         while (currentOffset < maxOffset) {
+            // Abort early if a newer display started
+            if (myToken !== this.currentDisplayToken) {
+                this.displayPromiseResolve?.();
+                return;
+            }
             this.ledModule.clearDisplay();
 
             for (let row = 0; row < 5; row++) {
@@ -81,7 +99,8 @@ export class BasicModule {
                 await new Promise((resolve) => setTimeout(resolve, interval));
             }
         }
-
+        // Finish and let scheduler continue
+        if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
         this.ledModule.clearDisplay();
     }
 
@@ -171,6 +190,12 @@ export class BasicModule {
         const runCallback = async () => {
             try {
                 await callback();
+                // If a display animation is running (e.g., show_string scrolling),
+                // wait for it to complete before scheduling the next tick. This avoids
+                // stacking animations when forever() body triggers display repeatedly.
+                if (this.displayPromise) {
+                    try { await this.displayPromise; } catch (_) { /* no-op */ }
+                }
             } catch (error) {
                 console.error("Error in forever loop:", error);
             }

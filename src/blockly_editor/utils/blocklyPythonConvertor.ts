@@ -155,11 +155,81 @@ export class BlocklyPythonIntegration {
 
   /**
    * Convert current Blockly blocks in the workspace to Python code
+   * Ensures on_start block always appears first in the generated code
    * @param pythonGenerator The Blockly Python generator instance
    * @returns Generated Python code as a string
    */
   exportToPython(pythonGenerator: any): string {
-    return pythonGenerator.workspaceToCode(this.workspace);
+    // Get all variables in the workspace and initialize them at module level
+    let variableInits = '';
+    try {
+      const allVariables = this.workspace.getAllVariables?.() || [];
+      if (allVariables.length > 0) {
+        const varNames = allVariables.map((v: any) => v.name || 'x').filter((name: string) => name);
+        if (varNames.length > 0) {
+          // Initialize all variables to None at the top of the file
+          // This allows them to be used in any function with the 'global' keyword
+          variableInits = varNames.map((name: string) => `${name} = None`).join('\n') + '\n\n';
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to collect variables:', error);
+    }
+
+    // Get all top-level blocks in the workspace
+    const allBlocks = this.workspace.getTopBlocks(false);
+
+    // Helper: determine if a block is enabled (skip disabled blocks)
+    const isBlockEnabled = (block: Blockly.Block): boolean => {
+      const anyBlock: any = block as any;
+      try {
+        if (typeof anyBlock.isEnabled === 'function') {
+          if (!anyBlock.isEnabled()) return false;
+        } else if (typeof anyBlock.getDisabled === 'function') {
+          if (anyBlock.getDisabled()) return false;
+        } else if ('disabled' in anyBlock) {
+          if (!!anyBlock.disabled) return false;
+        }
+      } catch {}
+      return true;
+    };
+    
+    // Separate on_start blocks from other blocks
+    const onStartBlocks: Blockly.Block[] = [];
+    const otherBlocks: Blockly.Block[] = [];
+    
+    allBlocks.forEach((block) => {
+      // Skip disabled top-level blocks entirely
+      if (!isBlockEnabled(block)) return;
+      if (block.type === 'on_start') {
+        onStartBlocks.push(block);
+      } else {
+        otherBlocks.push(block);
+      }
+    });
+    
+    // Generate code for on_start blocks first, then other blocks
+    // blockToCode returns [code, order] array, so we need to extract the code part
+    const onStartCode = onStartBlocks
+      .map((block) => {
+        const result = pythonGenerator.blockToCode(block);
+        return Array.isArray(result) ? result[0] : result;
+      })
+      .filter((code) => code && typeof code === 'string' && code.trim())
+      .join('\n');
+    
+    const otherCode = otherBlocks
+      .map((block) => {
+        const result = pythonGenerator.blockToCode(block);
+        return Array.isArray(result) ? result[0] : result;
+      })
+      .filter((code) => code && typeof code === 'string' && code.trim())
+      .join('\n');
+    
+    const parts = [variableInits, onStartCode, otherCode].filter((part) => part && part.trim());
+    const finalCode = parts.join('\n\n');
+        
+    return finalCode;
   }
 
   /**

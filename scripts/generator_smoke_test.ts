@@ -49,8 +49,6 @@ forever.getInput("DO")!.connection!.connect((ifBlock as any).previousConnection)
 
 // Generate Python
 const code = pythonGenerator.workspaceToCode(ws);
-console.log("==== Generated Python ====");
-console.log(code);
 
 // Basic sanity checks
 const hasDef = code.includes("def on_forever():");
@@ -58,5 +56,4 @@ const hasIf = code.includes("if input.button_is_pressed(Button.A):");
 const hasElseLine = /\r?\n\s*else:\r?\n/.test(code);
 const bodyThenElseOrderOk = /\r?\n\s+basic\.show_string\("A"\)\r?\n\s*else:\r?\n/.test(code);
 
-console.log(JSON.stringify({ hasDef, hasIf, hasElseLine, bodyThenElseOrderOk, codeLines: code.split("\n").length }, null, 2));
 

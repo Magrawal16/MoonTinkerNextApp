@@ -1,7 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import Konva from "konva";
-import { Wire, CircuitElement, EditingWire, Node } from "@/circuit_canvas/types/circuit";
+import { Wire, CircuitElement, Node } from "@/circuit_canvas/types/circuit";
 import { getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
+import { simplifyWirePath, snapToGrid } from "@/circuit_canvas/utils/wireRouting";
 
 interface UseWireManagementProps {
   elements: CircuitElement[];
@@ -28,7 +29,10 @@ export const useWireManagement = ({
   const [selectedWireColor, setSelectedWireColor] = useState<string>("#000000");
   const [creatingWireStartNode, setCreatingWireStartNode] = useState<string | null>(null);
   const [creatingWireJoints, setCreatingWireJoints] = useState<{ x: number; y: number }[]>([]);
-  const [editingWire, setEditingWire] = useState<EditingWire | null>(null);
+  // ...existing code...
+  const [draggingJoint, setDraggingJoint] = useState<{ wireId: string; jointIndex: number } | null>(null);
+  const [draggingEndpoint, setDraggingEndpoint] = useState<{ wireId: string; end: "from" | "to"; currentPos: { x: number; y: number } } | null>(null);
+  const [hoveredNodeForEndpoint, setHoveredNodeForEndpoint] = useState<string | null>(null);
 
   // Refs for wire optimization
   const wireRefs = useRef<Record<string, Konva.Line>>({});
@@ -203,21 +207,7 @@ export const useWireManagement = ({
   // Handle node click for wire creation
   const handleNodeClick = useCallback(
     (nodeId: string) => {
-      if (editingWire) {
-        // complete wire editing logic
-        setWires((prev) => {
-          const next = prev.map((wire) =>
-            wire.id === editingWire.wireId
-              ? { ...wire, [editingWire.end]: nodeId }
-              : wire
-          );
-          // push AFTER change
-          pushToHistorySnapshot(elements, next);
-          return next;
-        });
-        setEditingWire(null);
-        return;
-      }
+      // ...existing code...
 
       // First click: set start node
       if (!creatingWireStartNode) {
@@ -269,7 +259,7 @@ export const useWireManagement = ({
         return;
       }
 
-  // Second click: create wire
+      // Second click: create wire
       // Before creating, check for an existing wire connecting these two nodes (either direction)
       const duplicateExists = wiresRef.current.some(
         (w) =>
@@ -290,6 +280,9 @@ export const useWireManagement = ({
         return; // Do not push history or stop simulation since nothing changed
       }
 
+      // Use joints from wire creation (manual joints added by clicking canvas)
+      const finalJoints = creatingWireJoints;
+
       const newWire: Wire = {
         // Ensure unique incremental ID even if wires were loaded from storage
         // or counter was reset. We probe for the next free numeric suffix.
@@ -308,11 +301,9 @@ export const useWireManagement = ({
         })(),
         fromNodeId: creatingWireStartNode,
         toNodeId: nodeId,
-        joints: creatingWireJoints,
+        joints: finalJoints,
         color: selectedWireColor,
-      };
-
-  const next = [...wiresRef.current, newWire];
+      };  const next = [...wiresRef.current, newWire];
   setWires(next);
   // Push AFTER creation so each wire is a single undo step
   pushToHistorySnapshot(elements, next);
@@ -330,7 +321,7 @@ export const useWireManagement = ({
       }
     },
     [
-      editingWire,
+  // ...existing code...
       creatingWireStartNode,
       creatingWireJoints,
       wireCounter,
@@ -374,9 +365,250 @@ export const useWireManagement = ({
       // Push AFTER delete
       pushToHistorySnapshot(elements, updated);
       stopSimulation();
-      setEditingWire(null);
+  // ...existing code...
     },
     [elements, stopSimulation, pushToHistorySnapshot]
+  );
+
+  // Handle joint dragging start
+  const handleJointDragStart = useCallback(
+    (wireId: string, jointIndex: number) => {
+      setDraggingJoint({ wireId, jointIndex });
+      pushToHistorySnapshot(elements, wiresRef.current);
+      // Disable stage dragging while dragging joint
+      if (stageRef.current) {
+        stageRef.current.draggable(false);
+      }
+    },
+    [elements, pushToHistorySnapshot, stageRef]
+  );
+
+  // Handle joint dragging move
+  const handleJointDragMove = useCallback(
+    (wireId: string, jointIndex: number, newPos: { x: number; y: number }) => {
+      if (!stageRef.current) return;
+      
+      // Update the ref directly without triggering React re-render
+      const wireIndex = wiresRef.current.findIndex((w) => w.id === wireId);
+      if (wireIndex === -1) return;
+      
+      const wire = wiresRef.current[wireIndex];
+      const newJoints = [...wire.joints];
+      
+      newJoints[jointIndex] = { x: newPos.x, y: newPos.y };
+      
+      // Update ref directly
+      wiresRef.current = [
+        ...wiresRef.current.slice(0, wireIndex),
+        { ...wire, joints: newJoints },
+        ...wiresRef.current.slice(wireIndex + 1),
+      ];
+      
+      // Update Konva directly without React state change
+      updateWiresDirect();
+    },
+    [updateWiresDirect, stageRef]
+  );
+
+  // Handle joint dragging end
+  const handleJointDragEnd = useCallback(
+    (wireId: string, jointIndex: number, finalPos: { x: number; y: number }) => {
+      // Re-enable stage dragging
+      if (stageRef.current) {
+        stageRef.current.draggable(true);
+      }
+      
+      // Now sync to React state with the final position
+      const next = wiresRef.current.map((w) => {
+        if (w.id !== wireId) return w;
+        const newJoints = [...w.joints];
+        
+        newJoints[jointIndex] = { x: finalPos.x, y: finalPos.y };
+        
+        return { ...w, joints: newJoints };
+      });
+      
+      setWires(next);
+      pushToHistorySnapshot(elements, next);
+      setDraggingJoint(null);
+      stopSimulation();
+    },
+    [elements, pushToHistorySnapshot, stopSimulation, setWires, stageRef]
+  );
+
+  // Add a joint to a wire at a specific position
+  const addJointToWire = useCallback(
+    (wireId: string, position: { x: number; y: number }) => {
+      setWires((prev) => {
+        const next = prev.map((w) => {
+          if (w.id !== wireId) return w;
+          // Add the new joint at the end of existing joints
+          return { ...w, joints: [...w.joints, position] };
+        });
+        pushToHistorySnapshot(elements, next);
+        return next;
+      });
+      stopSimulation();
+    },
+    [elements, pushToHistorySnapshot, stopSimulation]
+  );
+
+  // Remove a joint from a wire
+  const removeJointFromWire = useCallback(
+    (wireId: string, jointIndex: number) => {
+      setWires((prev) => {
+        const next = prev.map((w) => {
+          if (w.id !== wireId) return w;
+          const newJoints = w.joints.filter((_, idx) => idx !== jointIndex);
+          return { ...w, joints: newJoints };
+        });
+        pushToHistorySnapshot(elements, next);
+        return next;
+      });
+      stopSimulation();
+    },
+    [elements, pushToHistorySnapshot, stopSimulation]
+  );
+
+  // Handle endpoint dragging start
+  const handleEndpointDragStart = useCallback(
+    (wireId: string, end: "from" | "to") => {
+      const wire = wiresRef.current.find((w) => w.id === wireId);
+      if (!wire) return;
+
+      const nodeId = end === "from" ? wire.fromNodeId : wire.toNodeId;
+      const node = getNodeById(nodeId);
+      const parent = node ? getNodeParent(nodeId) : null;
+      
+      if (!node || !parent) return;
+
+      const currentPos = getAbsoluteNodePosition(node, parent);
+      setDraggingEndpoint({ wireId, end, currentPos });
+      pushToHistorySnapshot(elements, wiresRef.current);
+      
+      // Disable stage dragging while dragging endpoint
+      if (stageRef.current) {
+        stageRef.current.draggable(false);
+      }
+    },
+    [elements, pushToHistorySnapshot, stageRef, getNodeById, getNodeParent]
+  );
+
+  // Handle endpoint dragging move
+  const handleEndpointDragMove = useCallback(
+    (wireId: string, end: "from" | "to", newPos: { x: number; y: number }) => {
+      setDraggingEndpoint((prev) => {
+        if (!prev || prev.wireId !== wireId || prev.end !== end) return prev;
+        return { ...prev, currentPos: newPos };
+      });
+
+      // Check if we're near any node for snapping feedback
+      let closestNodeId: string | null = null;
+      let minDistance = Infinity;
+      const snapDistance = 20; // pixels
+
+      elements.forEach((element) => {
+        element.nodes.forEach((node) => {
+          const nodePos = getAbsoluteNodePosition(node, element);
+          const distance = Math.sqrt(
+            Math.pow(nodePos.x - newPos.x, 2) + Math.pow(nodePos.y - newPos.y, 2)
+          );
+          
+          if (distance < snapDistance && distance < minDistance) {
+            // Don't allow connecting to the same wire's other endpoint
+            const wire = wiresRef.current.find((w) => w.id === wireId);
+            if (wire) {
+              const otherEndNodeId = end === "from" ? wire.toNodeId : wire.fromNodeId;
+              if (node.id !== otherEndNodeId) {
+                minDistance = distance;
+                closestNodeId = node.id;
+              }
+            }
+          }
+        });
+      });
+
+      setHoveredNodeForEndpoint(closestNodeId);
+
+      // Update Konva layer for visual feedback
+      if (wireLayerRef.current) {
+        wireLayerRef.current.batchDraw();
+      }
+    },
+    [elements, getNodeById, getNodeParent, wireLayerRef]
+  );
+
+  // Handle endpoint dragging end
+  const handleEndpointDragEnd = useCallback(
+    (wireId: string, end: "from" | "to", finalPos: { x: number; y: number }) => {
+      // Re-enable stage dragging
+      if (stageRef.current) {
+        stageRef.current.draggable(true);
+      }
+
+      // Find the closest node within snap distance
+      let targetNode: Node | null = null;
+      let minDistance = Infinity;
+      const snapDistance = 20; // pixels
+
+      elements.forEach((element) => {
+        element.nodes.forEach((node) => {
+          const nodePos = getAbsoluteNodePosition(node, element);
+          const distance = Math.sqrt(
+            Math.pow(nodePos.x - finalPos.x, 2) + Math.pow(nodePos.y - finalPos.y, 2)
+          );
+          
+          if (distance < snapDistance && distance < minDistance) {
+            minDistance = distance;
+            targetNode = node;
+          }
+        });
+      });
+
+      if (targetNode) {
+        // Update the wire to connect to the new node
+        const next = wiresRef.current.map((w) => {
+          if (w.id !== wireId) return w;
+
+          // Check for duplicate wire before updating
+          const newFromId = end === "from" ? targetNode!.id : w.fromNodeId;
+          const newToId = end === "to" ? targetNode!.id : w.toNodeId;
+
+          // Prevent self-connection
+          if (newFromId === newToId) {
+            return w; // Don't update
+          }
+
+          // Check if a wire already exists with these endpoints (either direction)
+          const duplicateExists = wiresRef.current.some(
+            (wire) =>
+              wire.id !== wireId &&
+              ((wire.fromNodeId === newFromId && wire.toNodeId === newToId) ||
+                (wire.fromNodeId === newToId && wire.toNodeId === newFromId))
+          );
+
+          if (duplicateExists) {
+            return w; // Don't update
+          }
+
+          // Update the endpoint
+          if (end === "from") {
+            return { ...w, fromNodeId: targetNode!.id };
+          } else {
+            return { ...w, toNodeId: targetNode!.id };
+          }
+        });
+
+        setWires(next);
+        pushToHistorySnapshot(elements, next);
+        stopSimulation();
+      }
+
+      // Clear dragging state
+      setDraggingEndpoint(null);
+      setHoveredNodeForEndpoint(null);
+    },
+    [elements, pushToHistorySnapshot, stopSimulation, setWires, stageRef, getNodeById, getNodeParent]
   );
 
   // Get wire color
@@ -389,7 +621,7 @@ export const useWireManagement = ({
     setWires([]);
     setWireCounter(0);
     setCreatingWireStartNode(null);
-    setEditingWire(null);
+  // ...existing code...
     setCreatingWireJoints([]);
     // Clear wire refs
     wireRefs.current = {};
@@ -416,8 +648,11 @@ export const useWireManagement = ({
     selectedWireColor,
     creatingWireStartNode,
     creatingWireJoints,
-    editingWire,
+  // ...existing code...
     wiresRef,
+    draggingJoint,
+    draggingEndpoint,
+    hoveredNodeForEndpoint,
 
     // Refs
     wireRefs,
@@ -430,7 +665,8 @@ export const useWireManagement = ({
     setSelectedWireColor,
     setCreatingWireStartNode,
     setCreatingWireJoints,
-    setEditingWire,
+  // ...existing code...
+    setDraggingJoint,
     getWirePoints,
     updateWiresDirect,
     updateInProgressWire,
@@ -441,5 +677,13 @@ export const useWireManagement = ({
     resetWireState,
     loadWires,
     sanitizeWireIds,
+    handleJointDragStart,
+    handleJointDragMove,
+    handleJointDragEnd,
+    addJointToWire,
+    removeJointFromWire,
+    handleEndpointDragStart,
+    handleEndpointDragMove,
+    handleEndpointDragEnd,
   };
 };

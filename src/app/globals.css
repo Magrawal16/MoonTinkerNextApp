@@ -45,7 +45,7 @@ body {
 .blocklyDisabled path.blocklyBlockBackground,
 .blocklyDisabled .blocklyPath,
 .blocklyDisabled {
-  opacity: 0.45 !important;
+  filter: grayscale(0.8) !important;
 }
 
 /* for text editor */
@@ -74,7 +74,98 @@ svg[display="none"] {
   display: none;
 }
 
+/* Monaco Editor: Red wavy underline for duplicate forever loops */
+.duplicate-forever-loop-underline {
+  border-bottom: 2px wavy #f14c4c !important;
+  text-decoration: wavy underline #f14c4c;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}
 
 .glass-popup {
   transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+/* Enhanced animations for block editor */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes progress {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(99, 102, 241, 0.6);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s infinite;
+}
+
+.animate-progress {
+  animation: progress 2s ease-in-out infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }

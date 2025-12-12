@@ -74,7 +74,17 @@ export interface PythonModule {
     DigitalPin: Record<string, string>;
     basic: {
         show_string: (text: string, interval?: number) => Promise<void>;
+        show_number: (value: string | number) => Promise<void>;
+        show_leds: (pattern: string) => Promise<void>;
         forever: (callback: () => void) => void;
         pause: (ms: number) => Promise<void>;
     };
+    music: {
+        play_tone: (frequency: number, durationBeats: number) => Promise<void>;
+        ring_tone: (frequency: number) => void;
+        rest: (durationBeats: number) => Promise<void>;
+        stop: () => void;
+    };
+    display?: any;
+    Image?: any;
 }

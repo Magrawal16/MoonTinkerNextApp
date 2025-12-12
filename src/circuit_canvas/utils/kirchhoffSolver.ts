@@ -1,6 +1,4 @@
 import { CircuitElement, Wire } from "../types/circuit";
-
-// DEBUG flag — set to true to console.log matrices and intermediate state
 const DEBUG = false;
 
 // Multimeter modeling constants
@@ -88,8 +86,6 @@ function solveSingleSubcircuit(
 
     const { A, z } = buildFullSystem(G, B, C, D, I, E);
 
-    if (DEBUG) console.log("A:", matrixToString(A), "z:", z);
-
     x = solveLinearSystem(A, z);
     if (!x) {
       return zeroOutComputed(elements);
@@ -120,13 +116,45 @@ function solveSingleSubcircuit(
     if (!changed) break; // converged
   }
 
+  // --- Bench Power Supply VC/CC adaptation pass ---
+  // After initial solve treating all ON supplies as voltage sources at vSet, detect any that exceed iLimit.
+  const supplyDefs = elements.filter(
+    (e) => e.type === "powersupply" && (e.properties as any)?.isOn !== false
+  );
+  const limitedIds = new Set<string>();
+  for (const s of supplyDefs) {
+    const idx = currentSourceIndexMap.get(s.id);
+    if (idx === undefined) continue;
+    const iLimit = (s.properties as any)?.iLimit ?? 1;
+    const currentVal = Math.abs(x![n + idx] ?? 0);
+    if (currentVal > iLimit + 1e-9) limitedIds.add(s.id);
+  }
+
+  let finalNodeVoltages = nodeVoltages;
+  let finalX = x!;
+  let finalCurrentSourceIndexMap = currentSourceIndexMap;
+
+  if (limitedIds.size > 0) {
+    // Rebuild matrices with limited supplies modeled as current sources instead of voltage sources.
+    const { results: reSolved } = reSolveWithCurrentLimitedSupplies(
+      elements,
+      nodeEquivalenceMap,
+      nodeIndex,
+      limitedIds
+    );
+    finalNodeVoltages = reSolved.nodeVoltages;
+    finalX = reSolved.x;
+    finalCurrentSourceIndexMap = reSolved.currentMap;
+  }
+
   const results = computeElementResults(
     elements,
-    nodeVoltages,
-    x!,
+    finalNodeVoltages,
+    finalX,
     nodeEquivalenceMap,
-    currentSourceIndexMap,
-    n
+    finalCurrentSourceIndexMap,
+    n,
+    limitedIds
   );
 
   return results;
@@ -313,16 +341,20 @@ function getElementsWithCurrent(
 ) {
   const result: CircuitElement[] = [];
 
-  for (const e of elements) {
-    if (!e || !e.type) continue;
-    if (
-      ((e.type === "battery" || e.type === "powersupply") &&
-        Array.isArray(e.nodes) &&
-        e.nodes.length === 2) ||
-      e.type === "microbit" ||
-      e.type === "microbitWithBreakout" ||
-      (e.type === "multimeter" && e.properties?.mode === "resistance")
-    ) {
+    for (const e of elements) {
+      if (!e || !e.type) continue;
+      if (
+        (((e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply")) &&
+          Array.isArray(e.nodes) &&
+          e.nodes.length === 2) ||
+        e.type === "microbit" ||
+        e.type === "microbitWithBreakout" ||
+        (e.type === "multimeter" && e.properties?.mode === "resistance")
+      ) {
+      // If it's a power supply explicitly switched OFF, do not treat as source.
+      if (e.type === "powersupply" && (e.properties as any)?.isOn === false) {
+        continue;
+      }
       result.push(e);
     }
   }
@@ -362,7 +394,8 @@ function buildMNAMatrices(
   nodeMap: Map<string, string>,
   nodeIndex: Map<string, number>,
   currentMap: Map<string, number>,
-  ledOnMap?: Map<string, boolean>
+  ledOnMap?: Map<string, boolean>,
+  currentLimitedIds?: Set<string>
 ) {
   const n = nodeIndex.size; // number of non-ground nodes
   const m = currentMap.size; // number of current sources / voltage sources
@@ -453,7 +486,7 @@ function buildMNAMatrices(
         G[bi2][wi] -= gb;
         G[wi][bi2] -= gb;
       }
-    } else if (el.type === "battery" || el.type === "powersupply") {
+    } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
       // find pos/neg mapped nodes
       const pos =
         el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1]?.id;
@@ -464,17 +497,48 @@ function buildMNAMatrices(
       const idx = safeCurrentIndex(el.id);
       if (idx === undefined) continue; // don't stamp if no mapping for source
 
+      // Treat an explicitly switched-off power supply as inactive (no source stamped)
+      const psIsOn = (el.properties as any)?.isOn;
+      if (el.type === "powersupply" && psIsOn === false) {
+        continue;
+      }
+
       if (pIdx !== undefined) B[pIdx][idx] -= 1;
       if (nIdx !== undefined) B[nIdx][idx] += 1;
       if (pIdx !== undefined) C[idx][pIdx] += 1;
       if (nIdx !== undefined) C[idx][nIdx] -= 1;
       // Battery has fixed params; powersupply is configurable
-      if (el.type === "battery") {
-        D[idx][idx] += 1.45; // Ω
-        E[idx] = 9; // V
+      // If this supply is current limited (CC mode), model as current source instead of voltage source.
+      if (el.type === "powersupply" && currentLimitedIds?.has(el.id)) {
+        // Undo voltage source stamping we just made (remove B/C contributions and D/E entry) then inject current.
+        if (pIdx !== undefined) B[pIdx][idx] += 1; // reverse earlier subtraction
+        if (nIdx !== undefined) B[nIdx][idx] -= 1;
+        if (pIdx !== undefined) C[idx][pIdx] -= 1;
+        if (nIdx !== undefined) C[idx][nIdx] += 1;
+        // zero row/col for this source index so it becomes inert
+        for (let k = 0; k < D.length; k++) {
+          D[k][idx] = 0;
+          D[idx][k] = 0;
+        }
+        D[idx][idx] = 0;
+        E[idx] = 0;
+        // Inject current source: +I at positive node, -I at negative node.
+        const iLimit = (el.properties as any)?.iLimit ?? 1;
+        if (pIdx !== undefined) I[pIdx] += iLimit;
+        if (nIdx !== undefined) I[nIdx] -= iLimit;
       } else {
-        D[idx][idx] += el.properties?.resistance ?? 0.2;
-        E[idx] = el.properties?.voltage ?? 5;
+        // Normal voltage source stamping
+        if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery") {
+          const defaultV = el.type === "battery" ? 9 : (el.type === "cell3v" ? 3 : (el.type === "AA_battery" ? 1.5 : 1.5));
+          const defaultR = el.type === "battery" ? 1.45 : (el.type === "cell3v" ? 0.8 : (el.type === "AA_battery" ? 0.3 : 0.4));
+          D[idx][idx] += el.properties?.resistance ?? defaultR; // internal resistance
+          E[idx] = el.properties?.voltage ?? defaultV; // source voltage
+        } else {
+          D[idx][idx] += el.properties?.resistance ?? 0.2;
+          // Use setpoint if present for bench supply
+          const vSet = (el.properties as any)?.vSet;
+          E[idx] = vSet !== undefined ? vSet : el.properties?.voltage ?? 5;
+        }
       }
     } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
       // Collect all 3.3V and GND node ids in this element
@@ -631,11 +695,12 @@ function computeElementResults(
   x: number[],
   nodeMap: Map<string, string>,
   currentMap: Map<string, number>,
-  n: number
+  n: number,
+  currentLimitedIds?: Set<string>
 ): CircuitElement[] {
   // Detect if subcircuit is externally powered (battery or microbit present)
   const externallyPowered = elements.some(
-    (e) => e.type === "battery" || e.type === "powersupply" || e.type === "microbit" || e.type === "microbitWithBreakout"
+    (e) => e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply" || e.type === "microbit" || e.type === "microbitWithBreakout"
   );
 
   return elements.map((el) => {
@@ -689,10 +754,24 @@ function computeElementResults(
       current = totalCurrent;
       voltage = totalVoltage;
       power = totalPower;
-    } else if (el.type === "battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
-      const idx = currentMap.get(el.id);
-      if (idx !== undefined) current = x[n + idx] ?? 0;
-      power = voltage * current;
+    } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
+      const isPsOff = el.type === "powersupply" && (el.properties as any)?.isOn === false;
+      if (isPsOff) {
+        // Hard zero when supply is OFF regardless of passive node potentials
+        voltage = 0;
+        current = 0;
+        power = 0;
+      } else {
+        const limited = el.type === "powersupply" && currentLimitedIds?.has(el.id);
+        if (limited) {
+          current = (el.properties as any)?.iLimit ?? 1;
+          power = voltage * current;
+        } else {
+          const idx = currentMap.get(el.id);
+            if (idx !== undefined) current = x[n + idx] ?? 0;
+          power = voltage * current;
+        }
+      }
     } else if (el.type === "multimeter") {
       const mode = el.properties?.mode;
       if (mode === "voltage") {
@@ -722,10 +801,16 @@ function computeElementResults(
       }
     }
 
+    const supplyMode = el.type === "powersupply"
+      ? ((el.type === "powersupply" && (el.properties as any)?.isOn === false)
+          ? "OFF"
+          : currentLimitedIds?.has(el.id) ? "CC" : "VC")
+      : undefined;
+
     return {
       ...el,
-      computed: { voltage, current, power, measurement },
-    };
+      computed: { voltage, current, power, measurement, supplyMode },
+    } as any;
   });
 }
 
@@ -799,6 +884,37 @@ function solveLinearSystem(A: number[][], z: number[]): number[] | null {
   }
 
   return x;
+}
+
+// Helper: rebuild & solve with identified current-limited supplies
+function reSolveWithCurrentLimitedSupplies(
+  elements: CircuitElement[],
+  nodeMap: Map<string, string>,
+  nodeIndex: Map<string, number>,
+  limitedIds: Set<string>
+) {
+  // Re-identify sources excluding limited supplies (they won't be voltage sources now)
+  const baseSources = getElementsWithCurrent(elements, nodeMap);
+  const filteredSources = baseSources.filter(
+    (e) => !(e.type === "powersupply" && limitedIds.has(e.id))
+  );
+  const currentMap = mapCurrentSourceIndices(filteredSources);
+  const { G, B, C, D, I, E } = buildMNAMatrices(
+    elements,
+    nodeMap,
+    nodeIndex,
+    currentMap,
+    undefined,
+    limitedIds
+  );
+  const { A, z } = buildFullSystem(G, B, C, D, I, E);
+  const x = solveLinearSystem(A, z) || [];
+  // Node voltages reconstruction
+  const nonGroundIds: string[] = [];
+  nodeIndex.forEach((_v, k) => nonGroundIds.push(k));
+  const groundId = Array.from(new Set(nodeMap.values())).find((id) => id.includes("GND")) || nonGroundIds[0];
+  const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+  return { results: { nodeVoltages, x, currentMap } };
 }
 
 /* ------------------------- Utilities for debug / small tests ------------------------- */

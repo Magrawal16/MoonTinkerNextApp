@@ -30,8 +30,7 @@ export class SimulatorProxy {
   private worker: Worker;
   private simulatorRemoteInstance: Comlink.Remote<any> | null = null;
   private options: SimulatorOptions;
-  private audio: AudioPlayer | null = null;
-
+  private audio: AudioPlayer;
 
   constructor(opts: SimulatorOptions) {
     this.options = {
@@ -40,6 +39,7 @@ export class SimulatorProxy {
       onEvent: opts.onEvent ? Comlink.proxy(opts.onEvent) : undefined,
     };
     this.worker = this.createWorker();
+    this.audio = new AudioPlayer();
   }
 
   private createWorker(): Worker {
@@ -47,6 +47,33 @@ export class SimulatorProxy {
       new URL("../workers/simulator.worker.ts", import.meta.url),
       { type: "module" }
     );
+  }
+
+  /**
+   * Handle audio commands from the Web Worker
+   */
+  private async handleAudioCommand(cmd: string, ...args: any[]): Promise<void> {
+    switch (cmd) {
+      case 'play_tone': {
+        const [frequency, durationBeats] = args;
+        await this.audio.playTone(frequency, durationBeats);
+        break;
+      }
+      case 'ring_tone': {
+        const [frequency] = args;
+        this.audio.ringTone(frequency);
+        break;
+      }
+      case 'rest': {
+        const [durationBeats] = args;
+        await this.audio.rest(durationBeats);
+        break;
+      }
+      case 'stop': {
+        this.audio.stopTone();
+        break;
+      }
+    }
   }
 
   async initialize() {
@@ -62,55 +89,22 @@ export class SimulatorProxy {
       throw new Error("SimulatorProxy not initialized after creation.");
     }
 
+    // Create a proxied audio callback
+    const audioCallback = Comlink.proxy(this.handleAudioCommand.bind(this));
+
     await this.simulatorRemoteInstance.initialize(
       this.options.onOutput,
-      this.options.onEvent
+      this.options.onEvent,
+      audioCallback
     );
-
-    // ✅ Initialize Audio Player
-    this.audio = new AudioPlayer();
   }
 
   async run(code: string): Promise<string> {
-  if (!this.simulatorRemoteInstance) throw new Error("Not initialized at run.");
-
-  // Initialize Audio if needed
-  if (!this.audio) this.audio = new AudioPlayer();
-
-  // 🎵 1. play_tone(frequency, duration)
-  const toneMatch = code.match(/music\.play_tone\((\d+),\s*(\d+)\)/);
-  if (toneMatch) {
-    const freq = parseFloat(toneMatch[1]);
-    const duration = parseFloat(toneMatch[2]);
-    await this.audio.playTone(freq, duration);
-    return "Played tone";
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at run.");
+    
+    // Pass all code to simulator - music module is now properly registered
+    return this.simulatorRemoteInstance.run(code);
   }
-
-  // 🎵 2. ring_tone(frequency)
-  const ringMatch = code.match(/music\.ring_tone\((\d+)\)/);
-  if (ringMatch) {
-    const freq = parseFloat(ringMatch[1]);
-    this.audio.ringTone(freq);
-    return "Ringing tone";
-  }
-
-  // 🎵 3. rest(duration)
-  const restMatch = code.match(/music\.rest\((\d+)\)/);
-  if (restMatch) {
-    const duration = parseFloat(restMatch[1]);
-    await this.audio.rest(duration);
-    return "Rest complete";
-  }
-
-  // 🎵 4. stop()
-  if (code.includes("music.stop()")) {
-    this.audio.stopTone();
-    return "Stopped tone";
-  }
-
-  // Default: pass to simulator
-  return this.simulatorRemoteInstance.run(code);
-}
 
 
   async getStates(): Promise<State> {
@@ -123,9 +117,14 @@ export class SimulatorProxy {
     return this.simulatorRemoteInstance.reset();
   }
 
+  async stop() {
+    this.audio.stopTone();
+    if (!this.simulatorRemoteInstance) throw new Error("Not initialized at stop.");
+    return this.simulatorRemoteInstance.stop();
+  }
+
   async disposeAndReload() {
-    // Stop any tone before resetting
-    this.audio?.stopTone(); //stops music when resetting
+    this.audio.stopTone();
     this.simulatorRemoteInstance?.reset();
     this.worker.terminate();
     this.worker = this.createWorker();
@@ -180,7 +179,7 @@ export class SimulatorProxy {
   }
 
   dispose() {
-    this.audio?.dispose();
+    this.audio.dispose();
     this.worker.terminate();
   }
 }

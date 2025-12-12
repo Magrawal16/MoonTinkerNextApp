@@ -6,6 +6,7 @@ export class AudioPlayer {
   private oscillator: OscillatorNode | null = null;
   private gainNode: GainNode | null = null;
   private isPlaying = false;
+  private closed = false;
 
 
   constructor() {
@@ -17,34 +18,30 @@ export class AudioPlayer {
   }
 
 
-  async playTone(frequency: number, durationSeconds: number = 1) {
+  async playTone(frequency: number, durationBeats: number = 1) {
     if (!this.audioCtx) return;
     if (this.isPlaying) {
       this.stopTone();
     }
 
+    // Convert beats to milliseconds (assuming 120 BPM = 500ms per beat)
+    const durationMs = durationBeats * 500;
 
     this.oscillator = this.audioCtx.createOscillator();
     this.gainNode = this.audioCtx.createGain();
 
-
     this.oscillator.connect(this.gainNode);
     this.gainNode.connect(this.audioCtx.destination);
-
 
     this.oscillator.type = "sine"; // could be 'square', 'triangle', 'sawtooth'
     this.oscillator.frequency.setValueAtTime(frequency, this.audioCtx.currentTime);
 
-
     this.gainNode.gain.setValueAtTime(0.2, this.audioCtx.currentTime); // soft volume
     this.oscillator.start();
 
-
     this.isPlaying = true;
 
-
-    await new Promise((resolve) => setTimeout(resolve, durationSeconds * 1000));
-
+    await new Promise((resolve) => setTimeout(resolve, durationMs));
 
     this.stopTone();
   }
@@ -68,9 +65,10 @@ export class AudioPlayer {
   }
 
 
-  rest(durationSeconds: number = 1) {
-    // Silence pause
-    return new Promise((resolve) => setTimeout(resolve, durationSeconds * 1000));
+  rest(durationBeats: number = 1) {
+    // Silence pause - convert beats to milliseconds (assuming 120 BPM = 500ms per beat)
+    const durationMs = durationBeats * 500;
+    return new Promise((resolve) => setTimeout(resolve, durationMs));
   }
 
 
@@ -87,7 +85,24 @@ export class AudioPlayer {
 
 
   dispose() {
-    this.stopTone();
-    this.audioCtx?.close();
+    // Idempotent teardown; safe to call multiple times
+    try {
+      this.stopTone();
+      const ctx = this.audioCtx;
+      if (!ctx) return;
+      // Avoid InvalidStateError: Cannot close a closed AudioContext
+      if ((ctx as any).state && (ctx as any).state === "closed") {
+        this.audioCtx = null;
+        this.closed = true;
+        return;
+      }
+      // Close asynchronously; ignore errors from already-closed contexts
+      void ctx.close().catch(() => {});
+      this.closed = true;
+    } catch (_) {
+      // swallow
+    } finally {
+      this.audioCtx = null;
+    }
   }
 }

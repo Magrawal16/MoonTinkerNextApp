@@ -1,9 +1,12 @@
 import type { PyodideInterface } from "pyodide";
 import { LEDModule } from "./ledModule";
+
 import { CHARACTER_PATTERNS } from "../characterPatterns";
+import { ImageModule } from "./imageModule";
 
 export class BasicModule {
     private foreverCallbacks: Set<any> = new Set();
+    private hasForeverLoop: boolean = false; // Track if a forever loop is already running
     // Serialize long-running display animations to avoid spamming from forever()
     private currentDisplayToken = 0;
     private displayPromise: Promise<void> | null = null;
@@ -13,6 +16,32 @@ export class BasicModule {
         private pyodide: PyodideInterface,
         private ledModule: LEDModule
     ) { }
+
+    /**
+     * Show a built-in image by name, e.g. display.show(Image.HAPPY)
+     */
+    async showImage(icon: string): Promise<void> {
+        const myToken = ++this.currentDisplayToken;
+        this.displayPromise = new Promise<void>((resolve) => {
+            this.displayPromiseResolve = resolve;
+        });
+        const pattern = ImageModule.getPattern(icon);
+        // First unplot all LEDs (clear display)
+        for (let y = 0; y < 5; y++) {
+            for (let x = 0; x < 5; x++) {
+                this.ledModule.unplot(x, y);
+            }
+        }
+        // Then plot only the pixels for the icon
+        for (let y = 0; y < 5; y++) {
+            const row = pattern[y] || "00000";
+            for (let x = 0; x < 5; x++) {
+                if (row.charAt(x) === "1") this.ledModule.plot(x, y);
+            }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
+    }
 
     async showString(text: string, interval: number = 150): Promise<void> {
         // Start a new display session; cancel previous by advancing the token
@@ -100,8 +129,11 @@ export class BasicModule {
             }
         }
         // Finish and let scheduler continue
-        if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
-        this.ledModule.clearDisplay();
+        if (myToken === this.currentDisplayToken) {
+            this.displayPromiseResolve?.();
+            // Only clear display if this is still the active display operation
+            this.ledModule.clearDisplay();
+        }
     }
 
     /**
@@ -109,7 +141,7 @@ export class BasicModule {
      * characters the value is treated as 0. The numeric value is converted to string
      * and displayed using showString (single digit renders statically; longer values scroll).
      */
-    showNumber(value: string | number): void {
+    async showNumber(value: string | number): Promise<void> {
         let num: number;
         if (typeof value === "string") {
             // If any alphabetic characters are present, treat as 0
@@ -129,8 +161,8 @@ export class BasicModule {
 
         // Format number string: keep decimal for non-integers
         const str = Number.isInteger(num) ? num.toString() : num.toString();
-        // Fire-and-forget to avoid requiring 'await' in Python code paths
-        void this.showString(str);
+        // Await the display operation to ensure it completes before moving on
+        await this.showString(str);
     }
 
     /**
@@ -144,8 +176,18 @@ export class BasicModule {
      *   # . . . .
      *   """)
      */
-    showLeds(pattern: string): void {
-        if (typeof pattern !== "string") return;
+    async showLeds(pattern: string): Promise<void> {
+        if (typeof pattern !== "string") {
+            return;
+        }
+        
+        // Start a new display session; cancel previous by advancing the token
+        const myToken = ++this.currentDisplayToken;
+        // Create/replace the display completion promise for the scheduler
+        this.displayPromise = new Promise<void>((resolve) => {
+            this.displayPromiseResolve = resolve;
+        });
+        
         // Normalize line endings and extract only '#' and '.' markers
         const markers = pattern
             .replace(/\r/g, "")
@@ -178,9 +220,20 @@ export class BasicModule {
                 else this.ledModule.unplot(x, y);
             }
         }
+        
+        // Add a small delay so the pattern is visible before next operation
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        // Resolve if this is still the active display
+        if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
     }
 
     forever(callback: () => void) {
+        // Only allow one forever loop - ignore subsequent calls
+        if (this.hasForeverLoop) {
+            console.warn("Multiple forever loops detected. Only the first forever loop will run.");
+            return;
+        }
+        this.hasForeverLoop = true;
         const proxy = this.pyodide.pyimport("pyodide.ffi.create_proxy")(callback);
         this.foreverCallbacks.add(proxy);
         this.startIndividualForeverLoop(proxy);
@@ -188,7 +241,14 @@ export class BasicModule {
 
     private startIndividualForeverLoop(callback: any) {
         const runCallback = async () => {
+            // If this callback has been removed/destroyed, stop the loop immediately
+            if (!this.foreverCallbacks.has(callback)) return;
             try {
+                // Wait for any ongoing display operation to complete first
+                if (this.displayPromise) {
+                    try { await this.displayPromise; } catch (_) { /* no-op */ }
+                }
+                await this.pause(300);
                 await callback();
                 // If a display animation is running (e.g., show_string scrolling),
                 // wait for it to complete before scheduling the next tick. This avoids
@@ -196,13 +256,20 @@ export class BasicModule {
                 if (this.displayPromise) {
                     try { await this.displayPromise; } catch (_) { /* no-op */ }
                 }
-            } catch (error) {
+            } catch (error: any) {
+                // If the PyProxy was destroyed (e.g., due to reset), stop the loop silently
+                const msg = String(error?.message || error || "");
+                if (msg.includes("already been destroyed")) {
+                    return;
+                }
                 console.error("Error in forever loop:", error);
             }
+            // Do not reschedule if this callback was removed in the interim
+            if (!this.foreverCallbacks.has(callback)) return;
             setTimeout(runCallback, 20);
         };
-        // Start after a delay to allow on_start() to complete
-        setTimeout(runCallback, 100);
+        // Start immediately but will wait for any display promise inside runCallback
+        setTimeout(runCallback, 0);
     }
 
     async pause(ms: number) {
@@ -210,12 +277,21 @@ export class BasicModule {
     }
 
     reset() {
+        // Cancel any scheduled forever callbacks
         this.foreverCallbacks.forEach((callback) => {
             if (callback.destroy) {
                 callback.destroy();
             }
         });
         this.foreverCallbacks.clear();
+        this.hasForeverLoop = false; // Reset the forever loop flag
+        // Abort any in-progress display (e.g., scrolling show_string)
+        this.currentDisplayToken++;
+        try { this.displayPromiseResolve?.(); } catch (_) { }
+        this.displayPromise = null;
+        this.displayPromiseResolve = null;
+        // Clear LED matrix immediately
+        this.ledModule.clearDisplay();
     }
 
     getAPI() {
@@ -223,6 +299,7 @@ export class BasicModule {
             show_string: this.showString.bind(this),
             show_number: this.showNumber.bind(this),
             show_leds: this.showLeds.bind(this),
+            show_image: this.showImage.bind(this),
             forever: this.forever.bind(this),
             pause: this.pause.bind(this),
         };

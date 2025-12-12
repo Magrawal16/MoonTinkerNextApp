@@ -55,13 +55,13 @@ export default function Microbit({
 
   const handleButtonDown = (btn: "A" | "B" | "AB") => {
     isPressing.current[btn] = true;
-    setButtonsPressed(prev => new Set([...prev, btn]));
+    setButtonsPressed((prev: Set<"A" | "B" | "AB">) => new Set([...prev, btn]));
     onControllerInput?.({ type: "button", button: btn, state: "pressed" });
   };
 
   const handleButtonUp = (btn: "A" | "B" | "AB") => {
     isPressing.current[btn] = false;
-    setButtonsPressed(prev => {
+    setButtonsPressed((prev: Set<"A" | "B" | "AB">) => {
       const next = new Set(prev);
       next.delete(btn);
       return next;
@@ -168,7 +168,7 @@ export default function Microbit({
   };
 
   return (
-    <BaseElement {...props}>
+    <BaseElement {...props} isSimulationOn={isSimulationOn}>
       <Group>
         {imgOffState && !isSimulationOn && (
           <Image
@@ -208,16 +208,20 @@ export default function Microbit({
           />
         )}
 
-        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
+        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x])
+            Render using the same layered glow + center LED used by the plain Microbit
+            but keep the breakout image's grid offsets so LEDs align correctly. */}
         {leds.map((row, y) =>
           row.map((_, x) => {
             const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
             const brightness = on ? b / 255 : 0;
-            
-            const centerX = 85+ x * 12.4;
-            const centerY = 50 + y * 12.4;
-            
+
+            // Use the breakout's original grid origin and cell spacing, then
+            // compute a center to draw the same glow layers as the Microbit
+            const centerX = 85 + x * 11.8 + 2; // original left + half of small rect -> center
+            const centerY = 44.4 + y * 13 + 5.05;
+
             return (
               <Group key={`${x}-${y}`}>
                 {/* Outermost extra wide glow - most transparent */}

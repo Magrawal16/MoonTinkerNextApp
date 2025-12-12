@@ -19,6 +19,10 @@ export type CircuitElement = {
     brightness?: number;
     color?: string;
     gesture?: string;
+    // For 1.5V battery form factor (AA or AAA) to mirror Tinkercad UI
+    batteryType?: "AA" | "AAA";
+    // For battery count (1-4 batteries in series) to mirror Tinkercad UI
+    batteryCount?: number;
   };
   computed?: {
     current?: number; // computed current through the element
@@ -69,10 +73,7 @@ export type Size =
   | { width: number; height: number; radius?: never }
   | { radius: number; width?: never; height?: never };
 
-export type EditingWire = {
-  wireId: string;
-  end: "from" | "to";
-};
+// ...existing code...
 
 export type CircuitElementProps = {
   type: string;
@@ -92,6 +93,8 @@ export type CircuitElementProps = {
 export type PaletteElementType =
   | "lightbulb"
   | "battery"
+  | "cell3v"
+  | "AA_battery"
   | "powersupply"
   | "resistor"
   | "multimeter"
@@ -111,6 +114,7 @@ export type PropertiesPanelProps = {
   ) => void;
   onWireEdit: (updatedWire: Wire, deleteElement: boolean) => void;
   onEditWireSelect?: (wire: Wire) => void;
+  // ...existing code...
   setOpenCodeEditor: (open: boolean) => void;
   wireColor?: string;
 };
@@ -149,4 +153,5 @@ export interface BaseElementProps {
   x: number;
   y: number;
   selected?: boolean;
+  draggable?: boolean;
 }

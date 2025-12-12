@@ -39,6 +39,26 @@ export default function CircuitSelector() {
             draggable
             onDragStart={(e) => {
               e.dataTransfer.setData("application/element-type", JSON.stringify(el));
+              
+              // Create a custom drag image showing only the element icon
+              const img = document.createElement('img');
+              img.src = el.iconPath;
+              img.style.position = 'absolute';
+              img.style.top = '-1000px';
+              img.style.left = '-1000px';
+              img.style.width = '60px';
+              img.style.height = '60px';
+              img.style.objectFit = 'contain';
+              
+              document.body.appendChild(img);
+              
+              // Set the custom drag image centered on cursor
+              e.dataTransfer.setDragImage(img, 30, 30);
+              
+              // Clean up the temporary element after drag starts
+              setTimeout(() => {
+                document.body.removeChild(img);
+              }, 0);
             }}
           >
             <img

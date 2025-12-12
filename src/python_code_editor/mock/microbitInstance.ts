@@ -7,6 +7,7 @@ import { LEDModule } from "./modules/ledModule";
 import { PinsModule } from "./modules/pinsModule";
 import { LogoTouchModule } from "./modules/logoTouchModule";
 import { BasicModule } from "./modules/basicModule";
+import { MusicModule } from "./modules/musicModule";
 import type { StateSnapshot, PythonModule } from "./interfaces";
 
 export class MicrobitSimulator {
@@ -16,6 +17,8 @@ export class MicrobitSimulator {
   private readonly pinsModule: PinsModule;
   private readonly logoTouchModule: LogoTouchModule;
   private readonly basicModule: BasicModule;
+  private readonly musicModule: MusicModule;
+  private audioCallback: ((cmd: string, ...args: any[]) => Promise<void>) | null = null;
 
   constructor(private readonly pyodide: PyodideInterface) {
     this.eventEmitter = new MicrobitEventEmitter();
@@ -24,6 +27,7 @@ export class MicrobitSimulator {
     this.pinsModule = new PinsModule(pyodide, this.eventEmitter);
     this.logoTouchModule = new LogoTouchModule(pyodide, this.eventEmitter);
     this.basicModule = new BasicModule(pyodide, this.ledModule);
+    this.musicModule = new MusicModule(pyodide);
     // initialize public APIs after modules exist
     this.pins = this.pinsModule.getAPI();
     this.Button = this.buttonModule.Button;
@@ -34,6 +38,7 @@ export class MicrobitSimulator {
       _clear: this.buttonModule.clearInputs.bind(this.buttonModule),
     };
     this.basic = this.basicModule.getAPI();
+    this.music = this.musicModule.getAPI();
     this.DigitalPin = this.pinsModule.DigitalPin;
   }
   // All pin/led/button/logo functionality is implemented in modules.
@@ -45,7 +50,18 @@ export class MicrobitSimulator {
   public readonly led: any;
   public readonly input: any;
   public readonly basic: any;
+  public readonly music: any;
   public readonly DigitalPin: Record<string, string>;
+
+  /**
+   * Set the audio callback that will be called for music operations
+   * This allows the music module to communicate with the main thread for audio playback
+   */
+  setAudioCallback(callback: (cmd: string, ...args: any[]) => Promise<void>): void {
+    this.audioCallback = callback;
+    this.musicModule.setAudioCallback(callback);
+  }
+
   subscribe(callback: (event: any) => void): () => void {
     return this.eventEmitter.subscribe(callback);
   }
@@ -56,6 +72,7 @@ export class MicrobitSimulator {
     this.pinsModule.reset();
     this.logoTouchModule.reset();
     this.basicModule.reset();
+    this.musicModule.reset();
     this.eventEmitter.emit({ type: "reset" });
   }
 
@@ -86,6 +103,14 @@ export class MicrobitSimulator {
   }
 
   getPythonModule(): PythonModule {
+    // Expose display and Image for display.show(Image.HEART) compatibility
+    const display = {
+      show: this.basicModule.showImage.bind(this.basicModule),
+      clear: this.ledModule.clearDisplay.bind(this.ledModule),
+    };
+    const Image = new Proxy({}, {
+      get: (_, icon: string) => icon
+    });
     return {
       pins: this.pinsModule.getAPI(),
       led: this.ledModule.getAPI(),
@@ -97,6 +122,9 @@ export class MicrobitSimulator {
       Button: this.buttonModule.Button,
       DigitalPin: this.pinsModule.DigitalPin,
       basic: this.basicModule.getAPI(),
+      music: this.musicModule.getAPI(),
+      display,
+      Image,
     };
   }
 }

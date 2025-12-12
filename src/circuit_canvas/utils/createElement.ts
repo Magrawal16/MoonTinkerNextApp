@@ -15,8 +15,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 1,
-        y: 43.5,
+        x: 47.5,
+        y: 20,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -24,8 +24,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 1,
-        y: 35.5,
+        x: 82,
+        y: 22,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -40,6 +40,111 @@ export default function createElement(
     displayProperties: [],
   };
 
+  const cell3vElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 55,
+        y: 3.5,
+        parentId: id,
+        polarity: "positive" as const,
+        placeholder: "Positive",
+        fillColor: "green",
+      },
+      {
+        id: id + "-node-2",
+        x: 55,
+        y: 150,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: 3,
+      resistance: 0.8, 
+    },
+    displayProperties: [],
+  };
+
+  const AA_batteryElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 102.5,
+        y: 2,
+        parentId: id,
+        polarity: "positive" as const,
+        placeholder: "Positive",
+        fillColor: "green",
+      },
+      {
+        id: id + "-node-2",
+        x: 94.5,
+        y: 2,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: 1.5,
+      resistance: 0.3, // AA cell internal resistance typical low value
+      // allow switching form-factor in Properties Panel (AA ↔ AAA)
+      // used only for rendering + default resistance; solver uses resistance value
+      batteryType: 'AA' as any,
+      // allow count selection (1-4 batteries in series)
+      batteryCount: 1,
+    },
+    // include custom tokens to enable the Update button in PropertiesPanel
+    displayProperties: ["batteryType", "batteryCount"],
+  };
+
+  const AAA_batteryElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 33.5,
+        y: 1,
+        parentId: id,
+        polarity: "positive" as const,
+        placeholder: "Positive",
+        fillColor: "green",
+      },
+      {
+        id: id + "-node-2",
+        x: 25.5,
+        y: 1,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: 1.5,
+      resistance: 0.4, // AAA cell internal resistance slightly higher than AA
+    },
+    displayProperties: [],
+  };
+
   const powerSupplyElement: CircuitElement = {
     id,
     type: props.type,
@@ -49,8 +154,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 72,
-        y: 117,
+        x: 73,
+        y: 115,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -58,8 +163,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 86.5,
-        y: 117,
+        x: 87,
+        y: 115,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -67,9 +172,14 @@ export default function createElement(
       },
     ],
     properties: {
+      // Store effective output voltage separately; settings tracked via custom keys on properties using casting
       voltage: props.properties?.voltage ?? 5,
       resistance: props.properties?.resistance ?? 0.2,
-    },
+      // Bench supply control settings (non-schema; accessed via casting)
+      vSet: (props as any).properties?.vSet ?? props.properties?.voltage ?? 5,
+      iLimit: (props as any).properties?.iLimit ?? 1,
+      isOn: (props as any).properties?.isOn ?? false,
+    } as any,
     displayProperties: ["voltage"],
   };
 
@@ -90,7 +200,7 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 79,
+        x: 80.5,
         y: 140,
         parentId: id,
         placeholder: "Terminal 2",
@@ -156,7 +266,7 @@ export default function createElement(
             x: pos.right.x - 40,
             y: pos.right.y + 13,
             parentId: id,
-            placeholder: "Terminal 1",
+            placeholder: "Terminal 2",
             fillColor: "red",
           },
         ],
@@ -599,6 +709,15 @@ export default function createElement(
   switch (props.type) {
     case "battery":
       element = batteryElement;
+      break;
+    case "cell3v":
+      element = cell3vElement;
+      break;
+    case "AA_battery":
+      element = AA_batteryElement;
+      break;
+    case "AAA_battery":
+      element = AAA_batteryElement;
       break;
     case "powersupply":
       element = powerSupplyElement;

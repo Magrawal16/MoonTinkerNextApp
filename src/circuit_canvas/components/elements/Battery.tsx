@@ -21,8 +21,8 @@ export default function Battery(props: BaseElementProps) {
       {img && (
         <Image
           image={img}
-          width={160}
-          height={80}
+          width={120}
+          height={180}
           shadowColor={props.selected ? "#000000" : undefined}
           shadowBlur={props.selected ? 10 : 0}
           shadowOffset={{ x: 15, y: -15 }}

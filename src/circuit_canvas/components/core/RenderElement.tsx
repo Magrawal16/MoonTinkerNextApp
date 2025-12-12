@@ -1,13 +1,16 @@
-// RenderElement.tsx
 
 import { useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
-import { Rect, Group, Text, Label, Tag } from "react-konva";
+import { Rect, Group, Text, Label, Tag, Path } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
 import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
+import { shouldHideNode, getElementRegions } from "@/circuit_canvas/utils/elementOverlap";
 import Lightbulb from "@/circuit_canvas/components/elements/Lightbulb";
 import Battery from "@/circuit_canvas/components/elements/Battery";
+import Cell3v from "@/circuit_canvas/components/elements/Cell3v";
+import AA_battery from "@/circuit_canvas/components/elements/AA_battery";
+import AAA_battery from "@/circuit_canvas/components/elements/AAA_battery";
 import Led from "@/circuit_canvas/components/elements/Led";
 import Resistor from "@/circuit_canvas/components/elements/Resistor";
 import Multimeter from "@/circuit_canvas/components/elements/Multimeter";
@@ -32,27 +35,28 @@ interface RenderElementProps {
   isSimulationOn?: boolean;
   elements?: CircuitElement[];
   wires?: Wire[];
+  onPowerSupplySettingsChange?: (id: string, settings: { vSet: number; iLimit: number; isOn: boolean }) => void;
   // Toggle node hit targets/tooltips (for external node overlay layer)
   showNodes?: boolean;
   // Toggle rendering of the element's visual body; when false, only nodes/labels render
   showBody?: boolean;
+  // Hovered node ID when dragging wire endpoint
+  hoveredNodeForEndpoint?: string | null;
 }
 
-export default function RenderElement({
-  element,
-  simulator,
-  elements,
-  wires,
-  ...props
-}: RenderElementProps) {
+export default function RenderElement(props: RenderElementProps) {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const elements = props.elements;
+  const wires = props.wires;
+  const { element } = props;
   const center = getElementCenter(element);
-
   // Get connected microbit data for ultrasonic sensor using utility function
   const connectedMicrobitData = element.type === "ultrasonicsensor4p" && elements && wires
     ? findConnectedMicrobit(element, elements, wires)
     : null;
-
+  // Get all collision regions for this element
+  const collisionRegions = getElementRegions(element);
+  
   return (
     <Group
       x={element.x}
@@ -68,6 +72,7 @@ export default function RenderElement({
       // Only the body layer should be draggable, and not while simulation is running
       draggable={props.showBody !== false && !props.isSimulationOn}
     >
+      
       {/* Render circuit elements (conditionally hidden in nodes-only overlay) */}
       {props.showBody !== false && element.type === "lightbulb" && (
         <Lightbulb
@@ -76,6 +81,8 @@ export default function RenderElement({
           y={0}
           power={element.computed?.power ?? 0}
           selected={props.selectedElementId === element.id}
+          draggable={false}
+          isSimulationOn={props.isSimulationOn}
         />
       )}
       {props.showBody !== false && element.type === "led" && (
@@ -86,6 +93,8 @@ export default function RenderElement({
           power={element.computed?.power ?? 0}
           selected={props.selectedElementId === element.id}
           color={element.properties?.color as string | undefined}
+          draggable={false}
+          isSimulationOn={props.isSimulationOn}
         />
       )}
       {props.showBody !== false && element.type === "battery" && (
@@ -93,7 +102,61 @@ export default function RenderElement({
           id={element.id}
           x={0}
           y={0}
+          draggable={false}
           selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
+        />
+      )}
+      {props.showBody !== false && element.type === "cell3v" && (
+        <Cell3v
+          id={element.id}
+          x={0}
+          y={0}
+          draggable={false}
+          selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
+        />
+      )}
+      {props.showBody !== false && element.type === "AA_battery" && (() => {
+        const batteryType = (element.properties as any)?.batteryType ?? 'AA';
+        const batteryCount = (element.properties as any)?.batteryCount ?? 1;
+        
+        // Handle AAA type with dynamic count
+        if (batteryType === 'AAA') {
+          return (
+            <AAA_battery
+              id={element.id}
+              x={0}
+              y={0}
+              count={batteryCount}
+              draggable={false}
+              selected={props.selectedElementId === element.id}
+              isSimulationOn={props.isSimulationOn}
+            />
+          );
+        }
+        
+        // Handle AA type with dynamic count
+        return (
+          <AA_battery
+            id={element.id}
+            x={0}
+            y={0}
+            count={batteryCount}
+            draggable={false}
+            selected={props.selectedElementId === element.id}
+            isSimulationOn={props.isSimulationOn}
+          />
+        );
+      })()}
+      {props.showBody !== false && element.type === "AAA_battery" && (
+        <AAA_battery
+          id={element.id}
+          x={0}
+          y={0}
+          draggable={false}
+          selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
         />
       )}
       {props.showBody !== false && element.type === "powersupply" && (
@@ -102,6 +165,15 @@ export default function RenderElement({
           x={0}
           y={0}
           selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
+          draggable={false}
+          vSet={(element.properties as any).vSet ?? element.properties?.voltage ?? 5}
+          iLimit={(element.properties as any).iLimit ?? 1}
+          isOn={(element.properties as any).isOn ?? false}
+          vMeasured={element.computed?.voltage ?? 0}
+          iMeasured={element.computed?.current ?? 0}
+          supplyMode={(element.computed as any)?.supplyMode}
+          onSettingsChange={props.onPowerSupplySettingsChange}
         />
       )}
       {props.showBody !== false && element.type === "resistor" && (
@@ -111,9 +183,11 @@ export default function RenderElement({
           y={22}
           resistance={element.properties?.resistance}
           selected={props.selectedElementId === element.id}
+          draggable={false}
           bandWidths={[2.6, 2.6, 2.6, 1.2]} // widths for each band
           bandHeights={[12.4, 10, 10, 12.2]} // heights for each band
           bandGaps={[3, 4, 6]} // gaps between bands
+          isSimulationOn={props.isSimulationOn}
         />
       )}
       {props.showBody !== false && element.type === "multimeter" && (
@@ -124,6 +198,7 @@ export default function RenderElement({
           measurement={element.computed?.measurement}
           initialMode={(element.properties?.mode as any) ?? "voltage"}
           onModeChange={props.handleModeChange}
+          draggable={false}
           isSimulationOn={props.isSimulationOn}
           selected={props.selectedElementId === element.id}
         />
@@ -139,6 +214,8 @@ export default function RenderElement({
           resistance={element.properties?.resistance ?? 100}
           ratio={element.properties?.ratio ?? 0.5}
           selected={props.selectedElementId === element.id}
+          draggable={false}
+          isSimulationOn={props.isSimulationOn}
         />
       )}
       {props.showBody !== false && element.type === "microbit" && (
@@ -154,6 +231,7 @@ export default function RenderElement({
             Array.from({ length: 5 }, () => Array(5).fill(0))
           }
           selected={props.selectedElementId === element.id}
+          draggable={false}
           isSimulationOn={props.isSimulationOn}
           pins={
             (element.controller?.pins as Record<
@@ -176,6 +254,7 @@ export default function RenderElement({
             Array.from({ length: 5 }, () => Array(5).fill(0))
           }
           selected={props.selectedElementId === element.id}
+          draggable={false}
           isSimulationOn={props.isSimulationOn}
           pins={
             (element.controller?.pins as Record<
@@ -190,6 +269,7 @@ export default function RenderElement({
           id={element.id}
           x={0}
           y={0}
+          draggable={false}
           selected={props.selectedElementId === element.id}
           connectionPins={{
             trig: element.nodes.find((n) => n.placeholder === "TRIG")?.id,
@@ -228,6 +308,11 @@ export default function RenderElement({
       {props.showNodes !== false &&
         element.nodes.map((node) => {
           const isHovered = node.id === hoveredNodeId;
+          const isTargetForEndpoint = node.id === props.hoveredNodeForEndpoint;
+          
+          // Hide node if element is covered by another element (z-order)
+          const isHidden = elements && shouldHideNode(element.id, elements);
+          if (isHidden) return null;
 
           return (
             <Group key={node.id}>
@@ -238,10 +323,20 @@ export default function RenderElement({
                 height={5.6}
                 cornerRadius={0.3}
                 fill={
-                  isHovered && node.fillColor ? node.fillColor : "transparent"
+                  isTargetForEndpoint
+                    ? "#FFD700"
+                    : isHovered && node.fillColor
+                    ? node.fillColor
+                    : "transparent"
                 }
-                stroke={isHovered ? "black" : "transparent"}
-                strokeWidth={isHovered ? 1.4 : 0}
+                stroke={
+                  isTargetForEndpoint
+                    ? "#FF6B00"
+                    : isHovered
+                    ? "black"
+                    : "transparent"
+                }
+                strokeWidth={isTargetForEndpoint ? 2.5 : isHovered ? 1.4 : 0}
                 onClick={(e) => {
                   e.cancelBubble = true;
                   // Prevent starting wire creation while simulation is running
@@ -259,11 +354,20 @@ export default function RenderElement({
                   const stage = e.target.getStage();
                   if (stage) stage.container().style.cursor = "default";
                 }}
+                shadowBlur={isTargetForEndpoint ? 8 : 0}
+                shadowColor="#FFD700"
+                shadowEnabled={isTargetForEndpoint}
               />
 
-              {/* Tooltip (conditionally rendered) */}
-              {isHovered && node.placeholder && (
-                <Label x={node.x + 8} y={node.y - 18} opacity={0.95}>
+              {/* Tooltip (shows on hover or when targeted during endpoint drag) */}
+              {node.placeholder && (isHovered || isTargetForEndpoint) && (
+                <Label
+                  x={node.x + 8}
+                  y={node.y - 18}
+                  opacity={0.95}
+                  rotation={-(element.rotation || 0)}
+                  listening={false}
+                >
                   <Tag
                     fill="#1f4060"
                     stroke="black"

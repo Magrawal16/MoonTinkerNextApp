@@ -31,7 +31,8 @@ class Simulator {
 
   async initialize(
     onOutput?: Comlink.Remote<(line: string) => void>,
-    onEvent?: Comlink.Remote<(event: MicrobitEvent) => void>
+    onEvent?: Comlink.Remote<(event: MicrobitEvent) => void>,
+    onAudio?: Comlink.Remote<(cmd: string, ...args: any[]) => Promise<void>>
   ) {
     this.onOutput = onOutput as (line: string) => void;
     this.onEvent = onEvent as (event: MicrobitEvent) => void;
@@ -52,6 +53,12 @@ class Simulator {
       (this.options.controller === "microbit" || this.options.controller === "microbitWithBreakout")
     ) {
       this.microbit = new MicrobitSimulator(this.interpreter.getPyodide()!);
+      
+      // Set up audio callback if provided
+      if (onAudio) {
+        this.microbit.setAudioCallback(onAudio as (cmd: string, ...args: any[]) => Promise<void>);
+      }
+      
       this.interpreter.registerHardwareModule(
         "microbit", // <-- always use "microbit"
         this.microbit.getPythonModule()
@@ -84,6 +91,22 @@ class Simulator {
 
     this.microbit?.reset();
     return this.interpreter.run(code);
+  }
+
+  /**
+   * Stop any running user program immediately. Cancels all asyncio tasks
+   * in the interpreter and resets the micro:bit peripherals/state.
+   */
+  async stop() {
+    if (!this.interpreter) return;
+    try {
+      await this.interpreter.run(`
+import asyncio
+for task in asyncio.all_tasks():
+    task.cancel()
+`);
+    } catch (_) { }
+    try { this.microbit?.reset(); } catch (_) { }
   }
 
   getStates() {

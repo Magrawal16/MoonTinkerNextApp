@@ -47,7 +47,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "src/lib/code/workers/pyodideWorkerClient"
+    "src/lib/code/workers/pyodideWorkerClient",
+    ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

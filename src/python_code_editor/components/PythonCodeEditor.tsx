@@ -7,6 +7,7 @@ import { registerHoverProvider } from "../providers/hovers";
 import { registerSignatureHelp } from "../providers/signatures";
 import { registerSymbolProvider } from "../providers/symbols";
 import { addInlineDefLint } from "../lint/inlineDefLint";
+import { addForeverLoopLint } from "../lint/foreverLoopLint";
 
 // Add WebUSB type declarations
 interface USBDevice {
@@ -348,6 +349,7 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
         registerSignatureHelp(monaco, disposables);
         registerSymbolProvider(monaco, disposables);
         addInlineDefLint(monaco, editor);
+        addForeverLoopLint(monaco, editor); // Add forever loop validation
       } catch (error) {
         console.warn('Some language services failed to load:', error);
       }

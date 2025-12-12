@@ -14,10 +14,12 @@ type ShortcutArgs = {
     React.SetStateAction<CircuitElement | null>
   >;
   setCreatingWireStartNode: React.Dispatch<React.SetStateAction<string | null>>;
-  setEditingWire: React.Dispatch<React.SetStateAction<any>>;
   pushToHistory: () => void;
+  // Optional: push specific snapshot to history (avoids ref timing issues)
+  pushToHistorySnapshot?: (elements: CircuitElement[], wires: Wire[]) => void;
   stopSimulation: () => void;
   resetState: () => void;
+  openNewSessionModal: () => void;
   getNodeParent: (nodeId: string) => CircuitElement | null | undefined;
   undo: () => void;
   redo: () => void;
@@ -25,6 +27,7 @@ type ShortcutArgs = {
   updateWiresDirect?: () => void; // Add wire update function
   setActiveControllerId: React.Dispatch<React.SetStateAction<string | null>>;
   isSimulationOn: boolean;
+  onRequestControllerDelete?: (element: CircuitElement) => void;
 };
 
 /**
@@ -38,8 +41,8 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
       keys: ["escape"],
     },
     {
-      name: "Reset",
-      description: "Reset the entire canvas",
+      name: "New Session",
+      description: "Start a new session",
       keys: ["ctrl", "l"],
     },
     {
@@ -82,16 +85,18 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
     setWires,
     setSelectedElement,
     setCreatingWireStartNode,
-    setEditingWire,
     pushToHistory,
+    pushToHistorySnapshot,
     stopSimulation,
     resetState,
+    openNewSessionModal,
     getNodeParent,
     undo,
     redo,
     toggleSimulation,
     setActiveControllerId,
     isSimulationOn,
+    onRequestControllerDelete,
   } = args;
 
   return getShortcutMetadata().map((meta) => {
@@ -101,17 +106,15 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
           ...meta,
           handler: () => {
             setCreatingWireStartNode(null);
-            setEditingWire(null);
             setSelectedElement(null);
-            setActiveControllerId(null);
+            // Keep last active micro:bit so Code button reopens it
           },
         };
       case "ctrl+l":
         return {
           ...meta,
           handler: () => {
-            setSelectedElement(null);
-            resetState();
+            openNewSessionModal();
           },
         };
       case "ctrl+z":
@@ -135,35 +138,57 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
           ...meta,
           handler: () => {
             if (!selectedElement) return;
-            pushToHistory();
+            // If a programmable controller is selected, delegate to confirmation modal
+            if (
+              (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") &&
+              onRequestControllerDelete
+            ) {
+              onRequestControllerDelete(selectedElement);
+              return;
+            }
             if (selectedElement.type === "wire") {
-              setWires((prev) =>
-                prev.filter((w) => w.id !== selectedElement.id)
-              );
+              const nextWires = wires.filter((w) => w.id !== selectedElement.id);
+              setWires(nextWires);
+              // Record history AFTER deletion so undo restores the wire
+              if (pushToHistorySnapshot) {
+                pushToHistorySnapshot(elements, nextWires);
+              } else {
+                pushToHistory();
+              }
             } else {
-              setElements((prev) =>
-                prev.filter((el) => el.id !== selectedElement.id)
+              const nextElements = elements.filter((el) => el.id !== selectedElement.id);
+              const nextWires = wires.filter(
+                (w) =>
+                  getNodeParent(w.fromNodeId)?.id !== selectedElement.id &&
+                  getNodeParent(w.toNodeId)?.id !== selectedElement.id
               );
-              setWires((prev) =>
-                prev.filter(
-                  (w) =>
-                    getNodeParent(w.fromNodeId)?.id !== selectedElement.id &&
-                    getNodeParent(w.toNodeId)?.id !== selectedElement.id
-                )
-              );
+              setElements(nextElements);
+              setWires(nextWires);
+              // Record history AFTER deletion so undo restores element+wires
+              if (pushToHistorySnapshot) {
+                pushToHistorySnapshot(nextElements, nextWires);
+              } else {
+                pushToHistory();
+              }
             }
             stopSimulation();
             setSelectedElement(null);
             setCreatingWireStartNode(null);
-            setEditingWire(null);
+            // ...existing code...
           },
         };
       case "shift+w":
         return {
           ...meta,
           handler: () => {
-            pushToHistory();
-            setWires([]);
+            const nextWires: Wire[] = [];
+            setWires(nextWires);
+            // Record history AFTER clearing for proper undo
+            if (pushToHistorySnapshot) {
+              pushToHistorySnapshot(elements, nextWires);
+            } else {
+              pushToHistory();
+            }
             stopSimulation();
           },
         };

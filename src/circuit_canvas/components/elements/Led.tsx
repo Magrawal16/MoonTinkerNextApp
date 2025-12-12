@@ -192,13 +192,13 @@ export default function Led(props: LedProps) {
           brightness > VISIBLE_THRESHOLD && (
             <Group listening={false}>
               <Rect
-                x={pos.rect.x}           // adjust to align with LED base
-                y={pos.rect.y}           // shift down to cover rectangular part
-                width={pos.rect.width}       // match LED width
-                height={pos.rect.height}      // height of straight sides
+                x={pos.rect.x}
+                y={pos.rect.y}
+                width={pos.rect.width}
+                height={pos.rect.height}
                 fill={glow.base}
                 opacity={0.25 + 0.4 * brightness}
-                cornerRadius={0} // slight curve
+                cornerRadius={0}
                 shadowColor={glow.shadow}
                 shadowBlur={30 + 60 * brightness}
                 shadowOpacity={0}
@@ -206,14 +206,14 @@ export default function Led(props: LedProps) {
                 globalCompositeOperation="lighten"
               />
 
-              {/* Semicircle top */}
+              {/* Semicircle top only, removed bottom arc for better look */}
               <Arc
-                x={pos.arcTop.x}        // center horizontally
-                y={pos.arcTop.y}          // where semicircle starts
+                x={pos.arcTop.x}
+                y={pos.arcTop.y }
                 innerRadius={0}
-                outerRadius={pos.arcTop.outerRadius} // should match half the LED width
-                angle={180}     // half circle
-                rotation={180}    // facing upward
+                outerRadius={pos.arcTop.outerRadius}
+                angle={180}
+                rotation={180}
                 fill={glow.base}
                 opacity={0.25 + 0.4 * brightness}
                 shadowColor={glow.shadow}
@@ -222,23 +222,35 @@ export default function Led(props: LedProps) {
                 listening={false}
                 globalCompositeOperation="lighten"
               />
-              {/* Semicircle bottom */
-                <Arc
-                  x={pos.arcBottom.x}        // center horizontally
-                  y={pos.arcBottom.y}          // where semicircle starts
-                  innerRadius={0}
-                  outerRadius={15.5} // should match half the LED width
-                  angle={180}     // half circle
-                  rotation={360}    // facing downward
-                  fill={glow.base}
-                  opacity={0.25 + 0.4 * brightness}
-                  shadowColor={glow.shadow}
-                  shadowBlur={30 + 60 * brightness}
-                  shadowOpacity={0}
-                  listening={false}
-                  globalCompositeOperation="lighten"
-                />
-              }
+
+              {/* Add a soft bottom glow using Ellipse */}
+              <Ellipse
+                x={pos.rect.x + pos.rect.width / 2}
+                y={pos.rect.y + pos.rect.height + 10}
+                radiusX={pos.rect.width * 0.45}
+                radiusY={5}
+                fill={glow.base}
+                opacity={0.15 + 0.16 * brightness}
+                shadowColor={glow.shadow}
+                shadowBlur={12 + 20 * brightness}
+                shadowOpacity={0.12 + 0.13 * brightness}
+                listening={false}
+                globalCompositeOperation="lighten"
+              />
+
+              {/* Optionally, keep a subtle fade at the bottom for extra realism */}
+              <Rect
+                x={pos.rect.x}
+                y={pos.rect.y + pos.rect.height - 5}
+                width={pos.rect.width}
+                height={4}
+                fillLinearGradientStartPoint={{ x: 0, y: 0 }}
+                fillLinearGradientEndPoint={{ x: 0, y: 4 }}
+                fillLinearGradientColorStops={[0, glow.base, 1, 'rgba(0,0,0,0)']}
+                opacity={0.12 + 0.15 * brightness}
+                listening={false}
+                globalCompositeOperation="lighten"
+              />
             </Group>
           )
         )}

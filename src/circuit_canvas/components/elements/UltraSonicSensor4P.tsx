@@ -258,7 +258,7 @@ useEffect(() => {
   };
 
   return (
-    <BaseElement {...props}>
+    <BaseElement {...props} isSimulationOn={props.isSimulation}>
       {img && (
         <Group>
           {/* Sensor image */}

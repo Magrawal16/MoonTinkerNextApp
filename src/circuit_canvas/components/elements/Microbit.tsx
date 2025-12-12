@@ -157,8 +157,18 @@ export default function Microbit({
     // Hook for future logo touch event dispatch if needed
   };
   return (
-    <BaseElement {...props}>
+    <BaseElement {...props} isSimulationOn={isSimulationOn}>
       <Group>
+        {/* Custom hit area for selecting the microbit - covers only the main board */}
+        <Rect
+          x={10}
+          y={48}
+          width={200}
+          height={135}
+          fill="transparent"
+          listening={true}
+        />
+        
         {imgOffState && !isSimulationOn && (
           <Image
             image={imgOffState}
@@ -170,6 +180,7 @@ export default function Microbit({
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
         {imgOnnState && isSimulationOn && (
@@ -181,6 +192,7 @@ export default function Microbit({
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
         {imgMicrobit && (
@@ -192,6 +204,7 @@ export default function Microbit({
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
 
@@ -200,7 +213,9 @@ export default function Microbit({
           row.map((_, x) => {
             const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
-            const brightness = on ? b / 255 : 0;
+            
+            const normalizedBrightness = b / 255;
+            const brightness = on ? Math.pow(normalizedBrightness, 2.8) : 0;
             
             const centerX = 84 + x * 12.4;
             const centerY = 114 + y * 12.4;
@@ -266,11 +281,11 @@ export default function Microbit({
                   width={5}
                   height={5}
                   fill={on ? "#FF3333" : "#545050ff"}
-                  opacity={on ? 0.9 : 0.5}
+                  opacity={on ? Math.min(0.9, 0.3 + brightness * 0.6) : 0.5}
                   cornerRadius={1.5}
                   shadowColor={on ? "#FF6666" : "#000000"}
                   shadowBlur={on ? 2 : 1}
-                  shadowOpacity={on ? 0.4 : 0.2}
+                  shadowOpacity={on ? 0.4 * brightness : 0.2}
                   shadowOffset={{ x: 0, y: 0 }}
                 />
                 {/* Bright center highlight - small square */}

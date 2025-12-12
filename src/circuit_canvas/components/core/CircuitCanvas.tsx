@@ -1494,6 +1494,49 @@ export default function CircuitCanvas() {
                 <FaRotateRight size={14} />
               </button>
             </div>
+           
+
+            {/* Delete/Trash Button */}
+            <button
+              onClick={() => {
+                if (!selectedElement) return;
+                if (simulationRunning) stopSimulation();
+                
+                if (selectedElement.type === "wire") {
+                  // Delete wire
+                  setWires((prev) => {
+                    const next = prev.filter((w) => w.id !== selectedElement.id);
+                    pushToHistory(elementsRef.current, next);
+                    return next;
+                  });
+                } else {
+                  if (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") {
+                    openDeleteControllerModal(selectedElement);
+                    return;
+                  }
+                  
+                  const elementNodeIds = selectedElement.nodes.map((n) => n.id);
+                  setWires((prev) => prev.filter((w) => 
+                    !elementNodeIds.includes(w.fromNodeId) && 
+                    !elementNodeIds.includes(w.toNodeId)
+                  ));
+                  setElements((prev) => {
+                    const next = prev.filter((el) => el.id !== selectedElement.id);
+                    pushToHistory(next, wiresRef.current);
+                    return next;
+                  });
+                }
+                
+                setSelectedElement(null);
+                setShowPropertiesPannel(false);
+                setCreatingWireStartNode(null);
+              }}
+              disabled={!selectedElement}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Delete"
+            >
+              <FaTrash size={14} />
+            </button>
 
             {/* Fit to View Button */}
             <button

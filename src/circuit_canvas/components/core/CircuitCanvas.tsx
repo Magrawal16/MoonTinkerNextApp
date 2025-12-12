@@ -1494,7 +1494,49 @@ export default function CircuitCanvas() {
                 <FaRotateRight size={14} />
               </button>
             </div>
-           
+             {/* Copy Button */}
+            <button
+              onClick={() => {
+                if (!selectedElement || selectedElement.type === "wire") return;
+                setCopiedElement(selectedElement);
+              }}
+              disabled={!selectedElement || selectedElement.type === "wire"}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Copy"
+            >
+              <FaCopy size={14} />
+            </button>
+
+            {/* Paste Button */}
+            <button
+              onClick={() => {
+                if (!copiedElement) return;
+                if (simulationRunning) stopSimulation();
+                
+                const newElement = createElement({
+                  type: copiedElement.type,
+                  idNumber: getNextIdNumberForType(copiedElement.type),
+                  pos: { x: copiedElement.x + 50, y: copiedElement.y + 50 },
+                  properties: { ...copiedElement.properties },
+                });
+                
+                if (!newElement) return;
+                
+                setElements((prev) => {
+                  const next = [...prev, newElement];
+                  pushToHistory(next, wires);
+                  return next;
+                });
+                
+                setSelectedElement(newElement);
+                setShowPropertiesPannel(true);
+              }}
+              disabled={!copiedElement}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Paste"
+            >
+              <FaPaste size={14} />
+            </button>
 
             {/* Delete/Trash Button */}
             <button

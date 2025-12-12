@@ -1423,26 +1423,28 @@ export default function CircuitCanvas() {
           {/* Controls */}
           <div className="flex items-center gap-4">
             {/* Color Palette */}
-            <ColorPaletteDropdown
-              colors={defaultColors}
-              selectedColor={selectedWireColor}
-              onColorSelect={(color) => {
-                setSelectedWireColor(color);
-                const selectedId = selectedElement?.id;
-                if (!selectedId) return;
-                // If a wire is selected, change its color, push AFTER change
-                setWires((prev) => {
-                  const exists = prev.some((w) => w.id === selectedId);
-                  if (!exists) return prev;
-                  const next = prev.map((w) =>
-                    w.id === selectedId ? { ...w, color } : w
-                  );
-                  // Push AFTER mutation so undo only reverts the color
-                  pushToHistory(elementsRef.current, next);
-                  return next;
-                });
-              }}
-            />
+            <div title="Wire colour">
+              <ColorPaletteDropdown
+                colors={defaultColors}
+                selectedColor={selectedWireColor}
+                onColorSelect={(color) => {
+                  setSelectedWireColor(color);
+                  const selectedId = selectedElement?.id;
+                  if (!selectedId) return;
+                  // If a wire is selected, change its color, push AFTER change
+                  setWires((prev) => {
+                    const exists = prev.some((w) => w.id === selectedId);
+                    if (!exists) return prev;
+                    const next = prev.map((w) =>
+                      w.id === selectedId ? { ...w, color } : w
+                    );
+                    // Push AFTER mutation so undo only reverts the color
+                    pushToHistory(elementsRef.current, next);
+                    return next;
+                  });
+                }}
+              />
+            </div>
 
             {/* Rotation Buttons */}
             <div className="flex items-center gap-1">
@@ -1494,7 +1496,8 @@ export default function CircuitCanvas() {
                 <FaRotateRight size={14} />
               </button>
             </div>
-             {/* Copy Button */}
+
+            {/* Copy Button */}
             <button
               onClick={() => {
                 if (!selectedElement || selectedElement.type === "wire") return;

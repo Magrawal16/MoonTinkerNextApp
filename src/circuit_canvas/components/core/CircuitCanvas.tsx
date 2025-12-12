@@ -29,6 +29,9 @@ import {
   FaRotateRight,
   FaRotateLeft,
   FaExpand,
+  FaCopy,
+  FaPaste,
+  FaTrash,
 } from "react-icons/fa6";
 import { VscDebug } from "react-icons/vsc";
 import Loader from "@/circuit_canvas/utils/loadingCircuit";
@@ -124,6 +127,7 @@ export default function CircuitCanvas() {
     if (simulationRunning) setSimulationTime(0);
   }, [simulationRunning]);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
+  const [copiedElement, setCopiedElement] = useState<CircuitElement | null>(null);
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -561,6 +565,7 @@ export default function CircuitCanvas() {
     setControllerCodeMap({});
     setActiveControllerId(null);
     setOpenCodeEditor(false);
+    setCopiedElement(null); 
     resetState();
     // Also reset history root to empty
     initializeHistory([], []);
@@ -1513,7 +1518,7 @@ export default function CircuitCanvas() {
                 </div>
               )}
               {/* Tooltip Box */}
-              <div className="absolute backdrop-blur-sm bg-white/10 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+              <div className="absolute bg-gray-100 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
                 <div className="font-semibold text-sm mb-2 text-gray-800">
                   Keyboard Shortcuts
                 </div>

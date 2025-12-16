@@ -360,6 +360,7 @@ export class BlocklyPythonIntegration {
 export class BidirectionalConverter {
   private integration: BlocklyPythonIntegration;
   private pythonGenerator: any;
+  private workspace: Blockly.Workspace;
 
   /**
    * Create a new bidirectional converter
@@ -367,6 +368,7 @@ export class BidirectionalConverter {
    * @param pythonGenerator The Blockly Python generator for blocks-to-Python conversion
    */
   constructor(workspace: Blockly.Workspace, pythonGenerator: any) {
+    this.workspace = workspace;
     this.integration = new BlocklyPythonIntegration(workspace);
     this.pythonGenerator = pythonGenerator;
   }
@@ -410,6 +412,10 @@ export class BidirectionalConverter {
    * @returns The generated Python code
    */
   blocksToPython(): string {
+    // Ensure generator is initialized for this workspace (prevents transient init errors)
+    try {
+      if (this.pythonGenerator?.init) this.pythonGenerator.init(this.workspace);
+    } catch (_) {}
     return this.integration.exportToPython(this.pythonGenerator);
   }
 

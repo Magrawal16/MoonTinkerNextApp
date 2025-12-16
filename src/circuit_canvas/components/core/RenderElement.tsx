@@ -19,12 +19,16 @@ import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
 import PowerSupply from "@/circuit_canvas/components/elements/PowerSupply";
+import Note from "@/circuit_canvas/components/elements/Note";
 
 interface RenderElementProps {
   element: CircuitElement;
   simulator?: any;
   onDragMove: (e: KonvaEventObject<DragEvent>) => void;
   handleNodeClick: (nodeId: string) => void;
+  handleNodePointerDown?: (nodeId: string) => void;
+  handleNodePointerUp?: (nodeId: string) => void;
+  snapTargetNodeId?: string | null;
   handleRatioChange?: (elementId: string, ratio: number) => void;
   handleModeChange: (elementId: string, mode: "voltage" | "current" | "resistance") => void;
   onSelect?: (elementId: string) => void;
@@ -42,6 +46,8 @@ interface RenderElementProps {
   showBody?: boolean;
   // Hovered node ID when dragging wire endpoint
   hoveredNodeForEndpoint?: string | null;
+  // Generic hook to update element properties
+  onUpdateElementProperties?: (elementId: string, properties: Record<string, any>) => void;
 }
 
 export default function RenderElement(props: RenderElementProps) {
@@ -264,6 +270,31 @@ export default function RenderElement(props: RenderElementProps) {
           }
         />
       )}
+      {props.showBody !== false && element.type === "note" && (
+        <Note
+          id={element.id}
+          x={0}
+          y={0}
+          text={element.properties?.text}
+          width={element.properties?.width}
+          height={element.properties?.height}
+          backgroundColor={element.properties?.backgroundColor}
+          collapsed={element.properties?.collapsed}
+          selected={props.selectedElementId === element.id}
+          draggable={false}
+          onDoubleClick={() => {
+            // Select the note and ensure properties panel is open
+            props.onSelect?.(element.id);
+          }}
+          onResize={(newWidth, newHeight) => {
+            props.onUpdateElementProperties?.(element.id, { width: newWidth, height: newHeight });
+            props.onSelect?.(element.id);
+          }}
+          onToggleCollapsed={(next) => {
+            props.onUpdateElementProperties?.(element.id, { collapsed: next });
+          }}
+        />
+      )}
       {props.showBody !== false && element.type === "ultrasonicsensor4p" && (
         <UltraSonicSensor4P
           id={element.id}
@@ -309,6 +340,7 @@ export default function RenderElement(props: RenderElementProps) {
         element.nodes.map((node) => {
           const isHovered = node.id === hoveredNodeId;
           const isTargetForEndpoint = node.id === props.hoveredNodeForEndpoint;
+          const isSnapTarget = node.id === props.snapTargetNodeId;
           
           // Hide node if element is covered by another element (z-order)
           const isHidden = elements && shouldHideNode(element.id, elements);
@@ -323,25 +355,39 @@ export default function RenderElement(props: RenderElementProps) {
                 height={5.6}
                 cornerRadius={0.3}
                 fill={
-                  isTargetForEndpoint
+                  isSnapTarget
+                    ? "#00FF00"
+                    : isTargetForEndpoint
                     ? "#FFD700"
                     : isHovered && node.fillColor
                     ? node.fillColor
                     : "transparent"
                 }
                 stroke={
-                  isTargetForEndpoint
+                  isSnapTarget
+                    ? "#00CC00"
+                    : isTargetForEndpoint
                     ? "#FF6B00"
                     : isHovered
                     ? "black"
                     : "transparent"
                 }
-                strokeWidth={isTargetForEndpoint ? 2.5 : isHovered ? 1.4 : 0}
+                strokeWidth={isSnapTarget ? 3 : isTargetForEndpoint ? 2.5 : isHovered ? 1.4 : 0}
                 onClick={(e) => {
                   e.cancelBubble = true;
                   // Prevent starting wire creation while simulation is running
                   if (props.isSimulationOn) return;
                   props.handleNodeClick(node.id);
+                }}
+                onMouseDown={(e) => {
+                  e.cancelBubble = true;
+                  if (props.isSimulationOn) return;
+                  props.handleNodePointerDown?.(node.id);
+                }}
+                onMouseUp={(e) => {
+                  e.cancelBubble = true;
+                  if (props.isSimulationOn) return;
+                  props.handleNodePointerUp?.(node.id);
                 }}
                 hitStrokeWidth={10}
                 onMouseEnter={(e) => {
@@ -354,9 +400,9 @@ export default function RenderElement(props: RenderElementProps) {
                   const stage = e.target.getStage();
                   if (stage) stage.container().style.cursor = "default";
                 }}
-                shadowBlur={isTargetForEndpoint ? 8 : 0}
-                shadowColor="#FFD700"
-                shadowEnabled={isTargetForEndpoint}
+                shadowBlur={isSnapTarget ? 12 : isTargetForEndpoint ? 8 : 0}
+                shadowColor={isSnapTarget ? "#00FF00" : "#FFD700"}
+                shadowEnabled={isSnapTarget || isTargetForEndpoint}
               />
 
               {/* Tooltip (shows on hover or when targeted during endpoint drag) */}

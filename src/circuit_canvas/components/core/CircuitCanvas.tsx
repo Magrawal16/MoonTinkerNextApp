@@ -21,6 +21,7 @@ import {
 } from "@/circuit_canvas/utils/circuitShortcuts";
 import { SimulatorProxy as Simulator } from "@/python_code_editor/lib/SimulatorProxy";
 import CircuitSelector from "@/circuit_canvas/components/toolbar/panels/Palette";
+import { NotesTool } from "@/circuit_canvas/components/toolbar/NotesTool";
 import {
   FaArrowRight,
   FaCode,
@@ -45,6 +46,7 @@ import GridLayer from "./layers/GridLayer";
 import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 import { useWireManagement } from "@/circuit_canvas/hooks/useWireManagement";
 import { useCircuitHistory } from "@/circuit_canvas/hooks/useCircuitHistory";
+import Note from "@/circuit_canvas/components/elements/Note";
 
 export default function CircuitCanvas() {
   // LocalStorage keys for session persistence
@@ -61,6 +63,13 @@ export default function CircuitCanvas() {
     null
   );
   const [openCodeEditor, setOpenCodeEditor] = useState(false);
+  const [codeEditorSize, setCodeEditorSize] = useState<{ width: number; height: number }>({
+    width: 900,
+    height: 600,
+  });
+  const [viewportWidth, setViewportWidth] = useState<number>(
+    typeof window !== "undefined" ? window.innerWidth : 1920
+  );
   const [controllerCodeMap, setControllerCodeMap] = useState<
     Record<string, string>
   >({});
@@ -75,6 +84,9 @@ export default function CircuitCanvas() {
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const wireLayerRef = useRef<Konva.Layer | null>(null);
+  
+  // Ref to reset UnifiedEditor during new session
+  const editorResetRef = useRef<(() => void) | null>(null);
 
   // Viewport tracking for grid optimization
   const { viewport, updateViewport } = useViewport(stageRef);
@@ -127,7 +139,10 @@ export default function CircuitCanvas() {
     if (simulationRunning) setSimulationTime(0);
   }, [simulationRunning]);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
+  const [snapTarget, setSnapTarget] = useState<{ dragNodeId: string; targetNodeId: string; offset: { x: number; y: number } } | null>(null);
+  const dragStartWireCountRef = useRef(0);
   const [copiedElement, setCopiedElement] = useState<CircuitElement | null>(null);
+  const [notesToolActive, setNotesToolActive] = useState(false);
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -153,6 +168,8 @@ export default function CircuitCanvas() {
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  // (note IDs computed on-demand; no counter needed)
 
   // Keep editor selection in sync with the canvas selection
   useEffect(() => {
@@ -219,6 +236,8 @@ export default function CircuitCanvas() {
     updateWiresDirect,
     updateInProgressWire,
     handleNodeClick,
+    handleNodePointerDown,
+    handleNodePointerUp,
     handleStageClickForWire,
     handleWireEdit,
     getWireColor,
@@ -243,6 +262,16 @@ export default function CircuitCanvas() {
     pushToHistorySnapshot: (els, ws) => pushToHistory(els, ws),
     stopSimulation,
   });
+
+  
+
+  const PROPERTIES_PANEL_WIDTH = 240;
+  const propertiesPanelRight = useMemo(() => {
+    const padding = 12;
+    const maxRight = Math.max(padding, viewportWidth - PROPERTIES_PANEL_WIDTH - padding);
+    if (!openCodeEditor) return padding;
+    return Math.min(codeEditorSize.width - 290, maxRight);
+  }, [openCodeEditor, codeEditorSize.width, viewportWidth]);
 
   // When undo/redo or any state change removes the currently selected entity,
   // fade out and close the Properties Panel gracefully.
@@ -561,6 +590,13 @@ export default function CircuitCanvas() {
       return {};
     });
 
+    // Reset UnifiedEditor state
+    if (editorResetRef.current) {
+      try { editorResetRef.current(); } catch (e) {
+        console.warn("⚠️ Failed to reset editor:", e);
+      }
+    }
+
     // Reset app state
     setControllerCodeMap({});
     setActiveControllerId(null);
@@ -648,8 +684,12 @@ export default function CircuitCanvas() {
 
   // Update viewport on mount and resize
   useEffect(() => {
-    const handleResize = () => updateViewport(true);
+    const handleResize = () => {
+      updateViewport(true);
+      setViewportWidth(window.innerWidth);
+    };
     updateViewport(); // Initial update
+    setViewportWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -989,9 +1029,63 @@ export default function CircuitCanvas() {
     }
   }, [creatingWireStartNode, updateInProgressWire]);
 
+  // Place note at a specific canvas position
+  const placeNoteAtPosition = useCallback((canvasX: number, canvasY: number) => {
+    setElements((prev) => {
+      // Compute next ID based on current state to avoid race conditions
+      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(`^${escape("note")}-(\\d+)$`);
+      const used = new Set<number>();
+      prev.forEach((el) => {
+        if (el.type !== "note") return;
+        const m = el.id.match(rx);
+        if (m) {
+          const n = Number(m[1]);
+          if (!Number.isNaN(n)) used.add(n);
+        }
+      });
+      let idNumber = 1;
+      while (used.has(idNumber)) idNumber += 1;
+
+      const newNote = createElement({
+        type: "note",
+        idNumber,
+        pos: { x: canvasX, y: canvasY },
+        properties: {
+          text: "",
+        },
+      });
+
+      if (!newNote) return prev;
+
+      const next = [...prev, newNote];
+      pushToHistory(next, wires);
+      setSelectedElement(newNote);
+      setShowPropertiesPannel(true);
+      return next;
+    });
+  }, [pushToHistory, wires]);
+
   const handleStageClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
+
+    // Handle notes tool placement
+    if (notesToolActive) {
+      const className = e.target.getClassName?.();
+      const clickedEmpty = className === "Stage" || className === "Layer";
+      if (clickedEmpty) {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const scale = stage.scaleX();
+        const stagePos = stage.position();
+        const canvasX = (pos.x - stagePos.x) / scale;
+        const canvasY = (pos.y - stagePos.y) / scale;
+        placeNoteAtPosition(canvasX, canvasY);
+        setNotesToolActive(false);
+        return;
+      }
+    }
 
     // If not wiring/editing and user clicked on empty canvas (Stage/Layer), clear selection and close editor
       if (!creatingWireStartNode) {
@@ -1009,20 +1103,62 @@ export default function CircuitCanvas() {
     if (creatingWireStartNode) {
       handleStageClickForWire(pos);
     }
-  }, [creatingWireStartNode, handleWireEdit, handleStageClickForWire]);
+  }, [creatingWireStartNode, handleWireEdit, handleStageClickForWire, notesToolActive, placeNoteAtPosition]);
 
   // Optimized drag move handler - updates wires directly without React re-render
   const handleElementDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
     const id = e.target.id();
-    const x = e.target.x();
-    const y = e.target.y();
+    let x = e.target.x();
+    let y = e.target.y();
+
+    // Check for node snap targets
+    const SNAP_DIST = 25; // px - detection radius
+    const draggedEl = getElementById(id);
+    
+    if (draggedEl) {
+      let closestDist = Infinity;
+      let snapData: { dragNodeId: string; targetNodeId: string; offsetX: number; offsetY: number } | null = null;
+      
+      elementsRef.current.forEach((other) => {
+        if (other.id === draggedEl.id) return;
+        other.nodes.forEach((otherNode) => {
+          const otherPos = getAbsoluteNodePosition(otherNode, other);
+          draggedEl.nodes.forEach((dNode) => {
+            const dPos = getAbsoluteNodePosition(dNode, { ...draggedEl, x, y });
+            const dx = otherPos.x - dPos.x;
+            const dy = otherPos.y - dPos.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= SNAP_DIST && dist < closestDist) {
+              closestDist = dist;
+              snapData = { dragNodeId: dNode.id, targetNodeId: otherNode.id, offsetX: dx, offsetY: dy };
+            }
+          });
+        });
+      });
+
+      if (snapData) {
+        // Adjust position to snap
+        const snap: { dragNodeId: string; targetNodeId: string; offsetX: number; offsetY: number } = snapData;
+        x = x + snap.offsetX;
+        y = y + snap.offsetY;
+        e.target.x(x);
+        e.target.y(y);
+        setSnapTarget({ 
+          dragNodeId: snap.dragNodeId, 
+          targetNodeId: snap.targetNodeId, 
+          offset: { x: snap.offsetX, y: snap.offsetY } 
+        });
+      } else {
+        setSnapTarget(null);
+      }
+    }
 
     tempDragPositions.current[id] = { x, y };
 
     // Directly update wires in Konva without triggering React re-render
     updateWiresDirect();
-  }, [updateWiresDirect]);
+  }, [updateWiresDirect, getElementById]);
 
   const computeCircuit = useCallback((wiresSnapshot: Wire[]) => {
     setElements((prevElements) => {
@@ -1446,6 +1582,14 @@ export default function CircuitCanvas() {
               />
             </div>
 
+            {/* Notes Tool */}
+            <NotesTool
+              isActive={notesToolActive}
+              onClick={() => {
+                setNotesToolActive(!notesToolActive);
+              }}
+            />
+
             {/* Rotation Buttons */}
             <div className="flex items-center gap-1">
               <button
@@ -1752,7 +1896,10 @@ export default function CircuitCanvas() {
           </div>
         </div>
         {selectedElement && showPropertiesPannel ? (
-          <div className={`absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}>
+          <div
+            className={`absolute top-2 me-73 mt-12 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}
+            style={{ right: `${propertiesPanelRight}px` }}
+          >
             <div className="p-1">
               <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
                 <button
@@ -1892,8 +2039,26 @@ export default function CircuitCanvas() {
                     elements={elements}
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
+                    handleNodePointerDown={handleNodePointerDown}
+                    handleNodePointerUp={handleNodePointerUp}
+                    snapTargetNodeId={snapTarget?.targetNodeId || null}
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
+                    onUpdateElementProperties={(id, properties) => {
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
+                          el.id === id
+                            ? {
+                                ...el,
+                                properties: { ...el.properties, ...properties },
+                              }
+                            : el
+                        );
+                        elementsRef.current = next;
+                        pushToHistory(next, wiresRef.current);
+                        return next;
+                      });
+                    }}
                     onPowerSupplySettingsChange={(id, settings) => {
                       setElements((prev) =>
                         prev.map((el) =>
@@ -1920,6 +2085,8 @@ export default function CircuitCanvas() {
                       pushToHistory(elements, wires);
                       setDraggingElement(element.id);
                       stageRef.current?.draggable(false);
+                      // Track initial wire count to detect disconnections
+                      dragStartWireCountRef.current = wiresRef.current.length;
                       if (!creatingWireStartNode) {
                         const current = getElementById(element.id) || element;
                         setSelectedElement(current);
@@ -1930,18 +2097,49 @@ export default function CircuitCanvas() {
                       }
                     }}
                     onDragEnd={(e) => {
-                      setDraggingElement(null);
-                      stageRef.current?.draggable(true);
-                      const id = e.target.id();
+                      const draggedId = e.target.id();
                       const x = e.target.x();
                       const y = e.target.y();
+
+                      // If snapping, create an invisible wire for the circuit solver
+                      if (snapTarget) {
+                        const { dragNodeId, targetNodeId } = snapTarget;
+                        // Check if wire already exists
+                        const exists = wiresRef.current.some(
+                          (w) =>
+                            (w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
+                            (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId)
+                        );
+                        if (!exists) {
+                          const newWire: Wire = {
+                            id: `wire-${Date.now()}-${Math.random()}`,
+                            fromNodeId: dragNodeId,
+                            toNodeId: targetNodeId,
+                            joints: [],
+                            color: selectedWireColor,
+                            hidden: true, // Mark as hidden for visual purposes
+                          };
+                          const nextWires = [...wiresRef.current, newWire];
+                          setWires(nextWires);
+                          pushToHistory(elementsRef.current, nextWires);
+                          stopSimulation();
+                        }
+                      }
+
                       setElements((prev) => {
                         const next = prev.map((el) =>
-                          el.id === id ? { ...el, x, y } : el
+                          el.id === draggedId ? { ...el, x, y } : el
                         );
-                        pushToHistory(next, wires);
+                        elementsRef.current = next;
+                        if (!snapTarget) {
+                          pushToHistory(next, wiresRef.current);
+                        }
                         return next;
                       });
+
+                      setDraggingElement(null);
+                      setSnapTarget(null);
+                      stageRef.current?.draggable(true);
                     }}
                     onSelect={(id) => {
                       if (creatingWireStartNode) return;
@@ -1990,6 +2188,9 @@ export default function CircuitCanvas() {
               {/* Wires layer sits above element bodies */}
               <Layer ref={wireLayerRef}>
                 {wires.map((wire) => {
+                  // Skip rendering hidden wires (used for node-to-node snaps that are electrically connected)
+                  if (wire.hidden) return null;
+
                   // Calculate wire points, considering if an endpoint is being dragged
                   let points = getWirePoints(wire);
 
@@ -2204,6 +2405,9 @@ export default function CircuitCanvas() {
                     elements={elements}
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
+                    handleNodePointerDown={handleNodePointerDown}
+                    handleNodePointerUp={handleNodePointerUp}
+                    snapTargetNodeId={snapTarget?.targetNodeId || null}
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
                     onPowerSupplySettingsChange={() => {}}
@@ -2344,10 +2548,18 @@ export default function CircuitCanvas() {
                   ];
                 })}
               </Layer>
+
             </Stage>
           )}
         </div>
       </div>
+
+      {/* Notes tool instruction message */}
+      {notesToolActive && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
+          Click on the canvas to add a note
+        </div>
+      )}
 
       <div
         className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"
@@ -2394,7 +2606,9 @@ export default function CircuitCanvas() {
           activeControllerId={activeControllerId}
           setControllerCodeMap={setControllerCodeMap}
           stopSimulation={stopSimulation}
+          onSizeChange={setCodeEditorSize}
           onClose={() => setOpenCodeEditor(false)}
+          onResetRef={editorResetRef}
           controllers={(() => {
             const list = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
             let microbitCount = 0;

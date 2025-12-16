@@ -15,8 +15,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 47.5,
-        y: 20,
+        x: 44.5,
+        y: 31,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -24,8 +24,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 82,
-        y: 22,
+        x: 75.5,
+        y: 31,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -704,6 +704,23 @@ export default function createElement(
     displayProperties: [],
   };
 
+  const noteElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [], // Notes don't have nodes as they're not circuit elements
+    properties: {
+      text: props.properties?.text ?? "",
+      width: props.properties?.width ?? 150,
+      height: props.properties?.height ?? 100,
+      backgroundColor: props.properties?.backgroundColor ?? "#E8E8E8",
+      collapsed: props.properties?.collapsed ?? false,
+    },
+    displayProperties: ["text"],
+  };
+
   // switch based on type
   let element;
   switch (props.type) {
@@ -745,6 +762,9 @@ export default function createElement(
       break;
     case "microbitWithBreakout":
       element = microbitElementWithBreakout;
+      break;
+    case "note":
+      element = noteElement;
       break;
     default:
       element = null;

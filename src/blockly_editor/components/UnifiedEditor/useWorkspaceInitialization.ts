@@ -12,7 +12,7 @@ import {
   ensureVariableShadowsOnBlock,
   updateLedBlockRunState,
 } from "./blockValidation";
-import { injectCategoryStyles, injectAnimationStyles, applyModernCategoryStyles } from "./workspaceStyles";
+import { injectCategoryStyles, applyModernCategoryStyles } from "./workspaceStyles";
 import { applyFieldEditorPatches } from "./hooks/useEditorPatches";
 import { addWorkspaceListeners } from "./hooks/useWorkspaceListeners";
 
@@ -25,13 +25,15 @@ interface UseWorkspaceInitializationProps {
   setControllerCodeMap: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   saveWorkspaceState: (controllerId?: string) => void;
   activeControllerId: string | null;
-  isUpdatingFromCode: boolean;
+  activeControllerIdRef: React.MutableRefObject<string | null>;
+  isUpdatingFromCodeRef: React.MutableRefObject<boolean>;
   localCodeRef: React.MutableRefObject<string>;
   lastCodeRef: React.MutableRefObject<string>;
   loadWorkspaceState: (controllerId?: string) => boolean;
   stopSimulationRef: React.MutableRefObject<(() => void) | undefined>;
   setIsConverting: (converting: boolean) => void;
   setConversionType: (type: "toBlocks" | "toText" | null) => void;
+  isSwitchingControllerRef?: React.MutableRefObject<boolean>;
 }
 
 export function useWorkspaceInitialization({
@@ -43,21 +45,16 @@ export function useWorkspaceInitialization({
   setControllerCodeMap,
   saveWorkspaceState,
   activeControllerId,
-  isUpdatingFromCode,
+  activeControllerIdRef,
+  isUpdatingFromCodeRef,
   localCodeRef,
   lastCodeRef,
   loadWorkspaceState,
   stopSimulationRef,
   setIsConverting,
   setConversionType,
+  isSwitchingControllerRef,
 }: UseWorkspaceInitializationProps) {
-  const pendingCreationGroups = useRef<Set<string>>(new Set());
-  const creationTimeouts = useRef<Map<string, ReturnType<typeof setTimeout>>>(
-    new Map()
-  );
-  const xmlSaveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const isUpdatingFromBlocksRef = useRef(false);
-
   const initializeWorkspace = useCallback(() => {
     if (!blocklyRef.current) {
       return;
@@ -332,18 +329,16 @@ export function useWorkspaceInitialization({
       setBidirectionalConverter(converter);
 
       // Set up change listener via helper
-      const changeListener = addWorkspaceListeners(workspaceRef, {
-        activeControllerId,
+      addWorkspaceListeners(workspaceRef, {
+        activeControllerIdRef,
         saveWorkspaceState,
         stopSimulationRef,
         setControllerCodeMap,
         lastCodeRef,
-        localCodeRef,
-        isUpdatingFromCode,
+        isUpdatingFromCodeRef,
         setIsUpdatingFromBlocks,
-        setWorkspaceReady,
-        loadWorkspaceState,
         converter,
+        isSwitchingControllerRef,
       });
 
 
@@ -388,7 +383,6 @@ export function useWorkspaceInitialization({
     workspaceRef,
     setWorkspaceReady,
     setBidirectionalConverter,
-    isUpdatingFromCode,
     setIsUpdatingFromBlocks,
     activeControllerId,
     setControllerCodeMap,
@@ -397,6 +391,9 @@ export function useWorkspaceInitialization({
     saveWorkspaceState,
     localCodeRef,
     loadWorkspaceState,
+    activeControllerIdRef,
+    isUpdatingFromCodeRef,
+    isSwitchingControllerRef,
     setIsConverting,
     setConversionType,
   ]);

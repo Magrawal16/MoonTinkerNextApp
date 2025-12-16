@@ -6,6 +6,7 @@ export interface PaletteElement {
   type: PaletteElementType;
   label: string;
   iconPath: string; // Relative to public/assets
+  hidden?: boolean; // Hide from palette without removing support
   defaultProps?: {
     resistance?: number;
     voltage?: number;
@@ -43,6 +44,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     type: "powersupply",
     label: "Power Supply",
     iconPath: "assets/circuit_canvas/elements/power_supply.svg",
+    hidden: true,
     defaultProps: { voltage: 5, resistance: 0.2 },
   },
   {

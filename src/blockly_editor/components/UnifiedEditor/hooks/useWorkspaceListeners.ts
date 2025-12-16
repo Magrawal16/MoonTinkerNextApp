@@ -5,17 +5,15 @@ import { ensureVariableShadowsOnBlock, updateAllLedBlockStates, updateForeverBlo
 export function addWorkspaceListeners(
   workspaceRef: React.MutableRefObject<Blockly.Workspace | null>,
   options: {
-    activeControllerId: string | null;
+    activeControllerIdRef: React.MutableRefObject<string | null>;
     saveWorkspaceState: (controllerId?: string) => void;
     stopSimulationRef: React.MutableRefObject<(() => void) | undefined>;
     setControllerCodeMap: React.Dispatch<React.SetStateAction<Record<string, string>>>;
     lastCodeRef: React.MutableRefObject<string>;
-    localCodeRef: React.MutableRefObject<string>;
-    isUpdatingFromCode: boolean;
+    isUpdatingFromCodeRef: React.MutableRefObject<boolean>;
     setIsUpdatingFromBlocks: (updating: boolean) => void;
-    setWorkspaceReady: (ready: boolean) => void;
-    loadWorkspaceState: (controllerId?: string) => boolean;
     converter: BidirectionalConverter;
+    isSwitchingControllerRef?: React.MutableRefObject<boolean>;
   }
 ) {
   const pendingCreationGroups = new Set<string>();
@@ -25,7 +23,8 @@ export function addWorkspaceListeners(
 
   let conversionTimeout: ReturnType<typeof setTimeout> | null = null;
   const changeListener = (event: any) => {
-    if (options.isUpdatingFromCode) return;
+    if (options.isUpdatingFromCodeRef.current) return;
+    if (options.isSwitchingControllerRef?.current) return;
     const BEvents: any = (Blockly as any).Events;
     const isCreate = event.type === BEvents.BLOCK_CREATE || event.type === BEvents.CREATE;
     const isDelete = event.type === BEvents.BLOCK_DELETE || event.type === BEvents.DELETE;
@@ -138,24 +137,32 @@ export function addWorkspaceListeners(
 
     if (affectsCode) {
       try { options.stopSimulationRef.current?.(); } catch (_) {}
-      if (options.activeControllerId) {
+      const activeId = options.activeControllerIdRef.current;
+      if (activeId) {
         if (xmlSaveTimeoutRef.current) clearTimeout(xmlSaveTimeoutRef.current);
         xmlSaveTimeoutRef.current = setTimeout(() => {
-          options.saveWorkspaceState(options.activeControllerId!);
+          // Re-read active id at save time to avoid stale writes
+          const idNow = options.activeControllerIdRef.current;
+          if (idNow) options.saveWorkspaceState(idNow);
         }, 400);
       }
     }
 
     if (conversionTimeout) clearTimeout(conversionTimeout);
     conversionTimeout = setTimeout(() => {
-      const w = workspaceRef.current;
-      if (options.converter && options.activeControllerId && !isUpdatingFromBlocksRef.current) {
+      const activeId = options.activeControllerIdRef.current;
+      if (options.isSwitchingControllerRef?.current) return;
+      if (options.converter && activeId && !isUpdatingFromBlocksRef.current) {
         try {
           isUpdatingFromBlocksRef.current = true;
           options.setIsUpdatingFromBlocks(true);
           const generatedCode = options.converter.blocksToPython();
           if (generatedCode !== options.lastCodeRef.current) {
-            options.setControllerCodeMap((prev) => ({ ...prev, [options.activeControllerId!]: generatedCode }));
+            // Always write under the *current* active controller id
+            const idNow = options.activeControllerIdRef.current;
+            if (idNow) {
+              options.setControllerCodeMap((prev) => ({ ...prev, [idNow]: generatedCode }));
+            }
             options.lastCodeRef.current = generatedCode;
             options.stopSimulationRef.current?.();
           }
@@ -170,7 +177,6 @@ export function addWorkspaceListeners(
 
   const ws = workspaceRef.current as any;
   ws?.addChangeListener(changeListener);
-  (ws as any).changeListener = changeListener;
 
   return changeListener;
 }

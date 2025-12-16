@@ -23,6 +23,12 @@ export type CircuitElement = {
     batteryType?: "AA" | "AAA";
     // For battery count (1-4 batteries in series) to mirror Tinkercad UI
     batteryCount?: number;
+    // For notes
+    text?: string; // note text content
+    width?: number; // note width
+    height?: number; // note height
+    backgroundColor?: string; // note background color
+    collapsed?: boolean; // note collapsed state
   };
   computed?: {
     current?: number; // computed current through the element
@@ -49,6 +55,7 @@ export type Wire = {
   resistance?: number;
   color?: string; // Optional color for the wire
   joints: { x: number; y: number }[];
+  hidden?: boolean; // When true, treated as connection but not rendered
 };
 
 export type Node = {
@@ -87,6 +94,11 @@ export type CircuitElementProps = {
     temperature?: number;
     brightness?: number;
     color?: string;
+    text?: string;
+    width?: number;
+    height?: number;
+    backgroundColor?: string;
+    collapsed?: boolean;
   };
 };
 
@@ -102,7 +114,8 @@ export type PaletteElementType =
   | "led"
   | "microbit"
   | "ultrasonicsensor4p"
-  | "microbitWithBreakout";
+  | "microbitWithBreakout"
+  | "note";
 
 export type PropertiesPanelProps = {
   selectedElement: CircuitElement | null;

@@ -39,6 +39,8 @@ export default function PropertiesPanel({
   const [batteryType, setBatteryType] = useState<"AA" | "AAA">("AA");
   const [batteryCount, setBatteryCount] = useState<number>(1);
   const [showUpdateMessage, setShowUpdateMessage] = useState(false);
+  // Note text state
+  const [noteText, setNoteText] = useState<string>("");
 
   // Gesture control
   const [showGesturePanel, setShowGesturePanel] = useState(false);
@@ -76,6 +78,7 @@ export default function PropertiesPanel({
       | "temperature"
       | "brightness"
       | "color"
+      | "text"
   ) =>
     !selectedElement?.displayProperties ||
     selectedElement.displayProperties.includes(name);
@@ -103,6 +106,9 @@ export default function PropertiesPanel({
     setTemperature(selectedElement.properties?.temperature ?? null);
     setBrightness(selectedElement.properties?.brightness ?? null);
     setColor(selectedElement.properties?.color ?? null);
+    // Normalize old "Select to edit" text to empty string
+    const text = selectedElement.properties?.text ?? "";
+    setNoteText(text === "Select to edit" ? "" : text);
     if (selectedElement.type === "AA_battery") {
       const bt = (selectedElement.properties as any)?.batteryType as
         | "AA"
@@ -142,6 +148,7 @@ export default function PropertiesPanel({
         brightness: brightness ?? undefined,
         color: color ?? undefined,
         gesture: selectedGesture || selectedElement.properties?.gesture,
+        text: noteText || undefined,
       };
 
       if (selectedElement.type === "battery") {
@@ -418,6 +425,19 @@ export default function PropertiesPanel({
             <option value="white">White</option>
             <option value="orange">Orange</option>
           </select>
+        </div>
+      )}
+
+      {/* Note-specific text */}
+      {selectedElement.type === "note" && (
+        <div className="flex flex-col text-xs">
+          <label>Note Text:</label>
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            className="border px-2 py-2 rounded text-xs min-h-[100px] resize-y"
+            placeholder="Write your note here"
+          />
         </div>
       )}
 

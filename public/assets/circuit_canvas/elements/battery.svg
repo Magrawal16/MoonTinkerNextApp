@@ -11,20 +11,17 @@
   <!-- 9V in center of blue area -->
   <text x="100" y="180" font-family="Arial, sans-serif" font-size="56" font-weight="bold" text-anchor="middle" fill="white">9V</text>
   
-  <!-- Top larger snap connector (positive) -->
+  <!-- Top snap connectors (uniform size) -->
   <g>
-    <!-- Connector base -->
-    <rect x="55" y="30" width="50" height="28" rx="4" ry="4" fill="#000" stroke="#222" stroke-width="0.5"/>
-    <!-- Positive terminal indent -->
-    <circle cx="80" cy="44" r="6" fill="#333" stroke="#111" stroke-width="0.5"/>
+    <!-- Positive: red (even smaller, centered on indent) -->
+    <rect x="60" y="48" width="28" height="12" rx="2" ry="2" fill="#c00000" stroke="#7a0000" stroke-width="0.5"/>
+    <circle cx="74" cy="54" r="2.5" fill="#f4f4f4" stroke="#7a0000" stroke-width="0.5"/>
   </g>
   
-  <!-- Top smaller snap connector (negative) -->
   <g>
-    <!-- Connector base -->
-    <rect x="115" y="38" width="40" height="20" rx="3" ry="3" fill="#000" stroke="#222" stroke-width="0.5"/>
-    <!-- Negative terminal indent -->
-    <circle cx="135" cy="48" r="4" fill="#333" stroke="#111" stroke-width="0.5"/>
+    <!-- Negative: black (even smaller, centered on indent) -->
+    <rect x="112" y="48" width="28" height="12" rx="2" ry="2" fill="#000" stroke="#222" stroke-width="0.5"/>
+    <circle cx="126" cy="54" r="2.5" fill="#f4f4f4" stroke="#111" stroke-width="0.5"/>
   </g>
   
   <!-- Edge highlight on left side for 3D effect -->

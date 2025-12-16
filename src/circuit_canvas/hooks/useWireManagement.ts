@@ -34,6 +34,10 @@ export const useWireManagement = ({
   const [draggingEndpoint, setDraggingEndpoint] = useState<{ wireId: string; end: "from" | "to"; currentPos: { x: number; y: number } } | null>(null);
   const [hoveredNodeForEndpoint, setHoveredNodeForEndpoint] = useState<string | null>(null);
 
+  // Pointer wiring flow helpers
+  const skipNextNodeClickRef = useRef(false);
+  const pointerDownNodeRef = useRef<string | null>(null);
+
   // Refs for wire optimization
   const wireRefs = useRef<Record<string, Konva.Line>>({});
   const wiresRef = useRef<Wire[]>(wires);
@@ -138,6 +142,9 @@ export const useWireManagement = ({
   const updateWiresDirect = useCallback(() => {
     const current = wiresRef.current;
     current.forEach((wire) => {
+      // Skip hidden wires (they don't have visual representation)
+      if (wire.hidden) return;
+      
       const wireLineRef = wireRefs.current[wire.id];
       if (wireLineRef) {
         const newPoints = getWirePoints(wire);
@@ -204,135 +211,123 @@ export const useWireManagement = ({
     [creatingWireStartNode, creatingWireJoints, getNodeById, getNodeParent, stageRef, wireLayerRef]
   );
 
-  // Handle node click for wire creation
-  const handleNodeClick = useCallback(
+  const showInProgressWireFromNode = useCallback(
     (nodeId: string) => {
-      // ...existing code...
+      if (
+        inProgressWireRef.current &&
+        animatedCircleRef.current &&
+        stageRef.current
+      ) {
+        const stage = stageRef.current;
+        const scaleFactor = 1 / stage.scaleX();
 
-      // First click: set start node
-      if (!creatingWireStartNode) {
-        setCreatingWireStartNode(nodeId);
-        setCreatingWireJoints([]);
+        inProgressWireRef.current.visible(true);
+        animatedCircleRef.current.visible(true);
 
-        // Show and initialize in-progress wire components
-        if (
-          inProgressWireRef.current &&
-          animatedCircleRef.current &&
-          stageRef.current
-        ) {
-          const stage = stageRef.current;
-          const scaleFactor = 1 / stage.scaleX();
+        animatedCircleRef.current.scaleX(scaleFactor);
+        animatedCircleRef.current.scaleY(scaleFactor);
+        inProgressWireRef.current.strokeWidth(2 / stage.scaleX());
 
-          // Show components
-          inProgressWireRef.current.visible(true);
-          animatedCircleRef.current.visible(true);
-
-          // Initialize scaling
-          animatedCircleRef.current.scaleX(scaleFactor);
-          animatedCircleRef.current.scaleY(scaleFactor);
-          inProgressWireRef.current.strokeWidth(2 / stage.scaleX());
-
-          // Immediately reset animatedCircle position to the start node
-          const startNode = getNodeById(nodeId);
-          const startParent = startNode ? getNodeParent(startNode.id) : null;
-          if (startNode && startParent) {
-            const startPos = getAbsoluteNodePosition(startNode, startParent);
-            animatedCircleRef.current.x(startPos.x);
-            animatedCircleRef.current.y(startPos.y);
-          }
+        const startNode = getNodeById(nodeId);
+        const startParent = startNode ? getNodeParent(startNode.id) : null;
+        if (startNode && startParent) {
+          const startPos = getAbsoluteNodePosition(startNode, startParent);
+          animatedCircleRef.current.x(startPos.x);
+          animatedCircleRef.current.y(startPos.y);
         }
-        return;
       }
+    },
+    [getNodeById, getNodeParent, stageRef]
+  );
 
-      // Clicked same node again: cancel
+  const cancelWireCreation = useCallback(() => {
+    setCreatingWireStartNode(null);
+    setCreatingWireJoints([]);
+    if (inProgressWireRef.current) inProgressWireRef.current.visible(false);
+    if (animatedCircleRef.current) animatedCircleRef.current.visible(false);
+  }, []);
+
+  const startWireFromNode = useCallback(
+    (nodeId: string, { skipClickGuard = false }: { skipClickGuard?: boolean } = {}) => {
+      setCreatingWireStartNode(nodeId);
+      setCreatingWireJoints([]);
+      showInProgressWireFromNode(nodeId);
+      if (skipClickGuard) skipNextNodeClickRef.current = true;
+    },
+    [showInProgressWireFromNode]
+  );
+
+  const finalizeWireToNode = useCallback(
+    (nodeId: string, { skipClickGuard = false }: { skipClickGuard?: boolean } = {}) => {
+      if (!creatingWireStartNode) return;
       if (creatingWireStartNode === nodeId) {
-        setCreatingWireStartNode(null);
-        setCreatingWireJoints([]);
-
-        // Hide in-progress wire components
-        if (inProgressWireRef.current) {
-          inProgressWireRef.current.visible(false);
-        }
-        if (animatedCircleRef.current) {
-          animatedCircleRef.current.visible(false);
-        }
+        cancelWireCreation();
+        if (skipClickGuard) skipNextNodeClickRef.current = true;
         return;
       }
 
-      // Second click: create wire
-      // Before creating, check for an existing wire connecting these two nodes (either direction)
       const duplicateExists = wiresRef.current.some(
         (w) =>
           (w.fromNodeId === creatingWireStartNode && w.toNodeId === nodeId) ||
           (w.fromNodeId === nodeId && w.toNodeId === creatingWireStartNode)
       );
-
       if (duplicateExists) {
-        // Discard creation attempt (Tinkercad-like behavior: silently ignore)
-        setCreatingWireStartNode(null);
-        setCreatingWireJoints([]);
-        if (inProgressWireRef.current) {
-          inProgressWireRef.current.visible(false);
-        }
-        if (animatedCircleRef.current) {
-          animatedCircleRef.current.visible(false);
-        }
-        return; // Do not push history or stop simulation since nothing changed
+        cancelWireCreation();
+        if (skipClickGuard) skipNextNodeClickRef.current = true;
+        return;
       }
 
-      // Use joints from wire creation (manual joints added by clicking canvas)
       const finalJoints = creatingWireJoints;
 
       const newWire: Wire = {
-        // Ensure unique incremental ID even if wires were loaded from storage
-        // or counter was reset. We probe for the next free numeric suffix.
         id: (function generateWireId() {
-          // Use current ref (more up-to-date than state in fast successive creations)
           const existing = new Set(wiresRef.current.map((w) => w.id));
           let candidate = wireCounter;
           while (existing.has(`wire-${candidate}`)) candidate++;
-          // Update counter so subsequent wires continue after this one
-          if (candidate !== wireCounter) {
-            setWireCounter(candidate + 1);
-          } else {
-            setWireCounter((c) => c + 1);
-          }
+          if (candidate !== wireCounter) setWireCounter(candidate + 1);
+          else setWireCounter((c) => c + 1);
           return `wire-${candidate}`;
         })(),
         fromNodeId: creatingWireStartNode,
         toNodeId: nodeId,
         joints: finalJoints,
         color: selectedWireColor,
-      };  const next = [...wiresRef.current, newWire];
-  setWires(next);
-  // Push AFTER creation so each wire is a single undo step
-  pushToHistorySnapshot(elements, next);
+      };
+
+      const next = [...wiresRef.current, newWire];
+      setWires(next);
+      pushToHistorySnapshot(elements, next);
       stopSimulation();
 
-      setCreatingWireStartNode(null);
-      setCreatingWireJoints([]);
-
-      // Hide in-progress wire components
-      if (inProgressWireRef.current) {
-        inProgressWireRef.current.visible(false);
-      }
-      if (animatedCircleRef.current) {
-        animatedCircleRef.current.visible(false);
-      }
+      cancelWireCreation();
+      if (skipClickGuard) skipNextNodeClickRef.current = true;
     },
-    [
-  // ...existing code...
-      creatingWireStartNode,
-      creatingWireJoints,
-      wireCounter,
-      wires,
-      selectedWireColor,
-      pushToHistorySnapshot,
-      stopSimulation,
-      getNodeById,
-      getNodeParent,
-      stageRef,
-    ]
+    [cancelWireCreation, creatingWireJoints, creatingWireStartNode, elements, pushToHistorySnapshot, selectedWireColor, stopSimulation, wireCounter, setWires, setWireCounter]
+  );
+
+  // Handle node click for wire creation
+  const handleNodeClick = useCallback(
+    (nodeId: string) => {
+      if (skipNextNodeClickRef.current) {
+        skipNextNodeClickRef.current = false;
+        return;
+      }
+
+      // First click: set start node
+      if (!creatingWireStartNode) {
+        startWireFromNode(nodeId);
+        return;
+      }
+
+      // Clicked same node again: cancel
+      if (creatingWireStartNode === nodeId) {
+        cancelWireCreation();
+        return;
+      }
+
+      finalizeWireToNode(nodeId);
+    },
+    [cancelWireCreation, creatingWireStartNode, finalizeWireToNode, startWireFromNode]
   );
 
   // Handle wire joint creation on stage click
@@ -452,6 +447,30 @@ export const useWireManagement = ({
     },
     [elements, pushToHistorySnapshot, stopSimulation]
   );
+
+  // Pointer-friendly node-to-node creation
+  const handleNodePointerDown = useCallback((nodeId: string) => {
+    pointerDownNodeRef.current = nodeId;
+    if (!creatingWireStartNode) {
+      startWireFromNode(nodeId, { skipClickGuard: true });
+      return;
+    }
+    if (creatingWireStartNode !== nodeId) {
+      finalizeWireToNode(nodeId, { skipClickGuard: true });
+      return;
+    }
+    cancelWireCreation();
+    skipNextNodeClickRef.current = true;
+  }, [cancelWireCreation, creatingWireStartNode, finalizeWireToNode, startWireFromNode]);
+
+  const handleNodePointerUp = useCallback((nodeId: string) => {
+    const startedFrom = pointerDownNodeRef.current;
+    pointerDownNodeRef.current = null;
+    if (!creatingWireStartNode) return;
+    if (creatingWireStartNode !== nodeId && startedFrom !== nodeId) {
+      finalizeWireToNode(nodeId, { skipClickGuard: true });
+    }
+  }, [creatingWireStartNode, finalizeWireToNode]);
 
   // Remove a joint from a wire
   const removeJointFromWire = useCallback(
@@ -671,6 +690,8 @@ export const useWireManagement = ({
     updateWiresDirect,
     updateInProgressWire,
     handleNodeClick,
+    handleNodePointerDown,
+    handleNodePointerUp,
     handleStageClickForWire,
     handleWireEdit,
     getWireColor,

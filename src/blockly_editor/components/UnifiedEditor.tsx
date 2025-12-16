@@ -33,9 +33,11 @@ interface UnifiedEditorProps {
     React.SetStateAction<Record<string, string>>
   >;
   stopSimulation: () => void;
+  onSizeChange?: (size: { width: number; height: number }) => void;
   onClose?: () => void;
   controllers?: Array<{ id: string; label: string }>;
   onSelectController?: (id: string) => void;
+  onResetRef?: React.MutableRefObject<(() => void) | null>; // Ref to expose reset functionality
 }
 
 export default function UnifiedEditor({
@@ -43,9 +45,11 @@ export default function UnifiedEditor({
   activeControllerId,
   setControllerCodeMap,
   stopSimulation,
+  onSizeChange,
   onClose,
   controllers = [],
   onSelectController,
+  onResetRef,
 }: UnifiedEditorProps) {
   // --- State and Refs ---
   const [editorMode, setEditorMode] = useState<EditorMode>("block");
@@ -76,6 +80,13 @@ export default function UnifiedEditor({
   const isDraggingRef = useRef(false);
   const { editorSize, resizeRef, handleResizeStart } = useEditorResizing(editorMode);
   const blocklyRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!onSizeChange) return;
+    const width = parseFloat(editorSize.width);
+    const height = parseFloat(editorSize.height);
+    if (Number.isNaN(width) || Number.isNaN(height)) return;
+    onSizeChange({ width, height });
+  }, [editorSize, onSizeChange]);
   const workspaceRef = useRef<Blockly.Workspace | null>(null);
   const lastCodeRef = useRef<string>("");
   const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,10 +94,22 @@ export default function UnifiedEditor({
   const localCodeRef = useRef<string>("");
   const previousControllerIdRef = useRef<string | null>(null);
   const controllerXmlMapRef = useRef<Record<string, string>>(controllerXmlMap);
+  const activeControllerIdRef = useRef<string | null>(activeControllerId);
+  const isUpdatingFromCodeRef = useRef<boolean>(isUpdatingFromCode);
   // Track text edits relative to the code generated from blocks when entering text mode
   const textBaselineRef = useRef<string>("");
   const textModifiedRef = useRef<boolean>(false);
+  // Flag to prevent code generation during controller switches
+  const isSwitchingControllerRef = useRef<boolean>(false);
   const { onToolboxSearch } = useToolboxSearch(workspaceRef);
+
+  useEffect(() => {
+    activeControllerIdRef.current = activeControllerId;
+  }, [activeControllerId]);
+
+  useEffect(() => {
+    isUpdatingFromCodeRef.current = isUpdatingFromCode;
+  }, [isUpdatingFromCode]);
 
   const hardResetToBlocks = useCallback(() => {
     try { if (workspaceRef.current) { workspaceRef.current.dispose(); } } catch(_) {}
@@ -111,6 +134,35 @@ export default function UnifiedEditor({
     setShowBlockModeConfirm(false);
   }, [activeControllerId, setControllerCodeMap, setWorkspaceReady]);
 
+  // Full editor reset for new session
+  const fullEditorReset = useCallback(() => {
+    try { if (workspaceRef.current) { workspaceRef.current.dispose(); } } catch(_) {}
+    workspaceRef.current = null;
+    setWorkspaceReady(false);
+    setControllerXmlMap({});
+    controllerXmlMapRef.current = {};
+    setWorkspaceXml("");
+    setLocalCode("");
+    localCodeRef.current = "";
+    lastCodeRef.current = "";
+    textBaselineRef.current = "";
+    textModifiedRef.current = false;
+    setShowCodePalette(false);
+    setShowBlockSearch(false);
+    setEditorMode("block");
+    setShowBlockModeConfirm(false);
+    setValidationError(null);
+    setBidirectionalConverter(null);
+    previousControllerIdRef.current = null;
+  }, [setControllerCodeMap, setWorkspaceReady]);
+
+  // Expose reset function to parent via ref
+  useEffect(() => {
+    if (onResetRef) {
+      onResetRef.current = fullEditorReset;
+    }
+  }, [onResetRef, fullEditorReset]);
+
   // --- Workspace Initialization Hook ---
   // This must come after all state/refs/hooks
   // Provide all required props for useWorkspaceInitialization
@@ -122,6 +174,7 @@ export default function UnifiedEditor({
     setIsUpdatingFromBlocks,
     setControllerCodeMap,
     activeControllerId,
+    activeControllerIdRef,
     // The following are required by the hook interface
     saveWorkspaceState: (controllerId?: string) => {
       // Save XML for the current controller
@@ -137,7 +190,7 @@ export default function UnifiedEditor({
         });
       }
     },
-    isUpdatingFromCode,
+    isUpdatingFromCodeRef,
     localCodeRef,
     lastCodeRef,
     loadWorkspaceState: (controllerId?: string) => {
@@ -158,6 +211,7 @@ export default function UnifiedEditor({
     stopSimulationRef,
     setIsConverting,
     setConversionType,
+    isSwitchingControllerRef,
   });
 
   // Persist controllerXmlMap to localStorage whenever it changes
@@ -229,7 +283,10 @@ export default function UnifiedEditor({
 
   const loadWorkspaceState = useCallback((controllerId?: string): boolean => {
     const id = controllerId ?? activeControllerId;
-    if (!id || !workspaceRef.current) return false;
+    if (!id || !workspaceRef.current) {
+      console.warn(`[loadWorkspaceState] Skipped: id=${id}, workspace=${!!workspaceRef.current}`);
+      return false;
+    }
     try {
       const xmlText = controllerXmlMapRef.current[id];
       if (xmlText) {
@@ -262,6 +319,20 @@ export default function UnifiedEditor({
     localCodeRef.current = currentCode;
   }, [currentCode, activeControllerId, isUpdatingFromBlocks]);
 
+  // Ensure controller code is synced when switching controllers
+  useEffect(() => {
+    if (!activeControllerId) return;
+    
+    const code = controllerCodeMap[activeControllerId] ?? "";
+    setLocalCode(code);
+    localCodeRef.current = code;
+    lastCodeRef.current = code;
+    
+    // Reset text modification tracking
+    textBaselineRef.current = code;
+    textModifiedRef.current = false;
+  }, [activeControllerId]);
+
   // Auto-select first controller if none is active but controllers exist
   useEffect(() => {
     if (!activeControllerId && controllers.length > 0 && onSelectController) {
@@ -277,26 +348,41 @@ export default function UnifiedEditor({
     
     // Only process if we're actually switching controllers
     if (prevId && prevId !== activeControllerId) {
-      console.log(`[UnifiedEditor] Switching from ${prevId} to ${activeControllerId}`);
+      // SET FLAG: Prevent code generation during the switch
+      isSwitchingControllerRef.current = true;
       
-      // Save the previous controller's state
-      saveWorkspaceState(prevId);
+      // Pause event listeners to prevent code generation during switch
+      setIsUpdatingFromBlocks(true);
       
-      // Clear workspace before loading new controller
-      workspaceRef.current.clear();
-      
-      // Load the new controller's workspace state
-      const loaded = loadWorkspaceState(activeControllerId);
-      console.log(`[UnifiedEditor] Loaded state for ${activeControllerId}:`, loaded);
+      try {
+        // IMPORTANT: Save the previous controller's state FIRST before clearing
+        saveWorkspaceState(prevId);
+        
+        // Clear workspace and dispose all blocks
+        try {
+          workspaceRef.current.clear();
+        } catch (e) {
+          console.warn("⚠️ Failed to clear workspace during controller switch:", e);
+        }
+        
+        // Load the new controller's workspace state
+        const loaded = loadWorkspaceState(activeControllerId);
+      } finally {
+        // CRITICAL: Must resume code generation and clear the switch flag
+        // Use a small timeout to ensure all state updates and DOM operations complete
+        setTimeout(() => {
+          isSwitchingControllerRef.current = false;
+          setIsUpdatingFromBlocks(false);
+        }, 50);
+      }
     } else if (!prevId) {
       // First time - just load
-      console.log(`[UnifiedEditor] Loading initial state for ${activeControllerId}`);
       loadWorkspaceState(activeControllerId);
     }
     
     // Update previous controller ref
     previousControllerIdRef.current = activeControllerId;
-  }, [activeControllerId, workspaceReady, loadWorkspaceState, saveWorkspaceState]);
+  }, [activeControllerId, workspaceReady, loadWorkspaceState, saveWorkspaceState, setIsUpdatingFromBlocks]);
 
   // Enable masking of SVG text while HTML inputs are focused
   useEffect(() => {
@@ -369,74 +455,7 @@ export default function UnifiedEditor({
     };
   }, [workspaceReady]);
 
-  // 4. OVERRIDE THE GENERATION HANDLER TO BE SAFE
-  // We attach this directly to handle the "CodeGenerator init" error
-  const safeGenerateCode = useCallback(() => {
-    // A. If dragging, ABORT. This prevents the "CodeGenerator init" crash.
-    if (isDraggingRef.current) return;
-    
-    // B. If no converter or workspace, ABORT.
-    if (!bidirectionalConverter || !workspaceRef.current || !activeControllerId) return;
-
-    setIsUpdatingFromBlocks(true);
-    try {
-        // C. FORCE INIT: This fixes the "CodeGenerator init was not called" error
-        // We manually tell the generator "This is the workspace you are working on"
-        try {
-            pythonGenerator.init(workspaceRef.current);
-        } catch (e) {
-            console.warn("Manual generator init failed, continuing...", e);
-        }
-
-        const generatedCode = bidirectionalConverter.blocksToPython();
-        
-        if (generatedCode !== lastCodeRef.current) {
-            lastCodeRef.current = generatedCode;
-            setControllerCodeMap((prev) => ({
-                ...prev,
-                [activeControllerId]: generatedCode,
-            }));
-            stopSimulationRef.current?.();
-        }
-    } catch (error) {
-        // D. CATCH THE CRASH: If it still fails, log it but DO NOT crash the UI
-        console.warn("Blockly generation skipped (transient error):", error);
-    } finally {
-        setIsUpdatingFromBlocks(false);
-    }
-  }, [bidirectionalConverter, activeControllerId, setControllerCodeMap]);
-
-  // Attach the safe generator to the workspace events
-  useEffect(() => {
-     if (!workspaceRef.current || !workspaceReady) return;
-     
-     const changeListener = (e: any) => {
-        // Only generate on these events
-        if (
-            e.type === Blockly.Events.BLOCK_CHANGE ||
-            e.type === Blockly.Events.BLOCK_MOVE ||
-            e.type === Blockly.Events.BLOCK_DELETE || 
-            e.type === Blockly.Events.FINISHED_LOADING
-        ) {
-             // Debounce the generation slightly
-             if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
-             debounceTimeoutRef.current = setTimeout(() => {
-               safeGenerateCode();
-               // Also save workspace state after blocks change
-               if (activeControllerId) {
-                 saveWorkspaceState(activeControllerId);
-               }
-             }, 100); 
-        }
-     };
-
-     workspaceRef.current.addChangeListener(changeListener);
-     return () => {
-        if (workspaceRef.current) {
-            try { workspaceRef.current.removeChangeListener(changeListener); } catch(e){}
-        }
-     };
-  }, [workspaceReady, safeGenerateCode, activeControllerId, saveWorkspaceState]);
+  // NOTE: Code generation is handled by workspace listeners created in useWorkspaceInitialization.
 
 
   // --- Initialization & Resize Logic ---
@@ -480,6 +499,7 @@ export default function UnifiedEditor({
 
   // --- Handlers ---
   const handleCodeChange = useCallback((newCode: string) => {
+      // Critical: Validate activeControllerId exists to prevent wrong controller updates
       if (!activeControllerId || isUpdatingFromBlocks) return;
       setLocalCode(newCode);
       setValidationError(null);
@@ -490,7 +510,11 @@ export default function UnifiedEditor({
       if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = setTimeout(() => {
         if (newCode !== currentCode) {
-          setControllerCodeMap((prev) => ({ ...prev, [activeControllerId]: newCode }));
+          // Double-check activeControllerId is still valid before updating
+          setControllerCodeMap((prev) => {
+            if (!activeControllerId) return prev; // Safety guard
+            return { ...prev, [activeControllerId]: newCode };
+          });
           stopSimulation();
           lastCodeRef.current = newCode;
         }

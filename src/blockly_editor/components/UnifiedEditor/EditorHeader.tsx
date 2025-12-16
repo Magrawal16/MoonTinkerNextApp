@@ -41,25 +41,32 @@ export function EditorHeader({
       }}
     >
       <div className="flex items-center gap-4">
-        {/* Controller selector */}
-        {controllers.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-600">SELECT DEVICE</label>
-            <select
-              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]"
-              value={activeControllerId ?? ""}
-              onChange={(e) => onSelectController && onSelectController(e.target.value)}
-            >
-              {controllers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
-            <span className="text-xs text-gray-600 font-medium">None</span>
+        {/* Toolbox Search Field (block mode only) */}
+        {editorMode === "block" && (
+          <div className="flex items-center">
+            <input
+              type="text"
+              value={toolboxSearch}
+              onChange={e => {
+                setToolboxSearch(e.target.value);
+                onToolboxSearch(e.target.value);
+              }}
+              placeholder="Search blocks..."
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              style={{ minWidth: 160 }}
+            />
+            {toolboxSearch && (
+              <button
+                className="ml-1 text-gray-400 hover:text-red-500 text-lg"
+                onClick={() => {
+                  setToolboxSearch("");
+                  onToolboxSearch("");
+                }}
+                title="Clear"
+              >
+                ✕
+              </button>
+            )}
           </div>
         )}
         {/* Code Palette Toggle Button - Only show in text mode */}
@@ -106,7 +113,7 @@ export function EditorHeader({
                 editorMode === "block" ? "scale-110" : "group-hover:scale-105"
               }`}
             />
-            <span className="relative z-10">Block Mode</span>
+              <span className="relative z-10 whitespace-nowrap leading-none">Block Mode</span>
           </button>
           <button
             className={`flex items-center gap-2.5 px-5 py-2.5 rounded-lg border-2 transition-all duration-300 font-semibold text-base relative overflow-hidden group ${
@@ -126,41 +133,34 @@ export function EditorHeader({
                 editorMode === "text" ? "scale-110" : "group-hover:scale-105"
               }`}
             />
-            <span className="relative z-10">Text Mode</span>
+              <span className="relative z-10 whitespace-nowrap leading-none">Text Mode</span>
           </button>
         </div>
-        {/* Toolbox Search Field (block mode only) */}
-        {editorMode === "block" && (
-          <div className="ml-4 flex items-center">
-            <input
-              type="text"
-              value={toolboxSearch}
-              onChange={e => {
-                setToolboxSearch(e.target.value);
-                onToolboxSearch(e.target.value);
-              }}
-              placeholder="Search blocks..."
-              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              style={{ minWidth: 160 }}
-            />
-            {toolboxSearch && (
-              <button
-                className="ml-1 text-gray-400 hover:text-red-500 text-lg"
-                onClick={() => {
-                  setToolboxSearch("");
-                  onToolboxSearch("");
-                }}
-                title="Clear"
-              >
-                ✕
-              </button>
-            )}
+        {/* Controller selector */}
+        {controllers.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-600">SELECT DEVICE</label>
+            <select
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm bg-white outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 min-w-[180px]"
+              value={activeControllerId ?? ""}
+              onChange={(e) => onSelectController && onSelectController(e.target.value)}
+            >
+              {controllers.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
+            <span className="text-xs text-gray-600 font-medium">None</span>
           </div>
         )}
       </div>
       {onClose && (
         <button
-          className="group flex items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-red-500 transition-all duration-300 shadow-sm hover:shadow-lg transform hover:scale-110 active:scale-95"
+          className="group flex m-2 mb-3 items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-red-500 transition-all duration-300 shadow-sm hover:shadow-lg transform hover:scale-110 active:scale-95"
           onClick={onClose}
           title="Close Editor"
         >

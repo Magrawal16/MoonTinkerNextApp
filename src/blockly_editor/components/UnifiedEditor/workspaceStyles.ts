@@ -25,7 +25,7 @@ export function injectCategoryStyles() {
         overflow: hidden !important;
         display: flex !important;
         align-items: center !important;
-        margin-right: 5px !important;
+        margin-right: 20px !important;
         width: 100% !important;
       }
 
@@ -171,10 +171,10 @@ export function injectCategoryStyles() {
         background: rgba(20, 184, 166, 0.18) !important;
       }
       .moontinker-category[data-category="Loops"]::before {
-        background: #f59e42 !important; /* orange-400 */
+        background: #10c000 !important; /* bright green */
       }
       .moontinker-category[data-category="Loops"] {
-        background: rgba(245, 158, 66, 0.18) !important;
+        background: rgba(16, 192, 0, 0.18) !important;
       }
       .moontinker-category[data-category="Timing"]::before {
         background: #ef4444 !important; /* red-500 */
@@ -275,6 +275,18 @@ export function injectCategoryStyles() {
         background: #eb4437 !important; /* pink */
         color: #ffffff !important;
       }
+
+      .moontinker-category[data-category="Loops"],
+      .moontinker-category[data-category="loops"],
+      .blocklyTreeRow[data-category="Loops"],
+      .blocklyTreeRow[data-category="loops"],
+      [role="treeitem"][data-category="Loops"],
+      [role="treeitem"][data-category="loops"],
+      .blocklyToolboxCategory[data-category="Loops"],
+      .blocklyToolboxCategory[data-category="loops"] {
+        background: #10c000 !important; /* bright green */
+        color: #ffffff !important;
+      }
       
       /* Category-specific color bars */
       .blocklyTreeRow[style*="0078D7"]::before,
@@ -315,6 +327,11 @@ export function injectCategoryStyles() {
       .blocklyTreeRow[style*="EB4437"]::before,
       [role="treeitem"][style*="EB4437"]::before {
         background: #EB4437 !important;
+      }
+
+      .blocklyTreeRow[style*="10C000"]::before,
+      [role="treeitem"][style*="10C000"]::before {
+        background: #10C000 !important;
       }
 
 
@@ -367,6 +384,11 @@ export function injectCategoryStyles() {
       .blocklyTreeRow[style*="EB4437"]:hover,
       [role="treeitem"][style*="EB4437"]:hover {
         background: linear-gradient(135deg, rgba(235, 68, 55, 0.25), rgba(235, 68, 55, 0.18)) !important;
+      }
+
+      .blocklyTreeRow[style*="10C000"]:hover,
+      [role="treeitem"][style*="10C000"]:hover {
+        background: linear-gradient(135deg, rgba(16, 192, 0, 0.25), rgba(16, 192, 0, 0.18)) !important;
       }
 
 

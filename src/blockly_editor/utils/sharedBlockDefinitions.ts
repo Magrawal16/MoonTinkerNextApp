@@ -3,6 +3,8 @@ import { Order } from "blockly/python";
 import "./fields/PianoField";
 import "./fields/MusicRecorderField";
 import "./fields/SliderField";
+import { registerIconField } from "./fields/IconField";
+import { registerLedMatrixField } from "./fields/LedMatrixField";
 import { initializeDuplicateOnDrag, installDuplicateOnDragListener } from "../plugins/duplicateOnDrag";
 
 export interface SharedBlockDefinition {
@@ -131,6 +133,10 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
 export class SharedBlockRegistry {
   // Register all shared block definitions with Blockly
   static registerBlocks(): void {
+    // Ensure custom fields are available before defining blocks
+    try { registerIconField(); } catch (_) {}
+    try { registerLedMatrixField(); } catch (_) {}
+
     // Set block color to match category color before registering
     Blockly.utils.colour.setHsvSaturation(1);
     Blockly.utils.colour.setHsvValue(0.8314);

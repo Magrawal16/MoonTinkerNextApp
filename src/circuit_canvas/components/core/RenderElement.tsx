@@ -409,27 +409,32 @@ export default function RenderElement(props: RenderElementProps) {
               {node.placeholder && (isHovered || isTargetForEndpoint) && (
                 <Label
                   x={node.x + 8}
-                  y={node.y - 18}
-                  opacity={0.95}
+                  y={node.y - 22}
+                  opacity={1}
                   rotation={-(element.rotation || 0)}
                   listening={false}
                 >
                   <Tag
-                    fill="#1f4060"
-                    stroke="black"
-                    strokeWidth={0.6}
-                    cornerRadius={4}
-                    shadowColor="black"
-                    shadowBlur={1}
-                    shadowOffset={{ x: 2, y: 2 }}
-                    shadowOpacity={0}
-                    opacity={0.5}
+                    fill="rgba(30, 41, 59, 0.95)"
+                    stroke="#3b82f6"
+                    strokeWidth={1.5}
+                    cornerRadius={6}
+                    shadowColor="rgba(0, 0, 0, 0.4)"
+                    shadowBlur={8}
+                    shadowOffset={{ x: 0, y: 2 }}
+                    shadowOpacity={0.5}
+                    pointerDirection="down"
+                    pointerWidth={6}
+                    pointerHeight={4}
                   />
                   <Text
                     text={node.placeholder}
-                    fontSize={10}
-                    padding={5}
-                    fill="white"
+                    fontSize={11}
+                    fontFamily="Arial, sans-serif"
+                    fontStyle="500"
+                    padding={8}
+                    fill="#ffffff"
+                    letterSpacing={0.3}
                   />
                 </Label>
               )}

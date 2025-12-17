@@ -1,7 +1,7 @@
 import { useCallback, useRef } from "react";
 import * as Blockly from "blockly";
 import { pythonGenerator } from "blockly/python";
-import { BidirectionalConverter } from "@/blockly_editor/utils/blocklyPythonConvertor";
+import { BidirectionalConverter, BlocklyPythonIntegration } from "@/blockly_editor/utils/blocklyPythonConvertor";
 import { createUpdatedBlocklyEditor, SharedBlockRegistry } from "@/blockly_editor/utils/sharedBlockDefinitions";
 import { setupRegistryAndGenerators } from "./hooks/useRegistrySetup";
 import { createSimpleToolbox } from "./toolbox";
@@ -76,6 +76,12 @@ export function useWorkspaceInitialization({
     }
 
     try {
+      try {
+        BlocklyPythonIntegration.initialize();
+        BlocklyPythonIntegration.setupPythonGenerators(pythonGenerator);
+      } catch (_) {
+      }
+
       // Initialize shared blocks + generators via modular helper
       const Editor = createUpdatedBlocklyEditor();
       Editor.initializeSharedBlocks();

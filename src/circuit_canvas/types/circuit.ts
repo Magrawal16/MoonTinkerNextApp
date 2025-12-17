@@ -55,7 +55,8 @@ export type Wire = {
   resistance?: number;
   color?: string; // Optional color for the wire
   joints: { x: number; y: number }[];
-  hidden?: boolean; // When true, treated as connection but not rendered
+  hidden?: boolean; // When true, treated as connection but not rendered (node-to-node)
+  deleted?: boolean; // When true, wire is marked for deletion and should not be in circuit
 };
 
 export type Node = {

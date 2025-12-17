@@ -273,8 +273,10 @@ export default function PropertiesPanel({
 
   const connectedWires = wires.filter(
     (w) =>
-      w.fromNodeId.startsWith(selectedElement.id) ||
-      w.toNodeId.startsWith(selectedElement.id)
+      !w.deleted && (
+        w.fromNodeId.startsWith(selectedElement.id) ||
+        w.toNodeId.startsWith(selectedElement.id)
+      )
   );
 
   const effResistanceText = useMemo(() => {

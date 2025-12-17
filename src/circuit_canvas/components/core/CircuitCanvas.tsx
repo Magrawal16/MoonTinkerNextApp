@@ -2104,25 +2104,49 @@ export default function CircuitCanvas() {
                       // If snapping, create an invisible wire for the circuit solver
                       if (snapTarget) {
                         const { dragNodeId, targetNodeId } = snapTarget;
-                        // Check if wire already exists
-                        const exists = wiresRef.current.some(
+                        // Check if an active wire already exists between these endpoints
+                        const activeIdx = wiresRef.current.findIndex(
                           (w) =>
-                            (w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
-                            (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId)
+                            !w.deleted &&
+                            ((w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
+                              (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId))
                         );
-                        if (!exists) {
-                          const newWire: Wire = {
-                            id: `wire-${Date.now()}-${Math.random()}`,
-                            fromNodeId: dragNodeId,
-                            toNodeId: targetNodeId,
-                            joints: [],
-                            color: selectedWireColor,
-                            hidden: true, // Mark as hidden for visual purposes
-                          };
-                          const nextWires = [...wiresRef.current, newWire];
-                          setWires(nextWires);
-                          pushToHistory(elementsRef.current, nextWires);
-                          stopSimulation();
+                        if (activeIdx === -1) {
+                          // If a deleted hidden wire exists, revive it; otherwise create a new one
+                          const deletedIdx = wiresRef.current.findIndex(
+                            (w) =>
+                              w.deleted &&
+                              ((w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
+                                (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId))
+                          );
+
+                          if (deletedIdx !== -1) {
+                            const revived = {
+                              ...wiresRef.current[deletedIdx],
+                              deleted: false,
+                              hidden: true,
+                              joints: [],
+                              color: selectedWireColor,
+                            } as Wire;
+                            const nextWires = [...wiresRef.current];
+                            nextWires[deletedIdx] = revived;
+                            setWires(nextWires);
+                            pushToHistory(elementsRef.current, nextWires);
+                            stopSimulation();
+                          } else {
+                            const newWire: Wire = {
+                              id: `wire-${Date.now()}-${Math.random()}`,
+                              fromNodeId: dragNodeId,
+                              toNodeId: targetNodeId,
+                              joints: [],
+                              color: selectedWireColor,
+                              hidden: true, // Mark as hidden for visual purposes
+                            };
+                            const nextWires = [...wiresRef.current, newWire];
+                            setWires(nextWires);
+                            pushToHistory(elementsRef.current, nextWires);
+                            stopSimulation();
+                          }
                         }
                       }
 
@@ -2136,6 +2160,50 @@ export default function CircuitCanvas() {
                         }
                         return next;
                       });
+                      
+                      // When not snapped after drag, remove any hidden node-to-node
+                      // wires attached to this element whose endpoints are no longer
+                      // within snapping distance. This prevents ghost electrical
+                      // connections from lingering after visually disconnecting nodes.
+                      if (!snapTarget) {
+                        const draggedElement = getElementById(draggedId);
+                        if (draggedElement && Array.isArray(draggedElement.nodes)) {
+                          const draggedNodeIds = new Set(
+                            draggedElement.nodes.map((n) => n.id)
+                          );
+
+                          let changed = false;
+                          const updatedWires = wiresRef.current.map((w) => {
+                            if (!w.hidden || w.deleted) return w;
+                            const touchesDragged =
+                              draggedNodeIds.has(w.fromNodeId) ||
+                              draggedNodeIds.has(w.toNodeId);
+                            if (!touchesDragged) return w;
+
+                            const fromNode = getNodeById(w.fromNodeId);
+                            const toNode = getNodeById(w.toNodeId);
+                            const fromParent = fromNode ? getNodeParent(fromNode.id) : null;
+                            const toParent = toNode ? getNodeParent(toNode.id) : null;
+                            if (!fromNode || !toNode || !fromParent || !toParent) return w;
+
+                            const p1 = getAbsoluteNodePosition(fromNode, fromParent);
+                            const p2 = getAbsoluteNodePosition(toNode, toParent);
+                            const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                            const UNSNAP_DIST = 25; // match snap detection radius
+                            if (dist > UNSNAP_DIST) {
+                              changed = true;
+                              return { ...w, deleted: true };
+                            }
+                            return w;
+                          });
+
+                          if (changed) {
+                            setWires(updatedWires);
+                            pushToHistory(elementsRef.current, updatedWires);
+                            stopSimulation();
+                          }
+                        }
+                      }
 
                       setDraggingElement(null);
                       setSnapTarget(null);
@@ -2189,7 +2257,8 @@ export default function CircuitCanvas() {
               <Layer ref={wireLayerRef}>
                 {wires.map((wire) => {
                   // Skip rendering hidden wires (used for node-to-node snaps that are electrically connected)
-                  if (wire.hidden) return null;
+                  // Also skip deleted wires
+                  if (wire.hidden || wire.deleted) return null;
 
                   // Calculate wire points, considering if an endpoint is being dragged
                   let points = getWirePoints(wire);
@@ -2428,7 +2497,7 @@ export default function CircuitCanvas() {
               <Layer>
                 {wires.map((wire) => {
                   const isSelected = selectedElement?.id === wire.id;
-                  if (!isSelected) return null;
+                  if (!isSelected || wire.deleted) return null;
 
                   const stage = stageRef.current;
                   const scaleFactor = stage ? 1 / stage.scaleX() : 1;

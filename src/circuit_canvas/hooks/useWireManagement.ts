@@ -142,8 +142,8 @@ export const useWireManagement = ({
   const updateWiresDirect = useCallback(() => {
     const current = wiresRef.current;
     current.forEach((wire) => {
-      // Skip hidden wires (they don't have visual representation)
-      if (wire.hidden) return;
+      // Skip hidden wires (they don't have visual representation) and deleted wires
+      if (wire.hidden || wire.deleted) return;
       
       const wireLineRef = wireRefs.current[wire.id];
       if (wireLineRef) {
@@ -268,8 +268,10 @@ export const useWireManagement = ({
 
       const duplicateExists = wiresRef.current.some(
         (w) =>
-          (w.fromNodeId === creatingWireStartNode && w.toNodeId === nodeId) ||
-          (w.fromNodeId === nodeId && w.toNodeId === creatingWireStartNode)
+          !w.deleted && (
+            (w.fromNodeId === creatingWireStartNode && w.toNodeId === nodeId) ||
+            (w.fromNodeId === nodeId && w.toNodeId === creatingWireStartNode)
+          )
       );
       if (duplicateExists) {
         cancelWireCreation();
@@ -355,7 +357,10 @@ export const useWireManagement = ({
   // Handle wire editing
   const handleWireEdit = useCallback(
     (wireId: string) => {
-      const updated = wiresRef.current.filter((w) => w.id !== wireId);
+      // Mark wire as deleted instead of removing it (preserves history)
+      const updated = wiresRef.current.map((w) =>
+        w.id === wireId ? { ...w, deleted: true } : w
+      );
       setWires(updated);
       // Push AFTER delete
       pushToHistorySnapshot(elements, updated);
@@ -602,6 +607,7 @@ export const useWireManagement = ({
           const duplicateExists = wiresRef.current.some(
             (wire) =>
               wire.id !== wireId &&
+              !wire.deleted &&
               ((wire.fromNodeId === newFromId && wire.toNodeId === newToId) ||
                 (wire.fromNodeId === newToId && wire.toNodeId === newFromId))
           );

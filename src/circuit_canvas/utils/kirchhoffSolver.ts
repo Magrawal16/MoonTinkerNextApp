@@ -239,7 +239,10 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
   const parent = new Map<string, string>();
   const allNodeIds = new Set<string>();
 
-  wires.forEach((w) => {
+  // Filter out deleted wires, but keep hidden wires (node-to-node connections are hidden but electrically active)
+  const activeWires = wires.filter((w) => !w.deleted);
+
+  activeWires.forEach((w) => {
     if (!w.fromNodeId || !w.toNodeId) return;
     parent.set(w.fromNodeId, w.fromNodeId);
     parent.set(w.toNodeId, w.toNodeId);
@@ -303,7 +306,7 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
     if (rootI !== rootJ) parent.set(rootI, rootJ);
   }
 
-  for (const wire of wires) {
+  for (const wire of activeWires) {
     if (wire.fromNodeId && wire.toNodeId) union(wire.fromNodeId, wire.toNodeId);
   }
 

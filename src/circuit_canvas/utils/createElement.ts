@@ -1,5 +1,6 @@
 import { CircuitElement, CircuitElementProps } from "../types/circuit";
 import { getLedNodePositions } from "../utils/ledNodeMap";
+import { createInitialLedRuntime, LED_INTERNAL_RESISTANCE } from "./ledBehavior";
 
 export default function createElement(
   props: CircuitElementProps
@@ -396,10 +397,13 @@ export default function createElement(
     properties: {
       ...{
         voltage: props.properties?.voltage,
-        resistance: props.properties?.resistance ?? 1,
+        resistance: props.properties?.resistance ?? LED_INTERNAL_RESISTANCE,
         color: props.properties?.color ?? 'red',
       },
       ...props.properties,
+    },
+    runtime: {
+      led: createInitialLedRuntime(),
     },
     displayProperties: ['resistance', 'color'],
   };

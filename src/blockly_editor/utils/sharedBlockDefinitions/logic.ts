@@ -15,7 +15,6 @@ export const LOGIC_BLOCKS: SharedBlockDefinition[] = [
       previousStatement: null,
       nextStatement: null,
       tooltip: "If / else if / else",
-      mutator: "controls_if_mutator",
     },
     pythonPattern: /\bif\b[\s\S]*?:/g,
     pythonGenerator: (block, generator) => {

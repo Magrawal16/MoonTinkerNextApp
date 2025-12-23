@@ -7,6 +7,7 @@ import RenderElement from "@/circuit_canvas/components/core/RenderElement";
 import { DebugBox } from "@/common/components/debugger/DebugBox";
 import createElement from "@/circuit_canvas/utils/createElement";
 import solveCircuit from "@/circuit_canvas/utils/kirchhoffSolver";
+import { updateLedRuntime, createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
 import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
 import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
 import Konva from "konva";
@@ -102,6 +103,8 @@ export default function CircuitCanvas() {
 
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationRunningRef = useRef(simulationRunning);
+  const simulationFrameRef = useRef<number | null>(null);
+  const lastTickRef = useRef<number | null>(null);
   // Simulation time state
   const [simulationTime, setSimulationTime] = useState(0); // seconds
   const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -764,6 +767,11 @@ export default function CircuitCanvas() {
 
     // Synchronously update ref to avoid a brief window where events still think simulation is running
     simulationRunningRef.current = false;
+    if (simulationFrameRef.current) {
+      cancelAnimationFrame(simulationFrameRef.current);
+      simulationFrameRef.current = null;
+    }
+    lastTickRef.current = null;
     // Make UI responsive while applying batch updates
     React.startTransition(() => {
       setSimulationRunning(false);
@@ -777,6 +785,10 @@ export default function CircuitCanvas() {
             power: undefined,
             measurement: el.computed?.measurement ?? undefined,
           },
+          // Reset LED runtime to initial state (no explosion, no thermal energy)
+          runtime: el.type === "led"
+            ? { led: createInitialLedRuntime() }
+            : el.runtime,
           // Immediately clear controller visuals (LEDs off, pins cleared)
           controller: el.controller
             ? {
@@ -879,6 +891,7 @@ export default function CircuitCanvas() {
     // Update ref synchronously so early simulator LED/pin events right after initialization are not dropped.
     simulationRunningRef.current = true;
     setSimulationRunning(true);
+    lastTickRef.current = null;
 
     setElements(prev => prev.map(el => {
       if (el.type === 'powersupply') {
@@ -1160,22 +1173,94 @@ export default function CircuitCanvas() {
     updateWiresDirect();
   }, [updateWiresDirect, getElementById]);
 
-  const computeCircuit = useCallback((wiresSnapshot: Wire[]) => {
-    setElements((prevElements) => {
+  const solveAndUpdateElements = useCallback(
+    (prevElements: CircuitElement[], wiresSnapshot: Wire[], dtSeconds: number) => {
       const solved = solveCircuit(prevElements, wiresSnapshot);
+      const solvedMap = new Map(solved.map((el) => [el.id, el] as const));
+      const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
 
       return prevElements.map((oldEl) => {
-        const updated = solved.find((e) => e.id === oldEl.id);
-        if (!updated) return oldEl; // If it's missing from the solved list, preserve it
+        const updated = solvedMap.get(oldEl.id);
+        if (!updated) return oldEl;
 
-        return {
-          ...oldEl, // keep everything (e.g., controller state, UI stuff)
-          ...updated, // overwrite any simulated data (like computed values)
-          controller: oldEl.controller, // explicitly preserve controller just in case
+        let next: CircuitElement = {
+          ...oldEl,
+          ...updated,
+          controller: oldEl.controller,
         };
+
+        if (updated.type === "led") {
+          const runtime = updateLedRuntime({
+            prev: oldEl.runtime?.led,
+            electrical: {
+              forwardVoltage: updated.computed?.forwardVoltage ?? updated.computed?.voltage ?? 0,
+              current: updated.computed?.current ?? 0,
+              power: updated.computed?.power ?? 0,
+              color: updated.properties?.color,
+            },
+            dt: dtSeconds,
+            nowMs,
+          });
+
+          next = {
+            ...next,
+            runtime: { ...(oldEl.runtime || {}), led: runtime },
+          };
+        }
+
+        return next;
       });
-    });
-  }, []);
+    },
+    []
+  );
+
+  const runSimulationStep = useCallback(
+    (dtSeconds: number, wiresSnapshot?: Wire[]) => {
+      const snapshot = wiresSnapshot ?? wiresRef.current ?? [];
+      setElements((prevElements) => {
+        const next = solveAndUpdateElements(prevElements, snapshot, dtSeconds);
+        elementsRef.current = next;
+        return next;
+      });
+    },
+    [solveAndUpdateElements, wiresRef]
+  );
+
+  const computeCircuit = useCallback(
+    (wiresSnapshot: Wire[], dtSeconds = 0) => {
+      runSimulationStep(dtSeconds, wiresSnapshot);
+    },
+    [runSimulationStep]
+  );
+
+  // Continuous simulation tick (dt-driven) for LED thermal model and circuit recompute
+  useEffect(() => {
+    if (!simulationRunning) {
+      if (simulationFrameRef.current) {
+        cancelAnimationFrame(simulationFrameRef.current);
+        simulationFrameRef.current = null;
+      }
+      lastTickRef.current = null;
+      return;
+    }
+
+    const tick = (timestamp: number) => {
+      if (!simulationRunningRef.current) return;
+      const last = lastTickRef.current ?? timestamp;
+      const dt = Math.max(0, (timestamp - last) / 1000);
+      lastTickRef.current = timestamp;
+      runSimulationStep(dt);
+      simulationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    simulationFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (simulationFrameRef.current) cancelAnimationFrame(simulationFrameRef.current);
+      simulationFrameRef.current = null;
+      lastTickRef.current = null;
+    };
+  }, [simulationRunning, runSimulationStep]);
 
   // handle resistance change for potentiometer
   const handleRatioChange = useCallback((elementId: string, ratio: number) => {
@@ -1852,14 +1937,13 @@ export default function CircuitCanvas() {
               <span>Code</span>
             </button>
 
-            {/* Debugger button hidden */}
-            {/* <button
+            <button
               onClick={() => setShowDebugBox((prev) => !prev)}
-              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105 me-2"
+              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
             >
               <VscDebug />
               <span>Debugger</span>
-            </button> */}
+            </button>
 
             <button
               onClick={openNewSessionModal}

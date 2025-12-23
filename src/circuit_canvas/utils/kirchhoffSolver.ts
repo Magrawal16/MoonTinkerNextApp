@@ -1,4 +1,5 @@
 import { CircuitElement, Wire } from "../types/circuit";
+import { getLedForwardVoltage, LED_INTERNAL_RESISTANCE } from "./ledBehavior";
 const DEBUG = false;
 
 // Multimeter modeling constants
@@ -98,6 +99,12 @@ function solveSingleSubcircuit(
     const nextMap = new Map<string, boolean>(ledOnMap);
     for (const el of elements) {
       if (el.type !== "led") continue;
+      const isExploded = (el.runtime as any)?.led?.exploded;
+      if (isExploded) {
+        if ((ledOnMap.get(el.id) ?? false) !== false) changed = true;
+        nextMap.set(el.id, false);
+        continue;
+      }
       const cathodeId = el.nodes?.[0]?.id;
       const anodeId = el.nodes?.[1]?.id;
       const cNode = cathodeId ? nodeEquivalenceMap.get(cathodeId) : undefined;
@@ -322,7 +329,7 @@ function getEffectiveNodeIds(map: Map<string, string>) {
 function zeroOutComputed(elements: CircuitElement[]) {
   return elements.map((el) => ({
     ...el,
-    computed: { current: 0, voltage: 0, power: 0, measurement: 0 },
+    computed: { current: 0, voltage: 0, power: 0, measurement: 0, forwardVoltage: 0, reverseVoltage: 0 },
   }));
 }
 
@@ -447,9 +454,13 @@ function buildMNAMatrices(
       }
     } else if (el.type === "led") {
       // LED is directional: only conduct when forward-biased beyond threshold.
+      const exploded = (el.runtime as any)?.led?.exploded;
+      if (exploded) {
+        continue; // blown LED becomes an open circuit
+      }
       const isOn = ledOnMap?.get(el.id) ?? false;
       if (isOn) {
-        const R = el.properties?.resistance ?? 100; // on-state series resistance approximation
+        const R = el.properties?.resistance ?? LED_INTERNAL_RESISTANCE; // on-state series resistance approximation
         const g = 1 / R;
         if (ai !== undefined) G[ai][ai] += g;
         if (bi !== undefined) G[bi][bi] += g;
@@ -673,25 +684,6 @@ function getNodeVoltages(x: number[], ids: string[], groundId: string) {
   return result;
 }
 
-// Estimated forward voltage per LED color (V). Used as a simple threshold.
-function getLedForwardVoltage(color?: string) {
-  const c = (color || 'red').toLowerCase();
-  switch (c) {
-    case 'red':
-    case 'orange':
-      return 1.8;
-    case 'yellow':
-      return 2.0;
-    case 'green':
-      return 2.1;
-    case 'blue':
-    case 'white':
-      return 2.8;
-    default:
-      return 2.0;
-  }
-}
-
 function computeElementResults(
   elements: CircuitElement[],
   nodeVoltages: Record<string, number>,
@@ -715,6 +707,8 @@ function computeElementResults(
     let current = 0,
       power = 0,
       measurement = 0;
+    let forwardVoltage: number | undefined;
+    let reverseVoltage: number | undefined;
 
     if (["resistor", "lightbulb"].includes(el.type)) {
       const R = el.properties?.resistance ?? 1;
@@ -722,21 +716,24 @@ function computeElementResults(
       power = voltage * current;
     } else if (el.type === "led") {
       // Respect polarity: forward conduction only (anode is node[1], cathode is node[0] per createElement)
-      const a = nodeMap.get(el.nodes?.[1]?.id ?? "");
-      const c = nodeMap.get(el.nodes?.[0]?.id ?? "");
-      const Va = a ? nodeVoltages[a] ?? 0 : 0;
-      const Vc = c ? nodeVoltages[c] ?? 0 : 0;
-      const forward = Va - Vc;
+      const anodeId = nodeMap.get(el.nodes?.[1]?.id ?? "");
+      const cathodeId = nodeMap.get(el.nodes?.[0]?.id ?? "");
+      const VaNode = anodeId ? nodeVoltages[anodeId] ?? 0 : 0;
+      const VcNode = cathodeId ? nodeVoltages[cathodeId] ?? 0 : 0;
+      const forward = VaNode - VcNode;
+      forwardVoltage = forward;
+      reverseVoltage = forward < 0 ? -forward : 0;
+      voltage = forward; // expose forward drop for UI and runtime models
+
+      const exploded = (el.runtime as any)?.led?.exploded;
       const Vf = getLedForwardVoltage(el.properties?.color);
-      if (forward >= Vf) {
-        const R = el.properties?.resistance ?? 100;
+      if (!exploded && forward >= Vf) {
+        const R = el.properties?.resistance ?? LED_INTERNAL_RESISTANCE;
         current = forward / R;
-        voltage = forward; // drop across LED path we model
         power = voltage * current;
       } else {
         current = 0;
         power = 0;
-        // keep voltage as Va-Vb for probes, but LED behaves open
       }
     } else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
@@ -818,7 +815,6 @@ function computeElementResults(
 }
 
 /* ------------------------- Improved linear solver ------------------------- */
-
 /**
  * Solve linear system using Gaussian elimination with scaled partial pivoting.
  * Returns solution vector x or null if no unique solution.

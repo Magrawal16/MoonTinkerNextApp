@@ -61,6 +61,11 @@ export const CATEGORY_ICONS: Record<string, string> = {
   Music: "🎵",
 };
 
+const IF_ELSE_ADD_ICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="4" ry="4" fill="%2300bcd4"/><path d="M11 5h2v14h-2z" fill="white"/><path d="M5 11h14v2H5z" fill="white"/></svg>';
+
+const IF_ELSE_REMOVE_ICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="4" ry="4" fill="%23f44336"/><path d="M5 11h14v2H5z" fill="white"/></svg>';
 import { LOGIC_BLOCKS } from "./sharedBlockDefinitions/logic";
 import { MUSIC_BLOCKS } from "./sharedBlockDefinitions/music";
 import { MATHS_BLOCKS } from "./sharedBlockDefinitions/maths";
@@ -119,6 +124,235 @@ function attachNumberShadow(
     input?.connection?.connect((num as any).outputConnection);
   } catch (_) {}
 }
+
+function attachBooleanShadow(
+  workspace: Blockly.Workspace,
+  hostBlock: Blockly.Block,
+  inputName: string,
+  defaultValue: boolean
+): void {
+  try {
+    const bool = workspace.newBlock("logic_boolean");
+    (bool as any).setShadow(true);
+    (bool as any).setFieldValue(defaultValue ? "TRUE" : "FALSE", "BOOL");
+    if ((bool as any).initSvg) (bool as any).initSvg();
+    if ((bool as any).render) (bool as any).render();
+    const input = hostBlock.getInput(inputName);
+    input?.connection?.connect((bool as any).outputConnection);
+  } catch (_) {}
+}
+
+function registerInlineIfElseBlock(): void {
+  const logicColor = CATEGORY_COLORS["Logic"] || "#00BCD4";
+
+  const IF_ELSE_MIXIN = {
+    elseifCount_: 0,
+    elseCount_: 0,
+    valueConnections_: [] as (Blockly.Connection | null)[],
+    statementConnections_: [] as (Blockly.Connection | null)[],
+    elseStatementConnection_: null as Blockly.Connection | null,
+    mutationToDom(this: any) {
+      if (!this.elseifCount_ && !this.elseCount_) return null;
+      const container = Blockly.utils.xml.createElement("mutation");
+      if (this.elseifCount_) container.setAttribute("elseif", String(this.elseifCount_));
+      if (this.elseCount_) container.setAttribute("else", "1");
+      return container;
+    },
+    domToMutation(this: any, xmlElement: Element) {
+      if (!xmlElement) return;
+      this.elseifCount_ = parseInt(xmlElement.getAttribute("elseif") || "0", 10) || 0;
+      this.elseCount_ = parseInt(xmlElement.getAttribute("else") || "0", 10) || 0;
+      this.rebuildShape_();
+    },
+    storeConnections_(this: any, skipIndex?: number) {
+      this.valueConnections_ = [null];
+      this.statementConnections_ = [null];
+      this.elseStatementConnection_ = null;
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        if (skipIndex && skipIndex === i) continue;
+        this.valueConnections_.push(this.getInput("IF" + i)?.connection?.targetConnection || null);
+        this.statementConnections_.push(this.getInput("DO" + i)?.connection?.targetConnection || null);
+      }
+      if (this.getInput("ELSE")) {
+        this.elseStatementConnection_ = this.getInput("ELSE")?.connection?.targetConnection || null;
+      }
+    },
+    restoreConnections_(this: any) {
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        this.reconnectValueConnection_(i, this.valueConnections_);
+        this.statementConnections_[i]?.reconnect(this, "DO" + i);
+      }
+      if (this.getInput("ELSE")) {
+        this.elseStatementConnection_?.reconnect(this, "ELSE");
+      }
+    },
+    addElse_(this: any) {
+      this.update_(() => {
+        this.elseCount_ = 1;
+      });
+    },
+    removeElse_(this: any) {
+      this.update_(() => {
+        this.elseCount_ = 0;
+      });
+    },
+    addElseIf_(this: any) {
+      this.update_(() => {
+        this.elseifCount_++;
+      });
+    },
+    removeElseIf_(this: any, index: number) {
+      this.update_(() => {
+        this.elseifCount_ = Math.max(0, this.elseifCount_ - 1);
+      }, index);
+    },
+    update_(this: any, updater: () => void, skipIndex?: number) {
+      Blockly.Events.setGroup(true);
+      this.storeConnections_(skipIndex);
+      const block = this as Blockly.Block;
+      const oldMutationDom = block.mutationToDom?.();
+      const oldMutation = oldMutationDom ? Blockly.Xml.domToText(oldMutationDom) : "";
+      updater?.();
+      this.updateShape_();
+      if ((block as any).initSvg) (block as any).initSvg();
+      if ((block as any).render) (block as any).render();
+      const newMutationDom = block.mutationToDom?.();
+      const newMutation = newMutationDom ? Blockly.Xml.domToText(newMutationDom) : "";
+      if (oldMutation !== newMutation) {
+        const changeEvent = new Blockly.Events.BlockChange(block, "mutation", null, oldMutation, newMutation);
+        Blockly.Events.fire(changeEvent);
+        const group = Blockly.Events.getGroup();
+        setTimeout(() => {
+          Blockly.Events.setGroup(group);
+          (block as any).bumpNeighbours?.();
+          Blockly.Events.setGroup(false);
+        }, (Blockly as any).config?.bumpDelay ?? 0);
+      }
+      this.restoreConnections_();
+      Blockly.Events.setGroup(false);
+    },
+    updateShape_(this: any) {
+      const rightAlign = (Blockly as any).inputs?.Align?.RIGHT ?? (Blockly as any).ALIGN_RIGHT;
+      if (this.getInput("ELSE")) {
+        this.removeInput("ELSEBUTTONS");
+        this.removeInput("ELSETITLE");
+        this.removeInput("ELSE");
+      }
+      let i = 1;
+      while (this.getInput("IF" + i)) {
+        this.removeInput("IF" + i);
+        this.removeInput("IFTITLE" + i);
+        this.removeInput("IFBUTTONS" + i);
+        this.removeInput("DO" + i);
+        i++;
+      }
+      for (let idx = 1; idx <= this.elseifCount_; idx++) {
+        const removeElseIf = () => this.removeElseIf_(idx);
+        this.appendValueInput("IF" + idx)
+          .setCheck("Boolean")
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_ELSEIF || "else if");
+        this.appendDummyInput("IFTITLE" + idx)
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_THEN || "then");
+        this.appendDummyInput("IFBUTTONS" + idx)
+          .setAlign(rightAlign)
+          .appendField(new Blockly.FieldImage(IF_ELSE_REMOVE_ICON, 18, 18, "-", removeElseIf, false));
+        this.appendStatementInput("DO" + idx);
+        
+        // Attach default false boolean to else-if conditions if no connection exists
+        if (this.workspace && !this.getInput("IF" + idx)?.connection?.targetConnection) {
+          attachBooleanShadow(this.workspace, this, "IF" + idx, false);
+        }
+      }
+      if (this.elseCount_) {
+        this.appendDummyInput("ELSETITLE")
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_ELSE || "else");
+        this.appendDummyInput("ELSEBUTTONS")
+          .setAlign(rightAlign)
+          .appendField(new Blockly.FieldImage(IF_ELSE_REMOVE_ICON, 18, 18, "-", this.removeElse_.bind(this), false));
+        this.appendStatementInput("ELSE");
+      }
+      if (this.getInput("ADDBUTTON")) this.removeInput("ADDBUTTON");
+      const addElseOrElseIf = () => {
+        if (!this.elseCount_) {
+          this.addElse_();
+        } else {
+          this.addElseIf_();
+        }
+      };
+      this.appendDummyInput("ADDBUTTON")
+        .setAlign(rightAlign)
+        .appendField(new Blockly.FieldImage(IF_ELSE_ADD_ICON, 18, 18, "+", addElseOrElseIf, false));
+    },
+    rebuildShape_(this: any) {
+      const valueConnections: (Blockly.Connection | null)[] = [null];
+      const statementConnections: (Blockly.Connection | null)[] = [null];
+      let elseConnection: Blockly.Connection | null = null;
+      if (this.getInput("ELSE")) {
+        elseConnection = this.getInput("ELSE")?.connection?.targetConnection || null;
+      }
+      let idx = 1;
+      while (this.getInput("IF" + idx)) {
+        valueConnections[idx] = this.getInput("IF" + idx)?.connection?.targetConnection || null;
+        statementConnections[idx] = this.getInput("DO" + idx)?.connection?.targetConnection || null;
+        idx++;
+      }
+      this.updateShape_();
+      this.reconnectChildBlocks_(valueConnections, statementConnections, elseConnection);
+    },
+    reconnectChildBlocks_(
+      this: any,
+      valueConnections: (Blockly.Connection | null)[],
+      statementConnections: (Blockly.Connection | null)[],
+      elseConnection: Blockly.Connection | null
+    ) {
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        this.reconnectValueConnection_(i, valueConnections);
+        statementConnections[i]?.reconnect(this, "DO" + i);
+      }
+      elseConnection?.reconnect(this, "ELSE");
+    },
+    reconnectValueConnection_(this: any, index: number, valueConnections: (Blockly.Connection | null)[]) {
+      const shadow = this.getInput("IF" + index)?.connection?.targetBlock();
+      if (valueConnections[index]) {
+        valueConnections[index]?.reconnect(this, "IF" + index);
+        if (shadow && typeof (shadow as any).getParent === "function" && !(shadow as any).getParent()) {
+          shadow.dispose();
+        }
+      }
+    },
+  };
+
+  Blockly.Blocks["controls_if"] = {
+    ...IF_ELSE_MIXIN,
+    init(this: any) {
+      this.elseifCount_ = 0;
+      this.elseCount_ = 0;
+      this.setHelpUrl(Blockly.Msg.CONTROLS_IF_HELPURL);
+      this.appendValueInput("IF0")
+        .setCheck("Boolean")
+        .appendField(Blockly.Msg.CONTROLS_IF_MSG_IF || "if");
+      this.appendDummyInput("THEN0")
+        .appendField(Blockly.Msg.CONTROLS_IF_MSG_THEN || "then");
+      this.appendStatementInput("DO0");
+      this.setInputsInline(true);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(logicColor);
+      this.updateShape_();
+      this.setTooltip(() => {
+        if (!this.elseifCount_ && !this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_1 || "If true, do something.";
+        if (!this.elseifCount_ && this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_2 || "If true, do first block; else do second block.";
+        if (this.elseifCount_ && !this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_3 || "If first condition false, test the next.";
+        return Blockly.Msg.CONTROLS_IF_TOOLTIP_4 || "Multiple conditions and an else block.";
+      });
+      
+      // Attach default true boolean to the first IF condition
+      if (this.workspace) {
+        attachBooleanShadow(this.workspace, this, "IF0", true);
+      }
+    },
+  } as any;
+}
 export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   ...BASIC_BLOCKS,
   ...LED_BLOCKS,
@@ -147,10 +381,11 @@ export class SharedBlockRegistry {
         block.blockDefinition.colour = categoryObj.color;
       }
     });
-    const blockDefinitions = SHARED_MICROBIT_BLOCKS.map(
-      (block) => block.blockDefinition
-    );
+    const blockDefinitions = SHARED_MICROBIT_BLOCKS
+      .filter((block) => block.type !== "controls_if")
+      .map((block) => block.blockDefinition);
     Blockly.defineBlocksWithJsonArray(blockDefinitions);
+    registerInlineIfElseBlock();
 
     // Disable copying and duplication for forever and on_start blocks
     const disableCopyForBlock = (blockType: string) => {

@@ -368,6 +368,34 @@ export function useWorkspaceInitialization({
             } catch (error) {
               // Silently handle errors
             }
+          } else if (workspace && !codeAtInit.trim()) {
+            // Add default blocks (forever and on_start) only when workspace is completely empty
+            const existingBlocks = workspace.getAllBlocks(false);
+            if (existingBlocks.length === 0) {
+              try {
+                // Get workspace metrics to center the blocks
+                const metrics = workspace.getMetrics();
+                const centerX = metrics.viewWidth / 2 - 150; // Offset for two blocks side by side
+                const centerY = metrics.viewHeight / 2 - 100;
+
+                const onStartBlock = workspace.newBlock('on_start');
+                onStartBlock.initSvg();
+                onStartBlock.render();
+                onStartBlock.moveBy(centerX, centerY);
+
+                const foreverBlock = workspace.newBlock('forever');
+                foreverBlock.initSvg();
+                foreverBlock.render();
+                foreverBlock.moveBy(centerX + 200, centerY); // Position 200px to the right
+
+                setTimeout(
+                  () => saveWorkspaceState(activeControllerId || undefined),
+                  100
+                );
+              } catch (error) {
+                // Silently handle errors
+              }
+            }
           }
         }
 

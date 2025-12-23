@@ -120,7 +120,7 @@ export class IconField extends Blockly.Field {
           cell.style.width = "8px";
           cell.style.height = "8px";
           cell.style.borderRadius = "2px";
-          cell.style.background = on ? "#ffd54f" : "#2f2f2f";
+          cell.style.background = on ? "#f44336" : "#2f2f2f";
           cell.style.opacity = on ? "1" : "0.35";
           preview.appendChild(cell);
         }

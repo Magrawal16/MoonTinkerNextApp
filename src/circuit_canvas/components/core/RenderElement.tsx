@@ -96,7 +96,12 @@ export default function RenderElement(props: RenderElementProps) {
           id={element.id}
           x={0}
           y={0}
-          power={element.computed?.power ?? 0}
+          electrical={{
+            current: element.computed?.current,
+            forwardVoltage: element.computed?.forwardVoltage ?? element.computed?.voltage,
+            power: element.computed?.power,
+          }}
+          runtime={element.runtime?.led}
           selected={props.selectedElementId === element.id}
           color={element.properties?.color as string | undefined}
           draggable={false}

@@ -58,18 +58,10 @@ export default function UnifiedEditor({
   // Lockout state to prevent immediate switch back to text mode
   const [blockModeLockout, setBlockModeLockout] = useState(false);
   const blockModeLockoutRef = useRef(false);
-  // Lockout to avoid switching to text while blocks are still settling
-  const [blockToTextLockout, setBlockToTextLockout] = useState(false);
-  const blockToTextLockoutRef = useRef(false);
-  const blockToTextLockoutTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingBlockToTextSwitchRef = useRef(false);
   // Keep ref in sync with state
   useEffect(() => {
     blockModeLockoutRef.current = blockModeLockout;
   }, [blockModeLockout]);
-  useEffect(() => {
-    blockToTextLockoutRef.current = blockToTextLockout;
-  }, [blockToTextLockout]);
   // --- State and Refs ---
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     if (typeof window === "undefined") return "block";
@@ -176,48 +168,6 @@ export default function UnifiedEditor({
   useEffect(() => {
     isUpdatingFromCodeRef.current = isUpdatingFromCode;
   }, [isUpdatingFromCode]);
-
-  // When blocks change, briefly lock switching to text so conversion uses latest workspace state
-  useEffect(() => {
-    if (!workspaceRef.current || !workspaceReady) return;
-    const ws = workspaceRef.current;
-
-    const onWsChange = (event: any) => {
-      // Ignore UI-only events and changes originating from code-to-blocks conversion
-      try {
-        if (event?.isUiEvent) return;
-      } catch {}
-      if (isUpdatingFromCodeRef.current) return;
-
-      // Most block edits will fire one of these
-      const t = event?.type;
-      if (
-        t !== Blockly.Events.BLOCK_CREATE &&
-        t !== Blockly.Events.BLOCK_CHANGE &&
-        t !== Blockly.Events.BLOCK_MOVE &&
-        t !== Blockly.Events.BLOCK_DELETE
-      ) {
-        return;
-      }
-
-      setBlockToTextLockout(true);
-      if (blockToTextLockoutTimerRef.current) {
-        clearTimeout(blockToTextLockoutTimerRef.current);
-      }
-      blockToTextLockoutTimerRef.current = setTimeout(() => {
-        setBlockToTextLockout(false);
-      }, 3000);
-    };
-
-    ws.addChangeListener(onWsChange);
-    return () => {
-      try { ws.removeChangeListener(onWsChange); } catch (_) {}
-      if (blockToTextLockoutTimerRef.current) {
-        clearTimeout(blockToTextLockoutTimerRef.current);
-        blockToTextLockoutTimerRef.current = null;
-      }
-    };
-  }, [workspaceReady]);
 
   const hardResetToBlocks = useCallback(() => {
     try { if (workspaceRef.current) { workspaceRef.current.dispose(); } } catch(_) {}
@@ -421,11 +371,12 @@ export default function UnifiedEditor({
   let currentCode = controllerCodeMap[activeControllerId ?? ""] ?? "";
 
   useEffect(() => {
-    if (!isUpdatingFromBlocks) {
+    // Only sync localCode from controllerCodeMap when in block mode
+    if (editorMode === "block" && !isUpdatingFromBlocks) {
       setLocalCode(currentCode);
     }
     localCodeRef.current = currentCode;
-  }, [currentCode, activeControllerId, isUpdatingFromBlocks]);
+  }, [currentCode, activeControllerId, isUpdatingFromBlocks, editorMode]);
 
   // Ensure controller code is synced when switching controllers
   useEffect(() => {
@@ -644,11 +595,7 @@ export default function UnifiedEditor({
   const handleModeChange = (newMode: EditorMode) => {
     if (newMode === editorMode) return;
     // Prevent switching to text mode if lockout is active
-    if (
-      editorMode === "block" &&
-      newMode === "text" &&
-      (blockModeLockoutRef.current || blockToTextLockoutRef.current)
-    ) {
+    if (editorMode === "block" && newMode === "text" && blockModeLockoutRef.current) {
       return;
     }
     setValidationError(null);
@@ -668,59 +615,31 @@ export default function UnifiedEditor({
       setBlockModeLockout(true);
       setTimeout(() => setBlockModeLockout(false), 1000);
     } else {
-      // Switching block -> text: ensure blocks have settled and a converter is available
-      if (isConverting) return;
-      pendingBlockToTextSwitchRef.current = true;
       setIsConverting(true);
       setConversionType("toText");
-
-      const targetControllerId = activeControllerId;
-      const attemptConvert = (retriesLeft: number) => {
-        // Abort if controller changed mid-flight
-        if (!targetControllerId || activeControllerIdRef.current !== targetControllerId) {
-          pendingBlockToTextSwitchRef.current = false;
-          setIsConverting(false);
-          setConversionType(null);
-          return;
-        }
-
-        // If blocks are still changing, wait a bit
-        if (blockToTextLockoutRef.current) {
-          if (retriesLeft > 0) return setTimeout(() => attemptConvert(retriesLeft - 1), 75);
-        }
-
-        // Workspace might not be ready immediately after creating a controller
-        if (!workspaceRef.current) {
-          if (retriesLeft > 0) return setTimeout(() => attemptConvert(retriesLeft - 1), 75);
-          // Fallback to current text
-          textBaselineRef.current = (localCode ?? "");
-          textModifiedRef.current = false;
-          setEditorMode("text");
-          setTimeout(() => { setIsConverting(false); setConversionType(null); }, 300);
-          pendingBlockToTextSwitchRef.current = false;
-          return;
-        }
-
+      if (workspaceRef.current && bidirectionalConverter) {
         try {
-          try { pythonGenerator.init(workspaceRef.current); } catch (_) {}
-          const converterToUse = bidirectionalConverter || new BidirectionalConverter(workspaceRef.current, pythonGenerator);
-          const code = converterToUse.blocksToPython();
+          try { pythonGenerator.init(workspaceRef.current); } catch (e) { }
+          const code = bidirectionalConverter.blocksToPython();
           setLocalCode(code);
-          setControllerCodeMap(prev => ({ ...prev, [targetControllerId]: code }));
+          setControllerCodeMap(prev => ({ ...prev, [activeControllerId!]: code }));
           textBaselineRef.current = (code ?? "");
           textModifiedRef.current = false;
-        } catch (_) {
-          // If conversion failed, retry a few times while blocks settle
-          if (retriesLeft > 0) return setTimeout(() => attemptConvert(retriesLeft - 1), 75);
-        }
-
-        setEditorMode("text");
-        setTimeout(() => { setIsConverting(false); setConversionType(null); }, 300);
-        pendingBlockToTextSwitchRef.current = false;
-      };
-
-      // Give the block drop/create event a tick to finish before converting
-      setTimeout(() => attemptConvert(12), 0);
+          // Ensure editor mode is set after code is updated
+          setTimeout(() => {
+            setEditorMode(newMode);
+            setIsConverting(false);
+            setConversionType(null);
+          }, 0);
+          return;
+        } catch (e) { }
+      }
+      if (!workspaceRef.current) {
+        textBaselineRef.current = (localCode ?? "");
+        textModifiedRef.current = false;
+      }
+      setEditorMode(newMode);
+      setTimeout(() => { setIsConverting(false); setConversionType(null); }, 300);
     }
   };
 
@@ -779,7 +698,6 @@ export default function UnifiedEditor({
         controllers={controllers}
         activeControllerId={activeControllerId}
         blockModeLockout={blockModeLockout}
-        blockToTextLockout={blockToTextLockout}
         onSelectController={(id) => {
           if (onSelectController) onSelectController(id);
         }}

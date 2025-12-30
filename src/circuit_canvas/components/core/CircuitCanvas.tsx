@@ -1375,42 +1375,48 @@ export default function CircuitCanvas() {
   }, []);
 
   // Confirm import from modal
+  const [importLoading, setImportLoading] = useState(false);
   const handleImportConfirm = useCallback(() => {
     if (!importInput) {
       setImportError("Please paste a link.");
       return;
     }
-    try {
-      const url = new URL(importInput);
-      const encoded = url.searchParams.get("circuit");
-      if (!encoded) throw new Error("No circuit data found in link.");
-      const json = atob(decodeURIComponent(encoded));
-      const data = JSON.parse(json);
-      if (!data.elements || !data.wires) throw new Error("Invalid circuit data.");
-      pushToHistory(elements, wires);
-      resetState();
-      setElements(data.elements);
-      setWires(data.wires);
-      // Only restore controllerCodeMap for micro:bit controllers present in the imported circuit
-      if (data.controllerCodeMap) {
-        const microbitIds = data.elements
-          .filter((el: any) => el.type === "microbit" || el.type === "microbitWithBreakout")
-          .map((el: any) => el.id);
-        const filteredControllerCodeMap = Object.fromEntries(
-          Object.entries(data.controllerCodeMap)
-            .filter(([id]) => microbitIds.includes(id))
-            .map(([id, val]) => [id, String(val)])
-        ) as Record<string, string>;
-        setControllerCodeMap(filteredControllerCodeMap);
+    setImportLoading(true);
+    setTimeout(() => {
+      try {
+        const url = new URL(importInput);
+        const encoded = url.searchParams.get("circuit");
+        if (!encoded) throw new Error("No circuit data found in link.");
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (!data.elements || !data.wires) throw new Error("Invalid circuit data.");
+        pushToHistory(elements, wires);
+        resetState();
+        setElements(data.elements);
+        setWires(data.wires);
+        // Only restore controllerCodeMap for micro:bit controllers present in the imported circuit
+        if (data.controllerCodeMap) {
+          const microbitIds = data.elements
+            .filter((el: any) => el.type === "microbit" || el.type === "microbitWithBreakout")
+            .map((el: any) => el.id);
+          const filteredControllerCodeMap = Object.fromEntries(
+            Object.entries(data.controllerCodeMap)
+              .filter(([id]) => microbitIds.includes(id))
+              .map(([id, val]) => [id, String(val)])
+          ) as Record<string, string>;
+          setControllerCodeMap(filteredControllerCodeMap);
+        }
+        setShowImportModal(false);
+        setImportInput("");
+        setImportError(null);
+        showMessage("Circuit imported from link!", "success");
+      } catch (e: any) {
+        setImportError(e?.message || "Failed to import circuit.");
+        showMessage("Failed to import circuit.", "error");
+      } finally {
+        setImportLoading(false);
       }
-      setShowImportModal(false);
-      setImportInput("");
-      setImportError(null);
-      showMessage("Circuit imported from link!", "success");
-    } catch (e: any) {
-      setImportError(e?.message || "Failed to import circuit.");
-      showMessage("Failed to import circuit.", "error");
-    }
+    }, 300);
   }, [importInput, pushToHistory, elements, wires, resetState, setElements, setWires, setControllerCodeMap, showMessage]);
 
   const handleImportCancel = useCallback(() => {
@@ -1591,7 +1597,16 @@ export default function CircuitCanvas() {
       {/* Import Modal */}
       {showImportModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 min-w-[340px] max-w-[90vw]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 min-w-[340px] max-w-[90vw] relative">
+            {importLoading && (
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 rounded-2xl">
+                <div className="relative w-16 h-16 mb-2">
+                  <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
+                </div>
+                <span className="text-blue-700 font-semibold animate-pulse">Importing...</span>
+              </div>
+            )}
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Import Circuit from Link</h3>
             <input
               type="text"
@@ -1601,16 +1616,19 @@ export default function CircuitCanvas() {
               onChange={e => setImportInput(e.target.value)}
               autoFocus
               onKeyDown={e => { if (e.key === 'Enter') handleImportConfirm(); }}
+              disabled={importLoading}
             />
             {importError && <div className="text-red-600 text-sm w-full text-left">{importError}</div>}
             <div className="flex gap-3 mt-2 w-full justify-end">
               <button
                 onClick={handleImportCancel}
                 className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium"
+                disabled={importLoading}
               >Cancel</button>
               <button
                 onClick={handleImportConfirm}
                 className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+                disabled={importLoading}
               >Import</button>
             </div>
           </div>

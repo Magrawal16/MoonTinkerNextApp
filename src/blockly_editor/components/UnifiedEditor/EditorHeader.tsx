@@ -16,7 +16,6 @@ interface EditorHeaderProps {
   controllers?: Array<{ id: string; label: string }>;
   activeControllerId?: string | null;
   blockModeLockout?: boolean;
-  blockToTextLockout?: boolean;
   onSelectController?: (id: string) => void;
 }
 
@@ -33,12 +32,8 @@ export function EditorHeader({
   controllers = [],
   activeControllerId = null,
   blockModeLockout = false,
-  blockToTextLockout = false,
   onSelectController,
 }: EditorHeaderProps) {
-  const textModeDisabled =
-    isConverting || blockModeLockout || (editorMode === "block" && blockToTextLockout);
-
   return (
     <div
       className="flex items-center justify-between px-6 py-4 border-b border-gray-200/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-sm backdrop-blur-sm"
@@ -127,10 +122,10 @@ export function EditorHeader({
               editorMode === "text"
                 ? "bg-gradient-to-br from-indigo-500 to-purple-600 border-transparent text-white shadow-lg shadow-indigo-500/50 scale-105"
                 : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 hover:shadow-md"
-            } ${textModeDisabled ? "opacity-50 cursor-not-allowed" : ""}`}
+            } ${blockModeLockout ? "opacity-50 cursor-not-allowed" : ""}`}
             onClick={() => handleModeChange("text")}
             aria-pressed={editorMode === "text"}
-            disabled={textModeDisabled}
+            disabled={isConverting || blockModeLockout}
           >
             {editorMode === "text" && (
               <span className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer"></span>

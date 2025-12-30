@@ -179,14 +179,7 @@ export const LOOPS_BLOCKS: SharedBlockDefinition[] = [
       type: "loops_while",
       message0: "while %1 %2 %3",
       args0: [
-        {
-          type: "field_dropdown",
-          name: "COND",
-          options: [
-            ["true", "true"],
-            ["false", "false"],
-          ],
-        },
+        { type: "input_value", name: "COND", check: "Boolean" },
         { type: "input_dummy" },
         { type: "input_statement", name: "DO" },
       ],
@@ -196,7 +189,8 @@ export const LOOPS_BLOCKS: SharedBlockDefinition[] = [
     },
     pythonPattern: /while\s+(true|false|True|False)\s*:/g,
     pythonGenerator: (block, generator) => {
-      const cond = block.getFieldValue("COND") || "true";
+      // Use valueToCode to get the actual code from the input connection
+      const cond = generator.valueToCode(block, "COND", (generator as any).ORDER_NONE) || "True";
       const IND = ((generator as any)?.INDENT ?? "    ") as string;
       const statements = generator.statementToCode(block, "DO");
       const body = indentBodyIfNeeded(statements, IND);

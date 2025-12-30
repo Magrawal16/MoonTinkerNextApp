@@ -15,6 +15,8 @@ import styles from "@/circuit_canvas/styles/CircuitCanvas.module.css";
 import AuthHeader from "@/components/AuthHeader";
 import CircuitStorage from "@/circuit_canvas/components/core/CircuitStorage";
 import useCircuitShortcuts from "@/circuit_canvas/hooks/useCircuitShortcuts";
+import { FaLink, FaDownload, FaUpload } from "react-icons/fa6";
+
 import { getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
 import {
   getCircuitShortcuts,
@@ -61,7 +63,14 @@ import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulat
 
 
 export default function CircuitCanvas() {
+  // Import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importInput, setImportInput] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+
   // LocalStorage keys for session persistence
+    // Notification system
+    const { showMessage } = useMessage();
   const CIRCUIT_ELEMENTS_KEY = "mt_circuit_elements";
   const CIRCUIT_WIRES_KEY = "mt_circuit_wires";
   const CODE_MAP_KEY = "mt_controller_code_map";
@@ -132,6 +141,30 @@ export default function CircuitCanvas() {
   const dragStartWireCountRef = useRef(0);
   const [copiedElement, setCopiedElement] = useState<CircuitElement | null>(null);
   const [notesToolActive, setNotesToolActive] = useState(false);
+
+
+
+  // Auto-import if ?circuit= param is present
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("circuit");
+    if (encoded) {
+      try {
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (data.elements && data.wires) {
+          pushToHistory(elements, wires);
+          resetState();
+          setElements(data.elements);
+          setWires(data.wires);
+          if (data.controllerCodeMap) setControllerCodeMap(data.controllerCodeMap);
+          // Optionally notify user: imported from link
+        }
+      } catch {}
+    }
+    // eslint-disable-next-line
+  }, []);
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -1308,6 +1341,105 @@ export default function CircuitCanvas() {
     }
   }, [creatingWireStartNode]);
 
+  // --- Export/Import logic (must be after all hooks/state) ---
+  // Export circuit as a shareable link
+  const handleExportCircuit = useCallback(() => {
+    try {
+      // Only include controllerCodeMap for micro:bit controllers present in the circuit
+      const microbitIds = elements
+        .filter(el => el.type === "microbit" || el.type === "microbitWithBreakout")
+        .map(el => el.id);
+      const filteredControllerCodeMap = Object.fromEntries(
+        Object.entries(controllerCodeMap).filter(([id]) => microbitIds.includes(id))
+      );
+      const data = {
+        elements,
+        wires,
+        controllerCodeMap: filteredControllerCodeMap,
+      };
+      const json = JSON.stringify(data);
+      const encoded = encodeURIComponent(btoa(json));
+      const url = `${window.location.origin}${window.location.pathname}?circuit=${encoded}`;
+      navigator.clipboard.writeText(url);
+      showMessage("Circuit link copied to clipboard!", "success");
+    } catch (e) {
+      showMessage("Failed to export circuit.", "error");
+    }
+  }, [elements, wires, controllerCodeMap, showMessage]);
+
+  // Import circuit from a link (show modal)
+  const handleImportCircuit = useCallback(() => {
+    setImportInput("");
+    setImportError(null);
+    setShowImportModal(true);
+  }, []);
+
+  // Confirm import from modal
+  const handleImportConfirm = useCallback(() => {
+    if (!importInput) {
+      setImportError("Please paste a link.");
+      return;
+    }
+    try {
+      const url = new URL(importInput);
+      const encoded = url.searchParams.get("circuit");
+      if (!encoded) throw new Error("No circuit data found in link.");
+      const json = atob(decodeURIComponent(encoded));
+      const data = JSON.parse(json);
+      if (!data.elements || !data.wires) throw new Error("Invalid circuit data.");
+      pushToHistory(elements, wires);
+      resetState();
+      setElements(data.elements);
+      setWires(data.wires);
+      // Only restore controllerCodeMap for micro:bit controllers present in the imported circuit
+      if (data.controllerCodeMap) {
+        const microbitIds = data.elements
+          .filter((el: any) => el.type === "microbit" || el.type === "microbitWithBreakout")
+          .map((el: any) => el.id);
+        const filteredControllerCodeMap = Object.fromEntries(
+          Object.entries(data.controllerCodeMap)
+            .filter(([id]) => microbitIds.includes(id))
+            .map(([id, val]) => [id, String(val)])
+        ) as Record<string, string>;
+        setControllerCodeMap(filteredControllerCodeMap);
+      }
+      setShowImportModal(false);
+      setImportInput("");
+      setImportError(null);
+      showMessage("Circuit imported from link!", "success");
+    } catch (e: any) {
+      setImportError(e?.message || "Failed to import circuit.");
+      showMessage("Failed to import circuit.", "error");
+    }
+  }, [importInput, pushToHistory, elements, wires, resetState, setElements, setWires, setControllerCodeMap, showMessage]);
+
+  const handleImportCancel = useCallback(() => {
+    setShowImportModal(false);
+    setImportInput("");
+    setImportError(null);
+  }, []);
+
+  // Auto-import if ?circuit= param is present
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("circuit");
+    if (encoded) {
+      try {
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (data.elements && data.wires) {
+          pushToHistory(elements, wires);
+          resetState();
+          setElements(data.elements);
+          setWires(data.wires);
+          if (data.controllerCodeMap) setControllerCodeMap(data.controllerCodeMap);
+        }
+      } catch {}
+    }
+    // eslint-disable-next-line
+  }, []);
+
   return (
     <div
       className={styles.canvasContainer}
@@ -1438,6 +1570,52 @@ export default function CircuitCanvas() {
                 <FaRotateRight size={14} />
               </button>
             </div>
+
+            {/* Export/Import Buttons */}
+            <button
+              onClick={handleExportCircuit}
+              className="p-1 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+              title="Export circuit as shareable link"
+            >
+              <FaLink size={14} />
+              <span className="ml-1">Export</span>
+            </button>
+            <button
+              onClick={handleImportCircuit}
+              className="p-1 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
+              title="Import circuit from link"
+            >
+              <FaUpload size={14} />
+              <span className="ml-1">Import</span>
+            </button>
+      {/* Import Modal */}
+      {showImportModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 min-w-[340px] max-w-[90vw]">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Import Circuit from Link</h3>
+            <input
+              type="text"
+              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              placeholder="Paste a shared circuit link here..."
+              value={importInput}
+              onChange={e => setImportInput(e.target.value)}
+              autoFocus
+              onKeyDown={e => { if (e.key === 'Enter') handleImportConfirm(); }}
+            />
+            {importError && <div className="text-red-600 text-sm w-full text-left">{importError}</div>}
+            <div className="flex gap-3 mt-2 w-full justify-end">
+              <button
+                onClick={handleImportCancel}
+                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium"
+              >Cancel</button>
+              <button
+                onClick={handleImportConfirm}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold"
+              >Import</button>
+            </div>
+          </div>
+        </div>
+      )}
 
             {/* Copy Button */}
             <button
@@ -1666,7 +1844,7 @@ export default function CircuitCanvas() {
               <span>Start a new session</span>
             </button>
 
-            {/* <CircuitStorage
+            <CircuitStorage
               onCircuitSelect={(circuitId) => {
                 const data = getCircuitById(circuitId);
                 if (!data) return;
@@ -1686,7 +1864,7 @@ export default function CircuitCanvas() {
               currentElements={elements}
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
-            /> */}
+            /> 
 
             <AuthHeader inline />
 

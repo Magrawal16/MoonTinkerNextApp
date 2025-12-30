@@ -104,6 +104,13 @@ export default function PythonCodePalette({
       const buttonLower = buttonValue.toLowerCase();
       code = code.replace(new RegExp(`\\{button_lower\\}`, 'g'), buttonLower);
     }
+
+    // For gesture_lower: convert gesture value to lowercase
+    if (code.includes('{gesture_lower}')) {
+      const gestureValue = parameterValues[snippet.id]?.['gesture'] || 'SHAKE';
+      const gestureLower = gestureValue.toLowerCase();
+      code = code.replace(new RegExp(`\\{gesture_lower\\}`, 'g'), gestureLower);
+    }
     
     return code;
   };

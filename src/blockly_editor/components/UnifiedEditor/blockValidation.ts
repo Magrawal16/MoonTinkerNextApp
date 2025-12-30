@@ -24,12 +24,21 @@ export const GATED_BLOCK_TYPES = new Set<string>([
   "music_record_and_play",
   // LOGIC
   "controls_if",
+  // INPUT (boolean reporters that should only be meaningful under an event)
+  "is_gesture",
+  // INPUT (sensor reporters)
+  "light_level",
+  "temperature",
 ]);
 
 export const EVENT_CONTAINER_BLOCKS = new Set<string>([
   "forever",
   "on_start",
   "on_button_pressed",
+  "on_gesture",
+  "on_logo_pressed",
+  "on_logo_released",
+  "loops_every_interval",
 ]);
 
 const disabledTooltip =
@@ -49,6 +58,9 @@ const defaultTooltips: Record<string, string> = {
   show_icon: "Show a predefined icon on the LED matrix",
   math_random_int: "Return a random integer between two values",
   controls_if: "If / else if / else",
+  is_gesture: "Check whether the selected gesture is currently active",
+  light_level: "Get the current ambient light level (0–255)",
+  temperature: "Get the temperature in degrees Celsius",
   music_play_tone: "Play a tone with given pitch and duration",
   music_ring_tone: "Ring a tone continuously",
   music_rest: "Pause sound for a specified duration",

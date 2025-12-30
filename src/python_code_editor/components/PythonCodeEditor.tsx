@@ -48,6 +48,7 @@ declare global {
 interface StandaloneEditorProps {
   code: string;
   onChange: (value: string) => void;
+  isSimulationOn?: boolean;
 }
 
 // NEW: Microbit flasher utility
@@ -137,19 +138,22 @@ return buf;
 }
 
 // Simple text editor fallback component
-const SimpleTextEditor = ({ code, onChange }: StandaloneEditorProps) => {
+const SimpleTextEditor = ({ code, onChange, isSimulationOn = false }: StandaloneEditorProps) => {
   return (
     <textarea
       value={code}
       onChange={(e) => onChange(e.target.value)}
-      className="w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono p-4 resize-none border-0 outline-none text-sm leading-5"
+      disabled={isSimulationOn}
+      className={`w-full h-full bg-[#1e1e1e] text-[#d4d4d4] font-mono p-4 resize-none border-0 outline-none text-sm leading-5 ${
+        isSimulationOn ? "opacity-50 cursor-not-allowed" : ""
+      }`}
       style={{ minHeight: '400px' }}
       spellCheck={false}
     />
   );
 };
 
-export default function PythonCodeEditor({ code, onChange }: StandaloneEditorProps) {
+export default function PythonCodeEditor({ code, onChange, isSimulationOn = false }: StandaloneEditorProps) {
   const [fontSize, setFontSize] = useState(14);
   const [isDragOver, setIsDragOver] = useState(false);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -338,7 +342,8 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
         scrollBeyondLastLine: false,
         wordWrap: 'on',
         wordWrapColumn: 80,
-        wrappingIndent: 'same'
+        wrappingIndent: 'same',
+        readOnlyMessage: { value: 'Cannot edit while simulation is running' }
       });
 
       // Register language services
@@ -535,7 +540,7 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
           <MonacoEditor
             language="python"
             value={code}
-            onChange={(val: string) => onChange(val ?? "")}
+            onChange={(val: string) => !isSimulationOn && onChange(val ?? "")}
             onMount={handleEditorDidMount}
             theme="vscode-dark-plus"
             loading={
@@ -553,12 +558,13 @@ export default function PythonCodeEditor({ code, onChange }: StandaloneEditorPro
               scrollBeyondLastLine: false,
               wordWrap: 'on',
               automaticLayout: true,
+              readOnly: isSimulationOn,
             }}
             height="100%"
             width="100%"
           />
         ) : (
-          <SimpleTextEditor code={code} onChange={onChange} />
+          <SimpleTextEditor code={code} onChange={onChange} isSimulationOn={isSimulationOn} />
         )}
       </div>
 

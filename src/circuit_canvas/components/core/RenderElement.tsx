@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+ 
+import { useCallback, useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 import { Rect, Group, Text, Label, Tag, Path } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
@@ -48,6 +48,9 @@ interface RenderElementProps {
   hoveredNodeForEndpoint?: string | null;
   // Generic hook to update element properties
   onUpdateElementProperties?: (elementId: string, properties: Record<string, any>) => void;
+  onMicrobitNode?: (id: string, node: any | null) => void;
+
+  
 }
 
 export default function RenderElement(props: RenderElementProps) {
@@ -56,6 +59,15 @@ export default function RenderElement(props: RenderElementProps) {
   const wires = props.wires;
   const { element } = props;
   const center = getElementCenter(element);
+
+  const microbitGroupRef = useCallback(
+    (node: any | null) => {
+      if (element.type === "microbit" || element.type === "microbitWithBreakout") {
+        props.onMicrobitNode?.(element.id, node);
+      }
+    },
+    [element.id, element.type, props.onMicrobitNode]
+  );
   // Get connected microbit data for ultrasonic sensor using utility function
   const connectedMicrobitData = element.type === "ultrasonicsensor4p" && elements && wires
     ? findConnectedMicrobit(element, elements, wires)
@@ -65,6 +77,8 @@ export default function RenderElement(props: RenderElementProps) {
   
   return (
     <Group
+      ref={microbitGroupRef}
+      
       x={element.x}
       y={element.y}
       offsetX={center.x}
@@ -74,7 +88,13 @@ export default function RenderElement(props: RenderElementProps) {
       onDragStart={props.onDragStart}
       onDragEnd={props.onDragEnd}
       onClick={() => props.onSelect?.(element.id)}
-      id={element.id}
+      id={
+          element.type === "microbit" || element.type === "microbitWithBreakout"
+            ? `microbit-${element.id}`
+            : element.id
+        }
+      name={element.type}
+
       // Only the body layer should be draggable, and not while simulation is running
       draggable={props.showBody !== false && !props.isSimulationOn}
     >
@@ -100,6 +120,7 @@ export default function RenderElement(props: RenderElementProps) {
             current: element.computed?.current,
             forwardVoltage: element.computed?.forwardVoltage ?? element.computed?.voltage,
             power: element.computed?.power,
+            explosionCurrentEstimate: (element.computed as any)?.explosionCurrentEstimate,
           }}
           runtime={element.runtime?.led}
           selected={props.selectedElementId === element.id}
@@ -347,8 +368,13 @@ export default function RenderElement(props: RenderElementProps) {
           const isTargetForEndpoint = node.id === props.hoveredNodeForEndpoint;
           const isSnapTarget = node.id === props.snapTargetNodeId;
           
+          // Check if this node has a valid wire connection
+          const hasValidConnection = props.wires?.some(w => 
+            !w.deleted && (w.fromNodeId === node.id || w.toNodeId === node.id)
+          );
+          
           // Hide node if element is covered by another element (z-order)
-          const isHidden = elements && shouldHideNode(element.id, elements);
+          const isHidden = elements && shouldHideNode(element.id, node.id, elements);
           if (isHidden) return null;
 
           return (
@@ -364,6 +390,8 @@ export default function RenderElement(props: RenderElementProps) {
                     ? "#00FF00"
                     : isTargetForEndpoint
                     ? "#FFD700"
+                    : hasValidConnection
+                    ? "#2559acff"
                     : isHovered && node.fillColor
                     ? node.fillColor
                     : "transparent"

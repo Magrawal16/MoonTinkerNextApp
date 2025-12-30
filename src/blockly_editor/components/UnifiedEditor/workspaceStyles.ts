@@ -13,7 +13,7 @@ export function injectCategoryStyles() {
       .moontinker-category {
         padding: 0 !important;
         margin: -3px 0 !important;
-        margin-left: -4px !important;
+        margin-left: 2px !important;
         border-radius: 4px !important;
         border: none !important;
         min-height: 40px !important;
@@ -145,18 +145,35 @@ export function injectCategoryStyles() {
       .blocklyToolboxCategory[data-category="music"] {
         background: rgba(244, 114, 182, 0.18) !important;
       }
+
+      .moontinker-category[data-category="Pins"]::before,
+      .moontinker-category[data-category="pins"]::before {
+        background: #b45309 !important; /* amber-700 */
+      }
+      .moontinker-category[data-category="Pins"],
+      .moontinker-category[data-category="pins"],
+      .blocklyTreeRow[data-category="Pins"],
+      .blocklyTreeRow[data-category="pins"],
+      [role="treeitem"][data-category="Pins"],
+      [role="treeitem"][data-category="pins"],
+      .blocklyToolboxCategory[data-category="Pins"],
+      .blocklyToolboxCategory[data-category="pins"] {
+        background: #b45309 !important; /* amber-700 (match Pins blocks) */
+      }
+      .blocklyTreeRow[data-category="Pins"] .blocklyTreeLabel,
+      .blocklyTreeRow[data-category="pins"] .blocklyTreeLabel,
+      .blocklyToolboxCategory[data-category="Pins"] .blocklyToolboxCategoryLabel,
+      .blocklyToolboxCategory[data-category="pins"] .blocklyToolboxCategoryLabel,
+      .blocklyToolboxCategory[data-category="Pins"] .blocklyTreeLabel,
+      .blocklyToolboxCategory[data-category="pins"] .blocklyTreeLabel {
+        color: #ffffff !important;
+      }
       /* --- Micro:bit Categories --- */
       .moontinker-category[data-category="Display"]::before {
         background: #2563eb !important; /* blue-600 */
       }
       .moontinker-category[data-category="Display"] {
         background: rgba(37, 99, 235, 0.18) !important;
-      }
-      .moontinker-category[data-category="Pins"]::before {
-        background: #22c55e !important; /* green-500 */
-      }
-      .moontinker-category[data-category="Pins"] {
-        background: rgba(34, 197, 94, 0.18) !important;
       }
       .moontinker-category[data-category="Buttons"]::before {
         background: #a21caf !important; /* purple-700 */

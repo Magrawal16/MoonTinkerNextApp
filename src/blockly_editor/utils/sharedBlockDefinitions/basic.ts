@@ -1,4 +1,6 @@
 import { SharedBlockDefinition } from "../sharedBlockDefinitions";
+// Side-effect import to register the custom pause time field with Blockly
+import "../fields/PauseTimeField";
 
 export const BASIC_BLOCKS: SharedBlockDefinition[] = [
   {
@@ -85,13 +87,26 @@ export const BASIC_BLOCKS: SharedBlockDefinition[] = [
   {
     type: "pause",
     category: "Basic",
-    blockDefinition: { type: "pause", message0: "pause %1 ms", args0: [{ type: "input_value", name: "TIME", check: "Number" }], previousStatement: null, nextStatement: null, tooltip: "Pause execution" },
+    blockDefinition: { 
+      type: "pause", 
+      message0: "pause (ms) %1", 
+      args0: [{ 
+        type: "field_pause_time", 
+        name: "TIME", 
+        value: 5000
+      }], 
+      previousStatement: null, 
+      nextStatement: null, 
+      tooltip: "Pause execution" 
+    },
     pythonPattern: /(?:^|\s)(?:await\s+)?basic\.pause\((\d+)\)/g,
     pythonGenerator: (block, generator) => {
-      const time = generator.valueToCode(block, "TIME", generator.ORDER_NONE) || "0";
+      const time = block.getFieldValue("TIME") || "100";
       return `basic.pause(${time})\n`;
     },
-    pythonExtractor: (match) => ({ TIME: parseInt(match[1]) }),
+    pythonExtractor: (match) => {
+      return { TIME: parseInt(match[1]) };
+    },
     blockCreator: (workspace, values) => workspace.newBlock("pause"),
   },
   {

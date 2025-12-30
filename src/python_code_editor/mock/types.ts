@@ -8,7 +8,22 @@ export type MicrobitEvent =
     | { type: "led-change"; x: number; y: number; value: number }
     | { type: "button-press"; button: "A" | "B" | "AB" }
     | { type: "logo-touch"; state: "pressed" | "released" }
-    | { type: "reset" };
+    | { type: "reset" }
+    | {
+        type: "gesture";
+        gesture:
+            | "shake"
+            | "logo_up"
+            | "logo_down"
+            | "screen_up"
+            | "screen_down"
+            | "tilt_left"
+            | "tilt_right"
+            | "free_fall"
+            | "3g"
+            | "6g"
+            | "8g";
+    };
 
 export type PinAPI = {
     digital_write_pin: (pin: string, value: number) => void;

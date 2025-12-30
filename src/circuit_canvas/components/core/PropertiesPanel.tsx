@@ -29,8 +29,6 @@ export default function PropertiesPanel({
   const [resistanceInput, setResistanceInput] = useState<string>("");
   const [voltage, setVoltage] = useState<number | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
-  const [temperature, setTemperature] = useState<number | null>(null);
-  const [brightness, setBrightness] = useState<number | null>(null);
   const [color, setColor] = useState<string | null>(null);
   const [selectedWireColor, setSelectedWireColor] = useState<string>(
     wireColor || defaultColors[0].hex
@@ -42,9 +40,6 @@ export default function PropertiesPanel({
   // Note text state
   const [noteText, setNoteText] = useState<string>("");
 
-  // Gesture control
-  const [showGesturePanel, setShowGesturePanel] = useState(false);
-  const [selectedGesture, setSelectedGesture] = useState("");
 
   // Parse numeric input safely: empty string => null, invalid => null
   const parseNumber = (v: string): number | null => {
@@ -53,30 +48,12 @@ export default function PropertiesPanel({
     return Number.isNaN(n) ? null : n;
   };
 
-  const handleGestureSelect = (gesture: string) => {
-    setSelectedGesture(gesture);
-    setShowGesturePanel(false);
-
-    if (onElementEdit && selectedElement) {
-      const updatedElement = {
-        ...selectedElement,
-        properties: {
-          ...selectedElement.properties,
-          gesture,
-        },
-      };
-      onElementEdit(updatedElement, false);
-    }
-  };
-
   // Whether this element wants to show a given property
   const showProp = (
     name:
       | "resistance"
       | "voltage"
       | "ratio"
-      | "temperature"
-      | "brightness"
       | "color"
       | "text"
   ) =>
@@ -103,8 +80,6 @@ export default function PropertiesPanel({
     }
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
-    setTemperature(selectedElement.properties?.temperature ?? null);
-    setBrightness(selectedElement.properties?.brightness ?? null);
     setColor(selectedElement.properties?.color ?? null);
     // Normalize old "Select to edit" text to empty string
     const text = selectedElement.properties?.text ?? "";
@@ -144,10 +119,7 @@ export default function PropertiesPanel({
         resistance: resistance ?? undefined,
         voltage: voltage ?? undefined,
         ratio: ratio ?? undefined,
-        temperature: temperature ?? undefined,
-        brightness: brightness ?? undefined,
         color: color ?? undefined,
-        gesture: selectedGesture || selectedElement.properties?.gesture,
         text: noteText || undefined,
       };
 
@@ -303,7 +275,7 @@ export default function PropertiesPanel({
       {/* Removed "Open Code Editor" button for microbit elements */}
 
       {/* Numeric fields — never show for wires */}
-      {selectedElement.type !== "wire" && selectedElement.type !== "battery" && selectedElement.type !== "lightbulb" && showProp("resistance") && (
+      {selectedElement.type !== "wire" && selectedElement.type !== "battery" && selectedElement.type !== "lightbulb" && selectedElement.type !== "led" && showProp("resistance") && (
         <div className="flex flex-col text-xs">
           <label>Resistance:</label>
           <div className="flex items-stretch gap-1">
@@ -443,83 +415,7 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {/* Micro:bit-specific controls */}
-      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("temperature") && (
-        <div className="flex flex-col text-xs">
-          <label>Temperature (°C):</label>
-          <input
-            type="range"
-            min="-5"
-            max="50"
-            value={temperature ?? 0}
-            onChange={(e) => setTemperature(parseNumber(e.target.value) ?? 0)}
-            className="w-full"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            {temperature ?? 0}°C
-          </div>
-        </div>
-      )}
-
-      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("brightness") && (
-        <div className="flex flex-col text-xs">
-          <label>Brightness (0–255):</label>
-          <input
-            type="range"
-            min="0"
-            max="255"
-            value={brightness ?? 0}
-            onChange={(e) => setBrightness(parseNumber(e.target.value) ?? 0)}
-            className="w-full"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            {brightness ?? 0}
-          </div>
-
-          {/* Gesture Section */}
-          <div className="mt-2">
-            <label>Gesture:</label>
-            <button
-              className="bg-purple-200 hover:bg-purple-300 text-xs px-2 py-1 rounded mt-1 ms-1"
-              onClick={() => setShowGesturePanel(!showGesturePanel)}
-            >
-              {selectedGesture
-                ? `Selected: ${selectedGesture}`
-                : "Choose Gesture"}
-            </button>
-
-            {showGesturePanel && (
-              <div className="grid grid-cols-2 gap-2 mt-2 bg-purple-50 p-2 rounded">
-                {[
-                  "shake",
-                  "logo up",
-                  "logo down",
-                  "screen up",
-                  "screen down",
-                  "tilt left",
-                  "tilt right",
-                  "free fall",
-                  "3g",
-                  "6g",
-                  "8g",
-                ].map((gesture) => (
-                  <button
-                    key={gesture}
-                    className={`px-2 py-1 rounded text-xs border ${selectedGesture === gesture
-                        ? "bg-purple-400 text-white"
-                        : "bg-white"
-                      }`}
-                    onClick={() => handleGestureSelect(gesture)}
-                  >
-                    {gesture}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
+  
       {/* Wire-specific color */}
       {selectedElement.type === "wire" && (
         <>
@@ -558,7 +454,10 @@ export default function PropertiesPanel({
       )}
 
       <div className="flex justify-between gap-2 text-xs">
-        {selectedElement.type !== "wire" && 
+        { 
+          selectedElement.type !== "wire" && 
+          selectedElement.type !== "microbit" &&
+          selectedElement.type !== "microbitWithBreakout" &&
           Array.isArray(selectedElement.displayProperties) &&
           selectedElement.displayProperties.length > 0 && (
           <button

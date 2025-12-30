@@ -11,6 +11,7 @@ interface LedProps extends BaseElementProps {
     current?: number;
     forwardVoltage?: number;
     power?: number;
+    explosionCurrentEstimate?: number;
   };
   runtime?: LedRuntimeState;
 }
@@ -227,7 +228,7 @@ export default function Led(props: LedProps) {
     : 0;
 
   const warningMessage = isExploded
-    ? `Current through the LED is ${((runtime.explosionCurrent ?? currentA) * 1000).toFixed(0)} mA, while absolute maximum is ${(LED_LIMITS.maxCurrent * 1000).toFixed(1)} mA.`
+    ? `Current through the LED is ${(((props.electrical?.explosionCurrentEstimate ?? runtime.explosionCurrent ?? currentA) as number) * 1000).toFixed(0)} mA, while absolute maximum is ${(LED_LIMITS.maxCurrent * 1000).toFixed(1)} mA.`
     : reverseOver
     ? `Reverse bias ${(Math.abs(forwardVoltage)).toFixed(2)} V > ${LED_LIMITS.maxReverseVoltage.toFixed(1)} V`
     : overPower
@@ -264,10 +265,10 @@ export default function Led(props: LedProps) {
               width={pos.rect.width}
               height={pos.rect.height}
               fill={glow.base}
-              opacity={0.25 + 0.45 * brightness}
+              opacity={0.15 + 0.75 * brightness}
               shadowColor={glow.shadow}
-              shadowBlur={30 + 60 * brightness}
-              shadowOpacity={0}
+              shadowBlur={40 + 80 * brightness}
+              shadowOpacity={0.2 + 0.6 * brightness}
               listening={false}
               globalCompositeOperation="lighten"
             />
@@ -279,10 +280,10 @@ export default function Led(props: LedProps) {
               angle={180}
               rotation={180}
               fill={glow.base}
-              opacity={0.25 + 0.45 * brightness}
+              opacity={0.15 + 0.75 * brightness}
               shadowColor={glow.shadow}
-              shadowBlur={30 + 60 * brightness}
-              shadowOpacity={0}
+              shadowBlur={40 + 80 * brightness}
+              shadowOpacity={0.2 + 0.6 * brightness}
               listening={false}
               globalCompositeOperation="lighten"
             />
@@ -292,10 +293,10 @@ export default function Led(props: LedProps) {
               radiusX={pos.rect.width * 0.45}
               radiusY={5}
               fill={glow.base}
-              opacity={0.15 + 0.16 * brightness}
+              opacity={0.2 + 0.35 * brightness}
               shadowColor={glow.shadow}
-              shadowBlur={12 + 20 * brightness}
-              shadowOpacity={0.12 + 0.13 * brightness}
+              shadowBlur={15 + 35 * brightness}
+              shadowOpacity={0.25 + 0.45 * brightness}
               listening={false}
               globalCompositeOperation="lighten"
             />

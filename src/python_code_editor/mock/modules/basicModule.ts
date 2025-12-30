@@ -17,6 +17,13 @@ export class BasicModule {
         private ledModule: LEDModule
     ) { }
 
+    // Optional reference to the owning microbit simulator (set by the simulator)
+    private microbit: any = null;
+
+    setMicrobit(microbit: any) {
+        this.microbit = microbit;
+    }
+
     /**
      * Show a built-in image by name, e.g. display.show(Image.HAPPY)
      */
@@ -302,6 +309,7 @@ export class BasicModule {
             show_image: this.showImage.bind(this),
             forever: this.forever.bind(this),
             pause: this.pause.bind(this),
+            temperature: () => this.microbit?.getTemperature?.() ?? 0,
         };
     }
 }

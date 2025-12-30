@@ -2,7 +2,17 @@ import { LedRuntimeState, LedVisualState } from "../types/circuit";
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
-export const LED_INTERNAL_RESISTANCE = 100; // ohms – approximates ~20 mA at ~2 V
+// Effective series resistance used by the circuit solver when the LED is ON.
+// Tuned to match TinkerCAD-like behavior for "battery directly to LED" scenarios.
+export const LED_INTERNAL_RESISTANCE = 6.2; // ohms
+
+// Per-color effective series resistance (piecewise-linear LED model).
+// Red is tuned so:
+// - 9V battery (Rint=1.45Ω) directly to LED => ~0.915A
+// - 1x AA (1.5V) can produce a visible low-current glow
+const seriesResistanceMap: Record<string, number> = {
+  red: 6.856, // keeps 9V case ~915mA when Vf(red)=1.4V
+};
 
 export const LED_LIMITS = {
   forwardVoltageDefault: 2.0, // V
@@ -18,7 +28,9 @@ export const LED_LIMITS = {
 };
 
 const forwardVoltageMap: Record<string, number> = {
-  red: 1.0,
+  // Lower knee for red so a single 1.5V cell can forward-bias slightly (Tinkercad-like "faint glow").
+  // Combined with seriesResistanceMap.red this still matches the 9V direct-to-LED current.
+  red: 1.4,
   orange: 1.8,
   yellow: 1.9,
   green: 2.0,
@@ -40,6 +52,11 @@ const explosionDelayMs = (seed: number) => {
 export const getLedForwardVoltage = (color?: string) => {
   const key = (color || "red").toLowerCase();
   return forwardVoltageMap[key] ?? LED_LIMITS.forwardVoltageDefault;
+};
+
+export const getLedSeriesResistance = (color?: string) => {
+  const key = (color || "red").toLowerCase();
+  return seriesResistanceMap[key] ?? LED_INTERNAL_RESISTANCE;
 };
 
 export const createInitialLedRuntime = (): LedRuntimeState => ({
@@ -92,6 +109,9 @@ export function updateLedRuntime(params: {
       brightness: 0,
       thermalEnergy: Math.max(runtime.thermalEnergy, LED_LIMITS.thermalExplosionThreshold),
       visualState: "exploded",
+      // Keep the displayed explosion current in sync with whatever the
+      // simulation provides (can be a hypothetical "intact" current estimate).
+      explosionCurrent: current,
       lastUpdateAt: params.nowMs,
     };
   }
@@ -137,7 +157,7 @@ export function updateLedRuntime(params: {
         failureReason:
           forwardPower > LED_LIMITS.maxPower ? "overpower" : "overcurrent",
         visualState: "exploded",
-        explosionCurrent: runtime.explosionCurrent ?? current,
+        explosionCurrent: current,
         lastUpdateAt: params.nowMs,
       };
     }
@@ -165,7 +185,11 @@ export function updateLedRuntime(params: {
       pendingExplosionAt = params.nowMs + explosionDelayMs(runtime.flickerSeed + thermalEnergy * 11);
     }
 
-    brightness = forwardOn ? clamp(forwardCurrent / LED_LIMITS.maxCurrent, 0, 1) : 0;
+    // Apply gamma correction to make LED more sensitive and prominent at lower currents
+    const normalizedCurrent = forwardOn ? clamp(forwardCurrent / LED_LIMITS.maxCurrent, 0, 1) : 0;
+    const gamma = 0.5; // <1 makes LED brighter at lower currents (more prominent)
+    brightness = Math.pow(normalizedCurrent, gamma);
+    
     if (thermalEnergy > LED_LIMITS.flickerStart && brightness > 0) {
       const wobbleStrength = Math.min(0.25, (thermalEnergy - LED_LIMITS.flickerStart) * 0.4);
       const wobble = 1 + wobbleStrength * Math.sin(params.nowMs / 60 + runtime.flickerSeed);
@@ -191,7 +215,7 @@ export function updateLedRuntime(params: {
       smokeStartedAt: runtime.smokeStartedAt ?? params.nowMs,
       failureReason: failureReason ?? runtime.failureReason,
       visualState: "exploded",
-      explosionCurrent: runtime.explosionCurrent ?? current,
+      explosionCurrent: current,
       lastUpdateAt: params.nowMs,
     };
   }

@@ -62,7 +62,9 @@ export function createFilteredToolboxXml(searchTerm: string): string {
             arg.check && (Array.isArray(arg.check) ? arg.check.includes("Variable") : arg.check === "Variable");
           
           if (wantsNumberShadow) {
-            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">0</field>\n        </shadow>\n      </value>`;
+            const defaultNumberValue =
+              block.type === "pins_analog_write_pin" && arg.name === "VALUE" ? 1023 : 0;
+            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">${defaultNumberValue}</field>\n        </shadow>\n      </value>`;
           } else if (wantsTextShadow) {
             valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="text">\n          <field name="TEXT">Hello!</field>\n        </shadow>\n      </value>`;
           } else if (wantsVariableShadow) {

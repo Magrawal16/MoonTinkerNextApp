@@ -183,6 +183,99 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
       },
     ],
   },
+  {
+    id: "temperature",
+    name: "Temperature",
+    description: "Read temperature in °C",
+    code: "input.temperature()",
+    category: "Input",
+  },
+  {
+    id: "light_level",
+    name: "Light Level",
+    description: "Read ambient light level (0-255)",
+    code: "input.light_level()",
+    category: "Input",
+  },
+  {
+    id: "logo_pressed",
+    name: "On Logo Pressed | micro:bit (V2)",
+    description: "Function triggered when logo is pressed",
+    code: `def on_logo_pressed():\n    pass\n\ninput.on_logo_pressed(on_logo_pressed)`,
+    category: "Input",
+  },
+  {
+    id: "logo_released",
+    name: "On Logo Released | micro:bit (V2)",
+    description: "Function triggered when logo is released",
+    code: `def on_logo_released():\n    pass\n\ninput.on_logo_released(on_logo_released)`,
+    category: "Input",
+  },
+  {
+    id: "logo_is_pressed",
+    name: "Logo Is Pressed | micro:bit (V2)",
+    description: "Check if logo touch sensor is pressed",
+    code: "input.logo_is_pressed()",
+    category: "Input",
+  },
+  {
+    id: "gesture_listener",
+    name: "On Gesture",
+    description: "Function triggered when a gesture happens",
+    code: `def on_gesture_{gesture_lower}():\n    pass\n\ninput.on_gesture(Gesture.{gesture}, on_gesture_{gesture_lower})`,
+    category: "Input",
+    parameters: [
+      {
+        id: "gesture",
+        name: "Gesture",
+        type: "dropdown",
+        options: [
+          "SHAKE",
+          "LOGO_UP",
+          "LOGO_DOWN",
+          "SCREEN_UP",
+          "SCREEN_DOWN",
+          "TILT_LEFT",
+          "TILT_RIGHT",
+          "FREE_FALL",
+          "THREE_G",
+          "SIX_G",
+          "EIGHT_G",
+        ],
+        defaultValue: "SHAKE",
+        placeholder: "Gesture",
+      },
+    ],
+  },
+  {
+    id: "gesture_conditional",
+    name: "Gesture Conditional",
+    description: "Check if a gesture is active",
+    code: "input.is_gesture(Gesture.{gesture})",
+    category: "Input",
+    parameters: [
+      {
+        id: "gesture",
+        name: "Gesture",
+        type: "dropdown",
+        options: [
+          "SHAKE",
+          "LOGO_UP",
+          "LOGO_DOWN",
+          "SCREEN_UP",
+          "SCREEN_DOWN",
+          "TILT_LEFT",
+          "TILT_RIGHT",
+          "FREE_FALL",
+          "THREE_G",
+          "SIX_G",
+          "EIGHT_G",
+        ],
+        defaultValue: "SHAKE",
+        placeholder: "Gesture",
+      },
+    ],
+  },
 
     // ===== LED SECTION =====
   {
@@ -321,48 +414,49 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     // ===== LOGIC SECTION =====
   {
     id: "if_true",
-    name: "If True",
+    name: "If ",
     description: "Execute code if condition is true",
     code: `if True:\n    # your code here`,
     category: "Logic",
   },
   {
-    id: "elif_false",
-    name: "Elif False",
-    description: "Execute code if previous condition is false and this is true",
-    code: `elif False:\n    # your code here`,
+    id: "if_else",
+    name: "If Else",
+    description: "Execute code in if/else branches",
+    code: "if True:\n    pass\nelse:\n    pass",
     category: "Logic",
   },
   {
-    id: "else",
-    name: "Else",
-    description: "Execute code if all previous conditions are false",
-    code: `else:\n    # your code here`,
+    id: "condition_and",
+    name: "And",
+    description: "Boolean AND condition",
+    code: "True and False",
     category: "Logic",
   },
-  // {
-  //   id: "while_true",
-  //   name: "While True Loop",
-  //   description: "Infinite loop structure",
-  //   code: `while True:\n    # Your code here`,
-  //   category: "Logic",
-  // },
-  // {
-  //   id: "for_range",
-  //   name: "For Range Loop",
-  //   description: "Loop with range",
-  //   code: `for i in range({count}):\n    # Your code here`,
-  //   category: "Logic",
-  //   parameters: [
-  //     {
-  //       id: "count",
-  //       name: "Loop count",
-  //       type: "number",
-  //       defaultValue: "10",
-  //       placeholder: "Enter count",
-  //     },
-  //   ],
-  // },
+  {
+    id: "condition_or",
+    name: "Or",
+    description: "Boolean OR condition",
+    code: "True or False",
+    category: "Logic",
+  },
+ 
+
+  // ===== LOOPS SECTION =====
+  {
+    id: "while_true",
+    name: "While",
+    description: "While loop structure",
+    code: "while true:\n  pass",
+    category: "Loops",
+  },
+  {
+    id: "repeat",
+    name: "Repeat",
+    description: "Repeat loop structure",
+    code: "for _ in range(0):\n  pass",
+    category: "Loops",
+  },
 
     // ===== VARIABLES SECTION =====
   {
@@ -498,75 +592,14 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
     ],
   },
 
-  // ===== SENSOR SECTION =====
+  // ===== MATHS SECTION =====
   {
-    id: "logo_pressed_listener",
-    name: "Logo Pressed Listener",
-    description: "Register handler for logo touch (pressed)",
-    code: `def on_logo_down():\n    #your code\n\ninput.on_logo_pressed(on_logo_down)`,
-    category: "Sensor",
+    id: "pick_random",
+    name: "Pick Random",
+    description: "Pick a random integer between two numbers",
+    code: "random.randint(0, 0)",
+    category: "Maths",
   },
-  {
-    id: "logo_released_listener",
-    name: "Logo Released Listener",
-    description: "Register handler for logo release",
-    code: `def on_logo_up():\n    #your code\n\ninput.on_logo_released(on_logo_up)`,
-    category: "Sensor",
-  },
-  {
-    id: "micropython_4p_ultrasonic",
-    name: "microPython : 4pUltrasonic sensor",
-    description: "Ultrasonic sensor simulation using TRIG and ECHO pins",
-    code: `from microbit import *
-
-# Pin configuration
-TRIG_PIN = "Your trig pin"
-ECHO_PIN = "Your echo pin"
-
-def measure():
-    # Clear TRIG pin
-    pins.digital_write_pin(TRIG_PIN, 0) 
-    basic.sleep(15)
-    
-    # Send trigger pulse
-    pins.digital_write_pin(TRIG_PIN, 1)
-    basic.sleep(1)  # 15ms pulse for reliability
-    pins.digital_write_pin(TRIG_PIN, 0)
-    
-    # Wait for sensor response
-    basic.sleep(100)
-    
-    # Read echo pin
-    return pins.digital_read_pin(ECHO_PIN)
-
-def show_result(detected):
-    # Clear display
-    for x in range(5):
-        for y in range(5):
-            led.unplot(x, y)
-    
-    if detected:
-        # Full screen for detection
-        for x in range(5):
-            for y in range(5):
-                led.plot(x, y)
-    else:
-        # Single center dot for no detection
-        led.plot(2, 2)
-
-# Main program
-basic.show_string("---")
-pins.digital_write_pin(TRIG_PIN, 1)
-basic.pause(1000)
-
-while True:
-    result = measure()
-    show_result(result)
-    basic.pause(300)
-`,
-    category: "Sensor",
-  },
-
 
   // ===== MUSIC SECTION =====
   // {
@@ -649,16 +682,72 @@ while True:
       },
     ],
   },
+
+  // ===== REFERENCE CODE SECTION =====
+  {
+    id: "reference_ultrasonic_4p",
+    name: "Reference: 4p Ultrasonic Sensor",
+    description: "Ultrasonic sensor reference using TRIG and ECHO pins",
+    code: `from microbit import *
+
+# Pin configuration
+TRIG_PIN = "Your trig pin"
+ECHO_PIN = "Your echo pin"
+
+def measure():
+    # Clear TRIG pin
+    pins.digital_write_pin(TRIG_PIN, 0)
+    basic.sleep(15)
+
+    # Send trigger pulse
+    pins.digital_write_pin(TRIG_PIN, 1)
+    basic.sleep(1)
+    pins.digital_write_pin(TRIG_PIN, 0)
+
+    # Wait for sensor response
+    basic.sleep(100)
+
+    # Read echo pin
+    return pins.digital_read_pin(ECHO_PIN)
+
+def show_result(detected):
+    # Clear display
+    for x in range(5):
+        for y in range(5):
+            led.unplot(x, y)
+
+    if detected:
+        # Full screen for detection
+        for x in range(5):
+            for y in range(5):
+                led.plot(x, y)
+    else:
+        # Single center dot for no detection
+        led.plot(2, 2)
+
+# Main program
+basic.show_string("---")
+pins.digital_write_pin(TRIG_PIN, 1)
+basic.pause(1000)
+
+while True:
+    result = measure()
+    show_result(result)
+    basic.pause(300)
+`,
+    category: "Reference Code",
+  },
 ];
 
 export const CATEGORIES = [
   "Basic",
   "Input",
+  "Loops",
   "Led",
   "Logic",
   "Variables",
-  "Pins",
-  "Sensor",
   "Maths",
   "Music",
+  "Pins",
+  "Reference Code",
 ] as const;

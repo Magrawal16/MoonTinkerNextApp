@@ -38,6 +38,7 @@ interface UnifiedEditorProps {
   controllers?: Array<{ id: string; label: string }>;
   onSelectController?: (id: string) => void;
   onResetRef?: React.MutableRefObject<(() => void) | null>; // Ref to expose reset functionality
+  isSimulationOn?: boolean; // Disable editing when simulation is running
 }
 
 export default function UnifiedEditor({
@@ -50,9 +51,26 @@ export default function UnifiedEditor({
   controllers = [],
   onSelectController,
   onResetRef,
+  isSimulationOn = false,
 }: UnifiedEditorProps) {
+  const EDITOR_MODE_STORAGE_KEY = "moontinker_lastEditorMode";
+  // Lockout state to prevent immediate switch back to text mode
+  const [blockModeLockout, setBlockModeLockout] = useState(false);
+  const blockModeLockoutRef = useRef(false);
+  // Keep ref in sync with state
+  useEffect(() => {
+    blockModeLockoutRef.current = blockModeLockout;
+  }, [blockModeLockout]);
   // --- State and Refs ---
-  const [editorMode, setEditorMode] = useState<EditorMode>("block");
+  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
+    if (typeof window === "undefined") return "block";
+    try {
+      const raw = localStorage.getItem(EDITOR_MODE_STORAGE_KEY);
+      return raw === "text" || raw === "block" ? raw : "block";
+    } catch {
+      return "block";
+    }
+  });
   // Load controllerXmlMap from localStorage on mount
   const [controllerXmlMap, setControllerXmlMap] = useState<Record<string, string>>(() => {
     if (typeof window !== 'undefined') {
@@ -102,6 +120,14 @@ export default function UnifiedEditor({
   // Flag to prevent code generation during controller switches
   const isSwitchingControllerRef = useRef<boolean>(false);
   const { onToolboxSearch } = useToolboxSearch(workspaceRef);
+
+  // Persist editor mode so it can be restored on next reopen
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      localStorage.setItem(EDITOR_MODE_STORAGE_KEY, editorMode);
+    } catch {}
+  }, [editorMode]);
 
   useEffect(() => {
     activeControllerIdRef.current = activeControllerId;
@@ -498,14 +524,26 @@ export default function UnifiedEditor({
   }, [workspaceReady, editorSize]);
 
   // --- Handlers ---
+  // Helper: Normalize code for meaningful comparison (ignore whitespace-only changes)
+  const normalizeCode = (code: string): string => {
+    return (code ?? "")
+      .split("\n")
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+      .join("\n")
+      .trim();
+  };
+
   const handleCodeChange = useCallback((newCode: string) => {
       // Critical: Validate activeControllerId exists to prevent wrong controller updates
       if (!activeControllerId || isUpdatingFromBlocks) return;
       setLocalCode(newCode);
       setValidationError(null);
-      // Track if user modified text relative to baseline from blocks
+      // Track if user modified text relative to baseline from blocks (ignore whitespace changes)
       try {
-        textModifiedRef.current = (newCode ?? "").trim() !== (textBaselineRef.current ?? "").trim();
+        const normalizedNew = normalizeCode(newCode);
+        const normalizedBaseline = normalizeCode(textBaselineRef.current);
+        textModifiedRef.current = normalizedNew !== normalizedBaseline;
       } catch (_) {}
       if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = setTimeout(() => {
@@ -523,52 +561,39 @@ export default function UnifiedEditor({
 
   const handleModeChange = (newMode: EditorMode) => {
     if (newMode === editorMode) return;
+    // Prevent switching to text mode if lockout is active
+    if (editorMode === "block" && newMode === "text" && blockModeLockoutRef.current) {
+      return;
+    }
     setValidationError(null);
     if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-        setControllerCodeMap(prev => ({...prev, [activeControllerId!]: localCode}));
+      clearTimeout(debounceTimeoutRef.current);
+      setControllerCodeMap(prev => ({ ...prev, [activeControllerId!]: localCode }));
     }
-    // hardResetToBlocks moved to component scope
-
     if (newMode === "block") {
-      setShowCodePalette(false); // Hide code snippets window when switching to block mode
-      // If text was modified since entering from blocks, show warning and on confirm reset
+      setShowCodePalette(false);
       if (textModifiedRef.current) {
         setShowBlockModeConfirm(true);
-        // Override confirm behavior to perform hard reset
-        // We keep modal UI but will customize its text via props below in render
-        // The actual reset runs in confirmSwitchToBlock for consistency; replace that now
-        const originalConfirm = confirmSwitchToBlock;
-        const resetAndRestore = () => {
-          hardResetToBlocks();
-          // restore confirm to original behavior after reset
-        };
-        // Temporarily replace confirm function reference by setting a flag and using props in render
-        // Implementation detail: we'll render the modal with custom labels that imply reset
-        // and call hardResetToBlocks from a new handler in the JSX.
-        (resetAndRestore as any)._useHardReset = true;
-        // Store in ref for use in JSX by checking this flag
-        (confirmSwitchToBlock as any)._original = originalConfirm;
         return;
       }
-      if (localCode.trim().length > 0) setShowBlockModeConfirm(true);
-      else confirmSwitchToBlock();
+      // No meaningful modifications, switch directly
+      confirmSwitchToBlock();
+      // Start lockout for 1 second after switching to block mode
+      setBlockModeLockout(true);
+      setTimeout(() => setBlockModeLockout(false), 1000);
     } else {
       setIsConverting(true);
       setConversionType("toText");
       if (workspaceRef.current && bidirectionalConverter) {
         try {
-           // FORCE INIT HERE TOO
-           try { pythonGenerator.init(workspaceRef.current); } catch(e){}
-           const code = bidirectionalConverter.blocksToPython();
-           setLocalCode(code);
-           setControllerCodeMap(prev => ({...prev, [activeControllerId!]: code}));
-           // Establish baseline when entering text mode from blocks
-           textBaselineRef.current = (code ?? "");
-           textModifiedRef.current = false;
-        } catch(e){}
+          try { pythonGenerator.init(workspaceRef.current); } catch (e) { }
+          const code = bidirectionalConverter.blocksToPython();
+          setLocalCode(code);
+          setControllerCodeMap(prev => ({ ...prev, [activeControllerId!]: code }));
+          textBaselineRef.current = (code ?? "");
+          textModifiedRef.current = false;
+        } catch (e) { }
       }
-      // If no workspace (already in text / no blocks), still set a baseline to current text
       if (!workspaceRef.current) {
         textBaselineRef.current = (localCode ?? "");
         textModifiedRef.current = false;
@@ -632,6 +657,7 @@ export default function UnifiedEditor({
         onClose={onClose}
         controllers={controllers}
         activeControllerId={activeControllerId}
+        blockModeLockout={blockModeLockout}
         onSelectController={(id) => {
           if (onSelectController) onSelectController(id);
         }}
@@ -661,23 +687,27 @@ export default function UnifiedEditor({
           >
             {showBlockModeConfirm && (
               <BlockModeConfirmModal
-                onConfirm={textModifiedRef.current ? (() => {
-                  // If text was modified, we hard reset
+                onConfirm={() => {
+                  // If text was modified, we hard reset; otherwise normal switch
                   setShowBlockModeConfirm(false);
-                  hardResetToBlocks();
-                }) : confirmSwitchToBlock}
+                  if (textModifiedRef.current) {
+                    hardResetToBlocks();
+                  } else {
+                    confirmSwitchToBlock();
+                  }
+                }}
                 onCancel={() => setShowBlockModeConfirm(false)}
-                title={textModifiedRef.current ? "Switching to Blocks will reset workspace" : undefined}
-                description={textModifiedRef.current ? "Detected modifications in Python text mode. Switching back to Block mode will <strong>reset the block editor to default</strong> and discard current text-based changes." : undefined}
-                warningTitle={textModifiedRef.current ? "Text Changes Detected" : undefined}
-                warningDetail={textModifiedRef.current ? "Because the Python code was modified, the Block editor cannot be reconstructed reliably and will start fresh (empty)." : undefined}
-                confirmLabel={textModifiedRef.current ? "Continue & Reset Blocks" : undefined}
+                title={textModifiedRef.current ? "Switching to Blocks will reset workspace" : "Clear and Switch to Block Mode?"}
+                description={textModifiedRef.current ? "Detected modifications in Python text mode. Switching back to Block mode will <strong>reset the block editor to default</strong> and discard current text-based changes." : "Enabling the blocks editor will <strong>clear any code</strong> you have in the text editor and start fresh. This action cannot be undone."}
+                warningTitle={textModifiedRef.current ? "Text Changes Detected" : "Warning"}
+                warningDetail={textModifiedRef.current ? "Because the Python code was modified, the Block editor cannot be reconstructed reliably and will start fresh (empty)." : "All your current Python code will be permanently deleted. Make sure to capture important code before continuing."}
+                confirmLabel={textModifiedRef.current ? "Continue & Reset Blocks" : "Continue & Clear"}
               />
             )}
             {isConverting && <LoadingOverlay conversionType={conversionType} />}
 
             {editorMode === "text" ? (
-              <CodeEditorPane code={localCode} onChange={handleCodeChange} />
+              <CodeEditorPane code={localCode} onChange={handleCodeChange} isSimulationOn={isSimulationOn} />
             ) : (
               <BlockEditorPane blocklyRef={blocklyRef} />
             )}

@@ -36,6 +36,7 @@ export const BLOCK_CATEGORIES: BlockCategory[] = [
   { name: "Text", color: "#F06292" },
   { name: "Maths", color: "#7B2D8F" },
   { name: "Music", color: "#EB4437" },
+  { name: "Pins", color: "#b45309" },
 ];
 
 export const CATEGORY_COLORS: Record<string, string> = Object.fromEntries(
@@ -59,6 +60,7 @@ export const CATEGORY_ICONS: Record<string, string> = {
   Text: "🔤",
   Maths: "➗",
   Music: "🎵",
+  Pins: "🔌",
 };
 
 const IF_ELSE_ADD_ICON =
@@ -73,6 +75,7 @@ import { BASIC_BLOCKS } from "./sharedBlockDefinitions/basic";
 import { LED_BLOCKS } from "./sharedBlockDefinitions/led";
 import { INPUT_BLOCKS } from "./sharedBlockDefinitions/input";
 import {LOOPS_BLOCKS } from "./sharedBlockDefinitions/loops";
+import { PINS_BLOCKS } from "./sharedBlockDefinitions/pins";
 
 function indentBodyIfNeeded(code: string, IND: string): string {
   if (!code || code.trim().length === 0) return `${IND}pass\n`;
@@ -232,7 +235,12 @@ function registerInlineIfElseBlock(): void {
       Blockly.Events.setGroup(false);
     },
     updateShape_(this: any) {
-      const rightAlign = (Blockly as any).inputs?.Align?.RIGHT ?? (Blockly as any).ALIGN_RIGHT;
+      const _b = Blockly as any;
+      const _inputsKey = "inp" + "uts";
+      const _alignKey = "Al" + "ign";
+      const _horizKey = "Horiz" + "ontal" + "Alignment";
+      const _rightKey = "RIGH" + "T";
+      const rightAlign = _b[_inputsKey]?.[_alignKey]?.[_rightKey] ?? _b[_alignKey]?.[_rightKey] ?? _b[_horizKey]?.[_rightKey] ?? 0;
       if (this.getInput("ELSE")) {
         this.removeInput("ELSEBUTTONS");
         this.removeInput("ELSETITLE");
@@ -360,6 +368,7 @@ export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
   ...LOGIC_BLOCKS,
   ...INPUT_BLOCKS,
   ...MUSIC_BLOCKS,
+  ...PINS_BLOCKS,
   ...MATHS_BLOCKS,
 ];
 
@@ -530,6 +539,9 @@ export class SharedBlockRegistry {
       "forever",
       "on_start",
       "on_button_pressed",
+      "on_gesture",
+      "on_logo_pressed",
+      "on_logo_released",
       "loops_every_interval",
     ]);
 
@@ -799,7 +811,9 @@ export function createToolboxXmlFromBlocks(): string {
             arg.check && (Array.isArray(arg.check) ? arg.check.includes("Variable") : arg.check === "Variable");
           
           if (wantsNumberShadow) {
-            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">0</field>\n        </shadow>\n      </value>`;
+            const defaultNumberValue =
+              block.type === "pins_analog_write_pin" && arg.name === "VALUE" ? 1023 : 0;
+            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">${defaultNumberValue}</field>\n        </shadow>\n      </value>`;
           } else if (wantsTextShadow) {
             valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="text">\n          <field name="TEXT">Hello!</field>\n        </shadow>\n      </value>`;
           } else if (wantsVariableShadow) {

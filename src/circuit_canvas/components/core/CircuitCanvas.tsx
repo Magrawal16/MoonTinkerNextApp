@@ -48,6 +48,17 @@ import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 import { useWireManagement } from "@/circuit_canvas/hooks/useWireManagement";
 import { useCircuitHistory } from "@/circuit_canvas/hooks/useCircuitHistory";
 import Note from "@/circuit_canvas/components/elements/Note";
+import { MicrobitSimulationPanel } from "../simulation/MicrobitSimulationPanel"; 
+import { AnimatePresence } from "framer-motion";
+import { useMicrobitSimulationPanelBridge } from "@/circuit_canvas/hooks/useMicrobitSimulationPanelBridge";
+import { useSimulationTimer } from "@/circuit_canvas/hooks/useSimulationTimer";
+import {
+  useHydrateCircuitFromLocalStorage,
+  useHydrationRedraw,
+  usePersistCircuitSessionToLocalStorage,
+} from "@/circuit_canvas/hooks/useCircuitLocalStorageSession";
+import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulators";
+
 
 export default function CircuitCanvas() {
   // LocalStorage keys for session persistence
@@ -85,7 +96,17 @@ export default function CircuitCanvas() {
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const wireLayerRef = useRef<Konva.Layer | null>(null);
-  
+
+  const {
+    microbitNodeMapRef,
+    onMicrobitNode: handleMicrobitNode,
+    getPosition: getMicrobitPanelPosition,
+    setTemperature: setMicrobitTemperature,
+    setLightLevel: setMicrobitLightLevel,
+    triggerGesture: triggerMicrobitGesture,
+  } = useMicrobitSimulationPanelBridge(controllerMap);
+
+
   // Ref to reset UnifiedEditor during new session
   const editorResetRef = useRef<(() => void) | null>(null);
 
@@ -105,42 +126,7 @@ export default function CircuitCanvas() {
   const simulationRunningRef = useRef(simulationRunning);
   const simulationFrameRef = useRef<number | null>(null);
   const lastTickRef = useRef<number | null>(null);
-  // Simulation time state
-  const [simulationTime, setSimulationTime] = useState(0); // seconds
-  const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Format time as HH:MM:SS
-  function formatTime(seconds: number) {
-    const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
-    const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
-    const s = String(seconds % 60).padStart(2, '0');
-    return `${h}:${m}:${s}`;
-  }
-
-  // Start/stop simulation timer
-  useEffect(() => {
-    if (simulationRunning) {
-      simulationTimerRef.current = setInterval(() => {
-        setSimulationTime((prev) => prev + 1);
-      }, 1000);
-    } else {
-      if (simulationTimerRef.current) {
-        clearInterval(simulationTimerRef.current);
-        simulationTimerRef.current = null;
-      }
-    }
-    return () => {
-      if (simulationTimerRef.current) {
-        clearInterval(simulationTimerRef.current);
-        simulationTimerRef.current = null;
-      }
-    };
-  }, [simulationRunning]);
-
-  // Reset time when simulation starts
-  useEffect(() => {
-    if (simulationRunning) setSimulationTime(0);
-  }, [simulationRunning]);
+  const { simulationTime, formatTime } = useSimulationTimer(simulationRunning);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
   const [snapTarget, setSnapTarget] = useState<{ dragNodeId: string; targetNodeId: string; offset: { x: number; y: number } } | null>(null);
   const dragStartWireCountRef = useRef(0);
@@ -295,278 +281,54 @@ export default function CircuitCanvas() {
   }, [elements, wires, selectedElement, showPropertiesPannel]);
 
   // Load saved circuit and code map from localStorage on first mount; else start clean
-  useEffect(() => {
-    try {
-      const elsRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CIRCUIT_ELEMENTS_KEY) : null;
-      const wiresRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CIRCUIT_WIRES_KEY) : null;
-      const codeMapRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CODE_MAP_KEY) : null;
-  if (elsRaw || wiresRaw) {
-        // Show loading overlay while we hydrate and initialize simulators
-        setInitializing(true);
-        const savedEls: CircuitElement[] = elsRaw ? JSON.parse(elsRaw) : [];
-        // Sanitize transient runtime fields so visuals don't appear active after refresh
-        const sanitizedEls = (savedEls || []).map((el: any) => {
-          const isMicrobit = el?.type === 'microbit' || el?.type === 'microbitWithBreakout';
-          return {
-            ...el,
-            computed: {
-              current: undefined,
-              voltage: undefined,
-              power: undefined,
-              measurement: el?.computed?.measurement ?? undefined,
-            },
-            // Always clear controller visuals on hydration so displays/pins start off
-            controller: isMicrobit
-              ? {
-                  leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                  pins: {},
-                  logoTouched: false,
-                }
-              : el?.controller,
-          } as any;
-        });
-        const savedWires: Wire[] = wiresRaw ? JSON.parse(wiresRaw) : [];
-        setElements(sanitizedEls || []);
-  setWires(savedWires || []);
-    initializeHistory(sanitizedEls || [], savedWires || []);
-    setHydratedFromStorage(true);
-        // Load persisted controller code map (raw python) directly if available
-        let parsedCodeMap: Record<string,string> = {};
-        if (codeMapRaw) {
-          try { parsedCodeMap = JSON.parse(codeMapRaw) as Record<string,string>; } catch(e) { parsedCodeMap = {}; }
-        }
-        // Fallback: reconstruct missing entries immediately from stored workspaces (without opening editor)
-        const needReconstruct = sanitizedEls.filter(el => (el.type === 'microbit' || el.type === 'microbitWithBreakout') && !parsedCodeMap[el.id]).map(el => el.id);
-        if (needReconstruct.length) {
-          Promise.resolve().then(async () => {
-            try {
-              const BlocklyMod = await import('blockly');
-              const Blockly = (BlocklyMod as any).default || BlocklyMod;
-              const { pythonGenerator } = await import('blockly/python');
-              // Ensure shared custom blocks and fields are registered in this context
-              try {
-                const { BlocklyPythonIntegration } = await import('@/blockly_editor/utils/blocklyPythonConvertor');
-                // Initialize shared blocks/fields once (safe if called multiple times)
-                BlocklyPythonIntegration.initialize();
-                BlocklyPythonIntegration.setupPythonGenerators(pythonGenerator as any);
-              } catch (regErr) {
-                console.warn('⚠️ Failed to initialize Blockly shared blocks for reconstruction:', regErr);
-              }
-              
-              const centralizedXmlRaw = typeof window !== 'undefined' ? window.localStorage.getItem('moontinker_controllerXmlMap') : null;
-              let centralizedXmlMap: Record<string, string> = {};
-              if (centralizedXmlRaw) {
-                try { centralizedXmlMap = JSON.parse(centralizedXmlRaw); } catch(e) {}
-              }
-              
-              const recovered: Record<string,string> = {};
-              needReconstruct.forEach(id => {
-                try {
-                  let xml = centralizedXmlMap[id];
-                  
-                  if (!xml && typeof window !== 'undefined') {
-                    xml = window.localStorage.getItem(`mt_workspace_${id}`) || '';
-                  }
-                  
-                  if (!xml) return;
-                  const tempWs = new Blockly.Workspace();
-                  try {
-                    const dom = new DOMParser().parseFromString(xml, 'text/xml');
-                    (Blockly.Xml as any).domToWorkspace(dom.documentElement, tempWs);
-                    const code = (pythonGenerator as any).workspaceToCode(tempWs) as string;
-                    if (code && code.trim()) recovered[id] = code;
-                  } finally { tempWs.dispose(); }
-                } catch(e) { /* ignore per-controller failure */ }
-              });
-              if (Object.keys(recovered).length) {
-                parsedCodeMap = { ...parsedCodeMap, ...recovered };
-              }
-              setControllerCodeMap(parsedCodeMap);
-            } catch(e) {
-              console.warn('⚠️ Failed proactive code reconstruction during hydration:', e);
-              setControllerCodeMap(parsedCodeMap); // still set any raw values we had
-            }
-          });
-        } else {
-          setControllerCodeMap(parsedCodeMap);
-        }
-        return; // Don't call resetState
-      }
-    } catch (e) {
-      console.warn("⚠️ Failed to load saved circuit from localStorage:", e);
-    }
-    resetState();
-  }, []);
+  useHydrateCircuitFromLocalStorage({
+    keys: {
+      elementsKey: CIRCUIT_ELEMENTS_KEY,
+      wiresKey: CIRCUIT_WIRES_KEY,
+      codeMapKey: CODE_MAP_KEY,
+    },
+    setInitializing,
+    setElements,
+    setWires,
+    initializeHistory,
+    setHydratedFromStorage,
+    setControllerCodeMap,
+    resetState,
+  });
 
   // After hydrating from storage, force wire geometry and redraw once Stage exists.
-  useEffect(() => {
-    if (!hydratedFromStorage) return;
-    let cancelled = false;
-    let attempts = 0;
-    const tryRedraw = () => {
-      if (cancelled) return;
-      const stage = stageRef.current;
-      const wireLayer = wireLayerRef.current;
-      if (stage && wireLayer) {
-        requestAnimationFrame(() => {
-          if (cancelled) return;
-          try {
-            updateWiresDirect();
-            wireLayer.batchDraw();
-            stage.batchDraw();
-            updateViewport(true);
-          } finally {
-            setHydratedFromStorage(false);
-          }
-        });
-      } else if (attempts < 20) {
-        attempts += 1;
-        setTimeout(tryRedraw, 25);
-      } else {
-        setHydratedFromStorage(false);
-      }
-    };
-    tryRedraw();
-    return () => {
-      cancelled = true;
-    };
-  }, [hydratedFromStorage, updateWiresDirect, updateViewport]);
+  useHydrationRedraw({
+    hydratedFromStorage,
+    setHydratedFromStorage,
+    stageRef,
+    wireLayerRef,
+    updateWiresDirect,
+    updateViewport,
+  });
 
-  // Persist circuit to localStorage whenever elements or wires change (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined') {
-          // Save without transient computed runtime values
-          const sanitized = (elementsRef.current || []).map((el: any) => {
-            const isMicrobit = el?.type === 'microbit' || el?.type === 'microbitWithBreakout';
-            return {
-              ...el,
-              computed: {
-                current: undefined,
-                voltage: undefined,
-                power: undefined,
-                measurement: el?.computed?.measurement ?? undefined,
-              },
-              // Do not persist live controller visuals for programmable controllers
-              controller: isMicrobit
-                ? {
-                    leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                    pins: {},
-                    logoTouched: false,
-                  }
-                : el?.controller,
-            } as any;
-          });
-          window.localStorage.setItem(CIRCUIT_ELEMENTS_KEY, JSON.stringify(sanitized));
-          window.localStorage.setItem(CIRCUIT_WIRES_KEY, JSON.stringify(wiresRef.current || []));
-        }
-      } catch (e) {
-        console.warn("⚠️ Failed to save circuit to localStorage:", e);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [elements, wires]);
+  usePersistCircuitSessionToLocalStorage({
+    keys: {
+      elementsKey: CIRCUIT_ELEMENTS_KEY,
+      wiresKey: CIRCUIT_WIRES_KEY,
+      codeMapKey: CODE_MAP_KEY,
+    },
+    elements,
+    wires,
+    elementsRef,
+    wiresRef,
+    controllerCodeMap,
+  });
 
-  // Persist controller code map so it survives refreshes
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(CODE_MAP_KEY, JSON.stringify(controllerCodeMap));
-      }
-    } catch (e) {
-      console.warn("⚠️ Failed to persist controller code map:", e);
-    }
-  }, [controllerCodeMap]);
-
-  // Create simulators for micro:bit controllers that exist (after load or add) but have no simulator yet
-  const createAndAttachSimulator = useCallback(async (element: CircuitElement): Promise<Simulator | null> => {
-    try {
-      const controllerType = element.type === "microbit" ? "microbit" : "microbitWithBreakout";
-      const simulator = new Simulator({
-        language: "python",
-        controller: controllerType,
-        onEvent: async (event) => {
-          // Ignore any non-reset events when simulation isn't running to avoid stale updates
-          if (!simulationRunningRef.current && event.type !== "reset") return;
-          // Guard against redundant updates causing render loops
-          const applyControllerState = async () => {
-            const state = await simulator.getStates();
-            const key = JSON.stringify({ leds: state.leds, pins: state.pins, logo: !!state.logo });
-            if (controllerStateCacheRef.current[element.id] === key && event.type !== "reset") {
-              return; // Skip unchanged state
-            }
-            controllerStateCacheRef.current[element.id] = key;
-            React.startTransition(() => {
-              setElements((prev) => prev.map((el) => (
-                el.id === element.id
-                  ? { ...el, controller: { leds: state.leds, pins: state.pins, logoTouched: !!state.logo } }
-                  : el
-              )));
-            });
-          };
-
-          if (event.type === "reset") {
-            controllerStateCacheRef.current[element.id] = ""; // clear cache to force next update
-            React.startTransition(() => {
-              setElements((prev) => prev.map((el) => (
-                el.id === element.id
-                  ? {
-                      ...el,
-                      controller: {
-                        leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                        pins: {},
-                        logoTouched: false,
-                      },
-                    }
-                  : el
-              )));
-            });
-          } else if (event.type === "led-change" || event.type === "pin-change" || event.type === "logo-touch") {
-            void applyControllerState();
-          }
-        },
-      });
-
-      await simulator.initialize();
-      const states = await simulator.getStates();
-      setControllerMap((prev) => ({ ...prev, [element.id]: simulator }));
-      setElements((prev) =>
-        prev.map((el) =>
-          el.id === element.id
-            ? { ...el, controller: { leds: states.leds, pins: states.pins, logoTouched: !!states.logo } }
-            : el
-        )
-      );
-      return simulator;
-    } catch (e) {
-      console.warn(`⚠️ Failed to initialize simulator for ${element.id}:`, e);
-      return null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const microbits = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
-    microbits.forEach((el) => {
-      if (!controllerMap[el.id]) {
-        void createAndAttachSimulator(el);
-      }
-    });
-    
-    // If we were initializing, hide loading screen when:
-    // 1. No microbits exist (empty canvas) OR
-    // 2. All microbits have simulators initialized
-    if (initializing) {
-      if (microbits.length === 0) {
-        // No micro:bits to initialize, dismiss immediately
-        setInitializing(false);
-      } else if (microbits.every(el => controllerMap[el.id])) {
-        // All micro:bits have simulators, dismiss after brief delay
-        const timer = setTimeout(() => setInitializing(false), 500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [elements, controllerMap, createAndAttachSimulator, initializing]);
+  const { createAndAttachSimulator } = useMicrobitSimulators({
+    elements,
+    controllerMap,
+    setControllerMap,
+    setElements,
+    simulationRunningRef,
+    controllerStateCacheRef,
+    initializing,
+    setInitializing,
+  });
 
   // Start a new session: clear all app-local storage and reset editor/canvas
   const performNewSessionClear = useCallback(() => {
@@ -911,13 +673,15 @@ export default function CircuitCanvas() {
       return el;
     }));
 
-    // Ensure every micro:bit has an initialized simulator BEFORE running user code
-    const microbitElements = elementsRef.current.filter(el => el.type === 'microbit' || el.type === 'microbitWithBreakout');
-    // Build an effective simulator map that includes any just-created simulators
+    // Ensure every micro:bit has an initialized simulator BEFORE running user code.
+    // (Keep initialization behavior deterministic; we instead smooth the overlay dismissal
+    // and prewarm sims on drop to reduce perceived startup delay.)
+    const microbitElements = elementsRef.current.filter(
+      (el) => el.type === "microbit" || el.type === "microbitWithBreakout"
+    );
     const effectiveSims: Record<string, Simulator> = { ...controllerMap };
     for (const el of microbitElements) {
       if (!effectiveSims[el.id]) {
-        // Await creation so its reset state is applied before code executes
         const sim = await createAndAttachSimulator(el);
         if (sim) effectiveSims[el.id] = sim;
       }
@@ -1121,7 +885,9 @@ export default function CircuitCanvas() {
   // Optimized drag move handler - updates wires directly without React re-render
   const handleElementDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
-    const id = e.target.id();
+    // Normalize ID by removing microbit- prefix if present
+    const rawId = e.target.id();
+    const id = rawId.startsWith('microbit-') ? rawId.replace('microbit-', '') : rawId;
     let x = e.target.x();
     let y = e.target.y();
 
@@ -1190,11 +956,16 @@ export default function CircuitCanvas() {
         };
 
         if (updated.type === "led") {
+          const wasExploded = !!oldEl.runtime?.led?.exploded;
+          const currentForRuntime = wasExploded
+            ? (updated.computed?.explosionCurrentEstimate ?? updated.computed?.current ?? 0)
+            : (updated.computed?.current ?? 0);
+
           const runtime = updateLedRuntime({
             prev: oldEl.runtime?.led,
             electrical: {
               forwardVoltage: updated.computed?.forwardVoltage ?? updated.computed?.voltage ?? 0,
-              current: updated.computed?.current ?? 0,
+              current: currentForRuntime,
               power: updated.computed?.power ?? 0,
               color: updated.properties?.color,
             },
@@ -1367,73 +1138,12 @@ export default function CircuitCanvas() {
       setActiveControllerId(newElement.id);
     }
 
+    // Pre-warm micro:bit simulators immediately on drop so starting simulation is instant.
+    // (Still safe if the hook effect also tries to create one; the start path also handles missing sims.)
     if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
-      // Init simulator in the background (non-blocking)
-      const controllerType = newElement.type === "microbit" ? "microbit" : "microbitWithBreakout";
-      void (async () => {
-        const simulator = new Simulator({
-          language: "python",
-          controller: controllerType,
-          onEvent: async (event) => {
-              // Ignore any non-reset events when simulation isn't running to avoid stale updates
-              if (!simulationRunningRef.current && event.type !== "reset") return;
-            const applyControllerState = async () => {
-              const state = await simulator.getStates();
-              const key = JSON.stringify({ leds: state.leds, pins: state.pins, logo: !!state.logo });
-              if (controllerStateCacheRef.current[newElement.id] === key && event.type !== "reset") {
-                return;
-              }
-              controllerStateCacheRef.current[newElement.id] = key;
-              React.startTransition(() => {
-                setElements((prev) => prev.map((el) => (
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds: state.leds, pins: state.pins, logoTouched: !!state.logo } }
-                    : el
-                )));
-              });
-            };
-
-            if (event.type === "reset") {
-              controllerStateCacheRef.current[newElement.id] = "";
-              React.startTransition(() => {
-                setElements((prev) => prev.map((el) => (
-                  el.id === newElement.id
-                    ? {
-                        ...el,
-                        controller: {
-                          leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                          pins: {},
-                          logoTouched: false,
-                        },
-                      }
-                    : el
-                )));
-              });
-            } else if (event.type === "led-change" || event.type === "pin-change" || event.type === "logo-touch") {
-              void applyControllerState();
-            }
-          },
-        });
-
-        await simulator.initialize();
-
-        // Initial snapshot cache to avoid duplicate first update
-        const initialState = await simulator.getStates();
-        controllerStateCacheRef.current[newElement.id] = JSON.stringify({ leds: initialState.leds, pins: initialState.pins, logo: !!initialState.logo });
-
-
-        // Update map and controller LED state once (already cached)
-        setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
-        React.startTransition(() => {
-          setElements((prev) => prev.map((el) => (
-            el.id === newElement.id
-              ? { ...el, controller: { leds: initialState.leds, pins: initialState.pins, logoTouched: !!initialState.logo } }
-              : el
-          )));
-        });
-      })();
+      void createAndAttachSimulator(newElement);
     }
-  }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, setElements, setActiveControllerId, setControllerMap, setElements]);
+  }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, wires, getNextIdNumberForType, createAndAttachSimulator]);
 
   // for canvas zoom in and zoom out
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -1640,7 +1350,10 @@ export default function CircuitCanvas() {
       {/* Left Side: Main Canvas */}
       <div className="flex-grow h-full flex flex-col">
         {/* Toolbar */}
-        <div className="w-full h-12 bg-gray-100 flex items-center px-4 space-x-4 py-2 justify-between shadow-md">
+        <div
+          id="circuit-top-toolbar"
+          className="w-full h-12 bg-gray-100 flex items-center px-4 space-x-4 py-2 justify-between shadow-md"
+        >
           {/* Controls */}
           <div className="flex items-center gap-4">
             {/* Color Palette */}
@@ -1953,8 +1666,6 @@ export default function CircuitCanvas() {
               <span>Start a new session</span>
             </button>
 
-            <AuthHeader inline />
-
             {/* <CircuitStorage
               onCircuitSelect={(circuitId) => {
                 const data = getCircuitById(circuitId);
@@ -1976,6 +1687,9 @@ export default function CircuitCanvas() {
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
             /> */}
+
+            <AuthHeader inline />
+
             {/* auth dropdown removed (use global AuthHeader component) */}
           </div>
         </div>
@@ -2092,7 +1806,7 @@ export default function CircuitCanvas() {
           {/* Stage Canvas */}
           {loadingSavedCircuit ? (
             <Loader />
-          ) : (
+          ) : (<>
             <Stage
               id="canvas-stage"
               width={window.innerWidth}
@@ -2165,6 +1879,10 @@ export default function CircuitCanvas() {
                         computeCircuit(wiresRef.current || []);
                       }
                     }}
+                    // Body layer should not render nodes (nodes are in the overlay layer)
+                    showNodes={false}
+                    // Use the body group as the anchor for the micro:bit simulation panel
+                    onMicrobitNode={handleMicrobitNode}
                     onDragStart={() => {
                       pushToHistory(elements, wires);
                       setDraggingElement(element.id);
@@ -2181,7 +1899,9 @@ export default function CircuitCanvas() {
                       }
                     }}
                     onDragEnd={(e) => {
-                      const draggedId = e.target.id();
+                      // Normalize ID by removing microbit- prefix if present
+                      const rawId = e.target.id();
+                      const draggedId = rawId.startsWith('microbit-') ? rawId.replace('microbit-', '') : rawId;
                       const x = e.target.x();
                       const y = e.target.y();
 
@@ -2330,8 +2050,6 @@ export default function CircuitCanvas() {
                         }
                       }
                     }}
-                    // Hide node rendering in this layer
-                    showNodes={false}
                     showBody={true}
                   />
                 ))}
@@ -2703,7 +2421,38 @@ export default function CircuitCanvas() {
               </Layer>
 
             </Stage>
-          )}
+            <AnimatePresence>
+            {simulationRunning &&
+            Object.entries(microbitNodeMapRef.current).map(
+              ([id]) => {
+                const element = elements.find((el) => el.id === id);
+
+                if (
+                  !element ||
+                  (element.type !== "microbit" &&
+                    element.type !== "microbitWithBreakout")
+                ) {
+                  return null;
+                }
+
+                const simulator = controllerMap[id];
+                if (!simulator) return null;
+
+                return (
+                  <MicrobitSimulationPanel
+                    key={id}
+                    elementId={id}
+                    element={element}
+                    getPosition={getMicrobitPanelPosition}
+                    setTemperature={setMicrobitTemperature}
+                    setLightLevel={setMicrobitLightLevel}
+                    triggerGesture={triggerMicrobitGesture}
+                  />
+                );
+              }
+            )}
+            </AnimatePresence>
+            </>)}
         </div>
       </div>
 
@@ -2715,8 +2464,8 @@ export default function CircuitCanvas() {
       )}
 
       <div
-        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"
-          } `}
+        id="circuit-palette-panel"
+        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"}`}
         style={{
           pointerEvents: "auto",
           // Glass effect
@@ -2747,52 +2496,52 @@ export default function CircuitCanvas() {
         {showPalette && <CircuitSelector />}
       </div>
 
-      <div
-        className="absolute right-0 top-13 z-50 transition-transform duration-300"
-        style={{
-          transform: openCodeEditor ? "translateX(0)" : "translateX(100%)",
-          pointerEvents: openCodeEditor ? "auto" : "none",
-        }}
-      >
-        <UnifiedEditor
-          controllerCodeMap={controllerCodeMap}
-          activeControllerId={activeControllerId}
-          setControllerCodeMap={setControllerCodeMap}
-          stopSimulation={stopSimulation}
-          onSizeChange={setCodeEditorSize}
-          onClose={() => setOpenCodeEditor(false)}
-          onResetRef={editorResetRef}
-          controllers={(() => {
-            const list = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
-            let microbitCount = 0;
-            let breakoutCount = 0;
-            return list.map((el) => {
-              if (el.type === "microbitWithBreakout") {
-                breakoutCount++;
-                return {
-                  id: el.id,
-                  label: `Micro:bit + Breakout ${breakoutCount}`,
-                };
-              } else {
-                microbitCount++;
-                return {
-                  id: el.id,
-                  label: `Micro:bit ${microbitCount}`,
-                };
+      {/* Conditionally render editor only when open to properly clean up DOM (toolbox, etc.) */}
+      {openCodeEditor && (
+        <div
+          className="absolute right-0 top-13 z-50"
+        >
+          <UnifiedEditor
+            controllerCodeMap={controllerCodeMap}
+            activeControllerId={activeControllerId}
+            setControllerCodeMap={setControllerCodeMap}
+            stopSimulation={stopSimulation}
+            onSizeChange={setCodeEditorSize}
+            onClose={() => setOpenCodeEditor(false)}
+            onResetRef={editorResetRef}
+            isSimulationOn={simulationRunning}
+            controllers={(() => {
+              const list = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
+              let microbitCount = 0;
+              let breakoutCount = 0;
+              return list.map((el) => {
+                if (el.type === "microbitWithBreakout") {
+                  breakoutCount++;
+                  return {
+                    id: el.id,
+                    label: `Micro:bit + Breakout ${breakoutCount}`,
+                  };
+                } else {
+                  microbitCount++;
+                  return {
+                    id: el.id,
+                    label: `Micro:bit ${microbitCount}`,
+                  };
+                }
+              });
+            })()}
+            onSelectController={(id) => {
+              // Switch active controller and reflect selection in canvas
+              setActiveControllerId(id);
+              const el = elements.find((e) => e.id === id) || null;
+              if (el) {
+                setSelectedElement(el);
+                setShowPropertiesPannel(true);
               }
-            });
-          })()}
-          onSelectController={(id) => {
-            // Switch active controller and reflect selection in canvas
-            setActiveControllerId(id);
-            const el = elements.find((e) => e.id === id) || null;
-            if (el) {
-              setSelectedElement(el);
-              setShowPropertiesPannel(true);
-            }
-          }}
-        />
-      </div>
+            }}
+          />
+        </div>
+      )}
 
       {showNewSessionModal && (
         <div

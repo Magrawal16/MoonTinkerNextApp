@@ -37,6 +37,11 @@ export type CircuitElement = {
     measurement?: number; // Specific reading for multimeter
     forwardVoltage?: number; // anode-to-cathode voltage used for diodes/LEDs
     reverseVoltage?: number; // cathode-to-anode voltage magnitude
+    // For failed components that are opened in the main solver (e.g., exploded LED),
+    // we can optionally provide a "what-if" current computed by solving the same
+    // circuit as-if the device were still electrically intact. Used to match
+    // Tinkercad-style readouts for direct-to-source scenarios.
+    explosionCurrentEstimate?: number;
   };
   controller?: {
     [key: string]: unknown;

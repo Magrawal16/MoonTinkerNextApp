@@ -96,10 +96,10 @@ export function getElementRegions(
     return [
       {
         type: 'rect',
-        x: element.x - center.x + 12,
-        y: element.y - center.y + 1.5,
-        width: 146,
-        height: 77,
+        x: element.x - center.x + 9,
+        y: element.y - center.y + 29.5,
+        width: 102,
+        height: 130,
       },
     ];
   }
@@ -355,33 +355,32 @@ export function getOverlappingElements(
 
 export function shouldHideNode(
   nodeParentId: string,
+  nodeId: string,
   allElements: CircuitElement[]
 ): boolean {
   const parentIndex = allElements.findIndex((e) => e.id === nodeParentId);
   if (parentIndex === -1) return false;
 
   const parent = allElements[parentIndex];
+  const node = parent.nodes.find((n) => n.id === nodeId);
+  if (!node) return false;
 
-  // Check each node of the parent element individually
-  for (const node of parent.nodes) {
-    // Get absolute node position using proper rotation calculation
-    const absolutePos = getAbsoluteNodePosition(node, parent);
+  // Get absolute node position using proper rotation calculation
+  const absolutePos = getAbsoluteNodePosition(node, parent);
 
-    // Check if any element that comes AFTER parent (higher z-index) covers this node
-    for (let i = parentIndex + 1; i < allElements.length; i++) {
-      const other = allElements[i];
-      
-      // Get all collision regions for the covering element (handles multi-part elements)
-      const regions = getElementRegions(other);
-      
-      // Check if node falls within ANY region of the covering element
-      for (const region of regions) {
-        if (isPointInRegion(absolutePos, region)) {
-          return true; // This node is covered by a later element
-        }
+  // Check if any element that comes AFTER parent (higher z-index) covers this node
+  for (let i = parentIndex + 1; i < allElements.length; i++) {
+    const other = allElements[i];
+
+    // Get all collision regions for the covering element (handles multi-part elements)
+    const regions = getElementRegions(other);
+    // Check if node falls within ANY region of the covering element
+    for (const region of regions) {
+      if (isPointInRegion(absolutePos, region)) {
+        return true;
       }
     }
   }
 
-  return false; // No nodes are covered
+  return false;
 }

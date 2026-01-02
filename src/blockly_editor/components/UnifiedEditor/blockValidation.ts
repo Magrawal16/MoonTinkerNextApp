@@ -41,6 +41,8 @@ export const EVENT_CONTAINER_BLOCKS = new Set<string>([
   "loops_every_interval",
 ]);
 
+const GATED_BLOCK_DISABLED_REASON = "GATED_BLOCK";
+
 const disabledTooltip =
   "This block is disabled and will not run. Attach this block to an event to enable it.";
 
@@ -69,49 +71,90 @@ const defaultTooltips: Record<string, string> = {
 
 /**
  * Update block's enabled state based on whether it's attached to an event
+ * Uses standard Blockly API: disabled property
  */
 export function updateLedBlockRunState(blk: Blockly.Block | null | undefined) {
   if (!blk) return;
   if (!GATED_BLOCK_TYPES.has(blk.type)) return;
-  const root = blk.getRootBlock();
-  const enabled = !!root && EVENT_CONTAINER_BLOCKS.has(root.type);
+  
   try {
-    const anyBlk: any = blk as any;
-    if (typeof anyBlk.setEnabled === "function") {
-      anyBlk.setEnabled(enabled);
-    } else if (typeof anyBlk.setDisabled === "function") {
-      anyBlk.setDisabled(!enabled);
-    }
-    if (typeof anyBlk.updateDisabled === "function") {
-      anyBlk.updateDisabled();
-    }
-    if (typeof anyBlk.render === "function") {
-      anyBlk.render();
-    }
-    if (typeof anyBlk.getSvgRoot === "function") {
-      const svg = anyBlk.getSvgRoot();
-      if (svg && svg.classList) {
-        svg.classList.toggle("blocklyDisabled", !enabled);
+    const root = blk.getRootBlock();
+    const enabled = !!root && EVENT_CONTAINER_BLOCKS.has(root.type);
+    
+    // Determine disabled state
+    const shouldBeDisabled = !enabled;
+    const anyBlock = blk as any;
+    const currentlyDisabled = !!anyBlock.disabled;
+    
+    // Only update if state changed
+    if (shouldBeDisabled !== currentlyDisabled) {
+      // Set disabled property directly
+      anyBlock.disabled = shouldBeDisabled;
+      
+      // Update tooltip
+      if (shouldBeDisabled) {
+        blk.setTooltip(disabledTooltip);
+      } else {
+        blk.setTooltip(defaultTooltips[blk.type] || "");
+      }
+      
+      // Force visual update - render will apply CSS classes
+      if (blk.rendered) {
+        // Get the SVG element and apply CSS classes manually
+        const svgRoot = anyBlock.getSvgRoot?.() || anyBlock.svgGroup_;
+        if (svgRoot && svgRoot.classList) {
+          if (shouldBeDisabled) {
+            svgRoot.classList.add('blocklyDisabled', 'blocklyDisabledPattern');
+          } else {
+            svgRoot.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+          }
+        }
+        
+        // Render the block to apply Blockly's internal disabled styling
+        try {
+          blk.render();
+        } catch (_) {}
       }
     }
-  } catch (_) {}
-  try {
-    if (!enabled) {
-      blk.setTooltip(disabledTooltip);
-    } else {
-      blk.setTooltip(defaultTooltips[blk.type] || "");
-    }
-  } catch (_) {}
+    
+    // Recursively update all descendants
+    const descendants = blk.getDescendants(false); // false = don't include self
+    descendants.forEach(child => {
+      if (GATED_BLOCK_TYPES.has(child.type)) {
+        updateLedBlockRunState(child);
+      }
+    });
+    
+  } catch (err) {
+    console.warn("Error updating gated block state:", err);
+  }
 }
 
 /**
- * Update all blocks' enabled state
+ * Update all blocks' enabled state (debounced)
  */
+let updateAllTimeout: ReturnType<typeof setTimeout> | null = null;
 export function updateAllLedBlockStates(workspace: Blockly.Workspace | null) {
-  try {
-    const all = workspace?.getAllBlocks(false) || [];
-    (all as any[]).forEach((b) => updateLedBlockRunState(b as any));
-  } catch (_) {}
+  if (!workspace) return;
+  
+  // Debounce to avoid excessive updates
+  if (updateAllTimeout) {
+    clearTimeout(updateAllTimeout);
+  }
+  
+  updateAllTimeout = setTimeout(() => {
+    try {
+      const all = workspace.getAllBlocks(false) || [];
+      all.forEach((b) => {
+        if (GATED_BLOCK_TYPES.has(b.type)) {
+          updateLedBlockRunState(b);
+        }
+      });
+    } catch (err) {
+      console.warn("Error updating all gated block states:", err);
+    }
+    updateAllTimeout = null;
+  }, 50); // 50ms debounce
 }
 
 /**
@@ -125,19 +168,29 @@ export function updateForeverBlockStates(workspace: Blockly.Workspace | null) {
     const foreverBlocks = allBlocks.filter((block: Blockly.Block) => {
       if (block.type !== "forever") return false;
       const isInFlyout = (block as any).isInFlyout || false;
-      const workspace = block.workspace;
-      const isFlyout = workspace && (workspace as any).isFlyout;
+      const ws = block.workspace;
+      const isFlyout = ws && (ws as any).isFlyout;
       return !isInFlyout && !isFlyout;
     });
 
     if (foreverBlocks.length <= 1) return;
 
+    // Sort by Y position (keep top-most)
+    foreverBlocks.sort((a, b) => {
+      const posA = a.getRelativeToSurfaceXY ? a.getRelativeToSurfaceXY() : { y: 0 };
+      const posB = b.getRelativeToSurfaceXY ? b.getRelativeToSurfaceXY() : { y: 0 };
+      return posA.y - posB.y;
+    });
+
+    // Delete all except first
     foreverBlocks.forEach((block: Blockly.Block, index: number) => {
       if (index > 0) {
         block.dispose(false);
       }
     });
-  } catch (_) {}
+  } catch (err) {
+    console.warn("Error updating forever blocks:", err);
+  }
 }
 
 /**
@@ -151,17 +204,29 @@ export function updateOnStartBlockStates(workspace: Blockly.Workspace | null) {
     const onStartBlocks = allBlocks.filter((block: Blockly.Block) => {
       if (block.type !== "on_start") return false;
       const isInFlyout = (block as any).isInFlyout || false;
-      const workspace = block.workspace;
-      const isFlyout = workspace && (workspace as any).isFlyout;
+      const ws = block.workspace;
+      const isFlyout = ws && (ws as any).isFlyout;
       return !isInFlyout && !isFlyout;
     });
 
+    if (onStartBlocks.length <= 1) return;
+
+    // Sort by Y position (keep top-most)
+    onStartBlocks.sort((a, b) => {
+      const posA = a.getRelativeToSurfaceXY ? a.getRelativeToSurfaceXY() : { y: 0 };
+      const posB = b.getRelativeToSurfaceXY ? b.getRelativeToSurfaceXY() : { y: 0 };
+      return posA.y - posB.y;
+    });
+
+    // Delete all except first
     onStartBlocks.forEach((block: Blockly.Block, index: number) => {
       if (index > 0) {
         block.dispose(false);
       }
     });
-  } catch (_) {}
+  } catch (err) {
+    console.warn("Error updating on_start blocks:", err);
+  }
 }
 
 /**
@@ -193,5 +258,8 @@ export function ensureVariableShadowsOnBlock(blk: Blockly.Block | null | undefin
         (num as any).outputConnection?.connect(conn);
       }
     }
-  } catch (_) {}
+  } catch (err) {
+    console.warn("Error ensuring variable shadows:", err);
+  }
 }
+

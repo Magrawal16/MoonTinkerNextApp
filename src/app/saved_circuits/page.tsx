@@ -10,12 +10,37 @@ const SavedCircuitsPage = () => {
   const [savedCircuits, setSavedCircuits] = React.useState<Array<{ id: string; name: string; createdAt?: string; updatedAt?: string }>>([]);
   const [deleteConfirmId, setDeleteConfirmId] = React.useState<string | null>(null);
   const [deleteConfirmName, setDeleteConfirmName] = React.useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = React.useState(false);
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
       setSavedCircuits(getSavedCircuitsList());
     }
   }, []);
+
+  // Show dialog when deleteConfirmId is set
+  React.useEffect(() => {
+    if (deleteConfirmId) setShowDeleteDialog(true);
+    else setShowDeleteDialog(false);
+  }, [deleteConfirmId]);
+  const handleDeleteCircuit = (id: string) => {
+    if (typeof window !== 'undefined') {
+      // Import here to avoid SSR issues
+      const { deleteCircuitById, getSavedCircuitsList } = require("@/circuit_canvas/utils/circuitStorage");
+      if (deleteCircuitById(id)) {
+        setSavedCircuits(getSavedCircuitsList());
+      }
+    }
+    setDeleteConfirmId(null);
+    setDeleteConfirmName(null);
+    setShowDeleteDialog(false);
+  };
+
+  const handleCancelDelete = () => {
+    setDeleteConfirmId(null);
+    setDeleteConfirmName(null);
+    setShowDeleteDialog(false);
+  };
 
   const handleLoad = (id: string) => {
     if (typeof window !== 'undefined') {
@@ -105,6 +130,33 @@ const SavedCircuitsPage = () => {
             ))
           )}
         </div>
+
+        {/* Delete Confirmation Dialog */}
+        {showDeleteDialog && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0,0,0,0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}>
+            <div style={{ background: '#fff', borderRadius: 12, padding: '2rem 2.5rem', boxShadow: '0 4px 24px #0002', minWidth: 320 }}>
+              <div style={{ fontWeight: 600, fontSize: '1.15rem', color: '#dc2626', marginBottom: 12 }}>Delete Circuit?</div>
+              <div style={{ color: '#334155', marginBottom: 18 }}>
+                Are you sure you want to delete <b>{deleteConfirmName}</b>? This action cannot be undone.
+              </div>
+              <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
+                <button onClick={handleCancelDelete} style={{ background: '#f1f5f9', color: '#334155', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 500, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={() => handleDeleteCircuit(deleteConfirmId!)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, padding: '0.5rem 1.2rem', fontWeight: 600, cursor: 'pointer' }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
         <div style={{ marginTop: '2.5rem', background: '#f1f5f9', borderRadius: '10px', padding: '1.5rem 1rem', boxShadow: '0 2px 8px #6366f122' }}>
           <h2 style={{ fontSize: '1.25rem', color: '#334155', fontWeight: 600, marginBottom: '1rem' }}>Import Circuit</h2>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: '1rem' }}>

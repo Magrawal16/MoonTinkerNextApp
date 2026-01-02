@@ -551,21 +551,24 @@ export class SharedBlockRegistry {
       pythonGenerator.forBlock[block.type] = (blk: any, gen: any) => {
         try {
           if (GATED_BLOCKS.has(blk?.type)) {
-            // Gate by enable state
-            const isDisabled = typeof blk.getInheritedDisabled === "function"
-              ? blk.getInheritedDisabled()
-              : (typeof blk.isEnabled === "function" ? !blk.isEnabled() : false);
-            if (isDisabled) return "";
+            // Check 1: Is the block disabled? Use standard Blockly API
+            const anyBlock = blk as any;
+            const isBlockDisabled = anyBlock.disabled === true || (anyBlock.isDisabled && anyBlock.isDisabled());
+            if (isBlockDisabled) {
+              return "";
+            }
 
-            // Gate by structural context: must be under an event container
-            const root = typeof blk.getRootBlock === "function" ? blk.getRootBlock() : null;
-            const rootType = root?.type as string | undefined;
+            // Check 2: Must be under an event container
+            const root = blk.getRootBlock ? blk.getRootBlock() : null;
+            const rootType = root?.type;
+            
             if (!rootType || !EVENT_CONTAINER_BLOCKS.has(rootType)) {
               return "";
             }
           }
-        } catch (_) {
+        } catch (err) {
           // Fall through to generation on any unexpected error
+          console.warn(`Error checking gated block ${blk?.type}:`, err);
         }
         return originalGen(blk, gen);
       };
@@ -899,12 +902,14 @@ export function enforceButtonHandlerUniqueness(workspace: Blockly.Workspace) {
   const checkDuplicates = () => {
     try {
       if (!workspace || (workspace as any).isFlyout) return;
+      
       const all = (workspace.getAllBlocks ? workspace.getAllBlocks(false) : []) as Blockly.Block[];
       const groups: Record<string, Blockly.Block[]> = { A: [], B: [], AB: [] };
       
       for (const b of all) {
         if (!b || b.type !== "on_button_pressed") continue;
         if (typeof (b as any).isInFlyout === 'function' && (b as any).isInFlyout()) continue;
+        
         const key = (b.getFieldValue && b.getFieldValue("BUTTON")) || "A";
         if (!groups[key]) groups[key] = [];
         groups[key].push(b);
@@ -917,87 +922,89 @@ export function enforceButtonHandlerUniqueness(workspace: Blockly.Workspace) {
           // Re-enable single blocks that might have been disabled
           if (list && list.length === 1) {
             const block = list[0];
-            const isDisabled = !!(block as any).disabled;
+            const anyBlock: any = block as any;
+            const isDisabled = anyBlock.disabled === true;
+            
             if (isDisabled) {
-              (block as any).disabled = false;
+              anyBlock.disabled = false;
               
-              if ((block as any)._originalTooltip) {
-                block.setTooltip((block as any)._originalTooltip);
-                delete (block as any)._originalTooltip;
+              // Restore original tooltip
+              if (anyBlock._originalTooltip) {
+                block.setTooltip(anyBlock._originalTooltip);
+                delete anyBlock._originalTooltip;
               }
               
-              const svgGroup = (block as any).svgGroup_ || (block as any).getSvgRoot?.();
-              
-              if (svgGroup && svgGroup.classList) {
-                svgGroup.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
-              }
-              
-              if (typeof (block as any).updateDisabled === 'function') {
-                (block as any).updateDisabled();
-              }
-              if (typeof (block as any).render === 'function') {
-                (block as any).render();
+              // Force render
+              if (block.rendered) {
+                try {
+                  // Remove CSS classes
+                  const svgRoot = anyBlock.getSvgRoot?.() || anyBlock.svgGroup_;
+                  if (svgRoot && svgRoot.classList) {
+                    svgRoot.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+                  }
+                  (block as any).render();
+                } catch (_) {}
               }
             }
           }
           return;
         }
         
+        // Sort by Y position (top-most first)
         list.sort((b1, b2) => {
-          const y1 = (b1.getRelativeToSurfaceXY && b1.getRelativeToSurfaceXY().y) || 0;
-          const y2 = (b2.getRelativeToSurfaceXY && b2.getRelativeToSurfaceXY().y) || 0;
-          return y1 - y2; // top-most first
+          const pos1 = b1.getRelativeToSurfaceXY ? b1.getRelativeToSurfaceXY() : { y: 0 };
+          const pos2 = b2.getRelativeToSurfaceXY ? b2.getRelativeToSurfaceXY() : { y: 0 };
+          return pos1.y - pos2.y;
         });
         
         list.forEach((b, idx) => {
           const shouldEnable = idx === 0;
+          const anyB: any = b as any;
+          const isDisabled = anyB.disabled === true;
           
-          // Blockly uses 'disabled' property, not isEnabled()
-          const isDisabled = !!(b as any).disabled;
-          const currentlyEnabled = !isDisabled;
-          
-          if (shouldEnable && !currentlyEnabled) {
+          if (shouldEnable && isDisabled) {
             // Enable the block
-            (b as any).disabled = false;
+            anyB.disabled = false;
             
-            if ((b as any)._originalTooltip) {
-              b.setTooltip((b as any)._originalTooltip);
-              delete (b as any)._originalTooltip;
+            if (anyB._originalTooltip) {
+              b.setTooltip(anyB._originalTooltip);
+              delete anyB._originalTooltip;
             }
             
-            const svgGroup = (b as any).svgGroup_ || (b as any).getSvgRoot?.();
-            
-            if (svgGroup && svgGroup.classList) {
-              svgGroup.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+            // Force render
+            if (b.rendered) {
+              try {
+                const svgRoot = anyB.getSvgRoot?.() || anyB.svgGroup_;
+                if (svgRoot && svgRoot.classList) {
+                  svgRoot.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+                }
+                (b as any).render();
+              } catch (_) {}
             }
             
-            if (typeof (b as any).updateDisabled === 'function') {
-              (b as any).updateDisabled();
-            }
-            if (typeof (b as any).render === 'function') {
-              (b as any).render();
-            }
-          } else if (!shouldEnable && currentlyEnabled) {
+          } else if (!shouldEnable && !isDisabled) {
             // Disable the block
-            (b as any).disabled = true;
-            
             const currentTooltip = b.tooltip || "Run when a button is pressed";
-            if (!(b as any)._originalTooltip) {
-              (b as any)._originalTooltip = currentTooltip;
-            }
-            b.setTooltip("This block is disabled because another 'on button pressed' block with the same button already exists. Change the button or remove the duplicate to enable this block.");
-            
-            const svgGroup = (b as any).svgGroup_ || (b as any).getSvgRoot?.();
-            
-            if (svgGroup && svgGroup.classList) {
-              svgGroup.classList.add('blocklyDisabled', 'blocklyDisabledPattern');
+            if (!anyB._originalTooltip) {
+              anyB._originalTooltip = currentTooltip;
             }
             
-            if (typeof (b as any).updateDisabled === 'function') {
-              (b as any).updateDisabled();
-            }
-            if (typeof (b as any).render === 'function') {
-              (b as any).render();
+            anyB.disabled = true;
+            b.setTooltip(
+              "This block is disabled because another 'on button pressed' block with the same button already exists. " +
+              "Change the button or remove the duplicate to enable this block."
+            );
+            
+            // Force render
+            if (b.rendered) {
+              try {
+                // Apply CSS classes
+                const svgRoot = anyB.getSvgRoot?.() || anyB.svgGroup_;
+                if (svgRoot && svgRoot.classList) {
+                  svgRoot.classList.add('blocklyDisabled', 'blocklyDisabledPattern');
+                }
+                (b as any).render();
+              } catch (_) {}
             }
           }
         });

@@ -1,3 +1,5 @@
+import { SaveCircuit } from "@/circuit_canvas/utils/circuitStorage";
+  // (autosave feature removed)
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Stage, Layer, Line, Circle } from "react-konva";
@@ -62,7 +64,7 @@ import {
 import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulators";
 
 
-export default function CircuitCanvas() {
+export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: string | null }) {
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [importInput, setImportInput] = useState("");
@@ -144,27 +146,51 @@ export default function CircuitCanvas() {
 
 
 
-  // Auto-import if ?circuit= param is present
+  // Auto-import if ?circuit= param is present or importedCircuit prop is set
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let encoded = null;
     const params = new URLSearchParams(window.location.search);
-    const encoded = params.get("circuit");
+    if (params.get("circuit")) {
+      encoded = params.get("circuit");
+    } else if (importedCircuit) {
+      encoded = importedCircuit;
+    }
     if (encoded) {
       try {
         const json = atob(decodeURIComponent(encoded));
         const data = JSON.parse(json);
         if (data.elements && data.wires) {
-          pushToHistory(elements, wires);
+          // Debug: log imported data
+          console.log("[Import] Loaded circuit:", data);
+          pushToHistory(data.elements, data.wires);
           resetState();
-          setElements(data.elements);
+          setElements(
+            data.elements.map((el: any) => {
+              if ((el.type === "microbit" || el.type === "microbitWithBreakout") && !simulationRunningRef.current) {
+                return {
+                  ...el,
+                  controller: {
+                    leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
+                    pins: {},
+                    logoTouched: false,
+                  },
+                };
+              }
+              return el;
+            })
+          );
           setWires(data.wires);
           if (data.controllerCodeMap) setControllerCodeMap(data.controllerCodeMap);
-          // Optionally notify user: imported from link
+        } else {
+          console.warn("[Import] No elements or wires in imported data", data);
         }
-      } catch {}
+      } catch (e) {
+        console.error("[Import] Failed to decode circuit:", e);
+      }
     }
     // eslint-disable-next-line
-  }, []);
+  }, [importedCircuit]);
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -458,6 +484,17 @@ export default function CircuitCanvas() {
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`mt_workspace_${id}`);
         window.localStorage.removeItem(`mt_last_editor_mode_${id}`);
+        // Remove from moontinker_controllerXmlMap as well
+        try {
+          const raw = window.localStorage.getItem('moontinker_controllerXmlMap');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && id in parsed) {
+              delete parsed[id];
+              window.localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(parsed));
+            }
+          }
+        } catch {}
         // CODE_MAP_KEY save will happen automatically on next effect; removing entry is enough
       }
     } catch (_) {}
@@ -1169,11 +1206,18 @@ export default function CircuitCanvas() {
     setShowPropertiesPannel(true);
     if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
       setActiveControllerId(newElement.id);
-    }
-
-    // Pre-warm micro:bit simulators immediately on drop so starting simulation is instant.
-    // (Still safe if the hook effect also tries to create one; the start path also handles missing sims.)
-    if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
+      // Force block mode for this controller in localStorage
+      try {
+        // Set global last editor mode
+        localStorage.setItem("moontinker_lastEditorMode", "block");
+        // Set per-controller mode map
+        const CONTROLLER_MODE_MAP_KEY = "moontinker_controllerEditorModeMap";
+        const raw = localStorage.getItem(CONTROLLER_MODE_MAP_KEY);
+        const parsed = (raw ? JSON.parse(raw) : {}) || {};
+        parsed[newElement.id] = "block";
+        localStorage.setItem(CONTROLLER_MODE_MAP_KEY, JSON.stringify(parsed));
+      } catch {}
+      // Pre-warm micro:bit simulators immediately on drop so starting simulation is instant.
       void createAndAttachSimulator(newElement);
     }
   }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, wires, getNextIdNumberForType, createAndAttachSimulator]);
@@ -1494,6 +1538,25 @@ export default function CircuitCanvas() {
         >
           {/* Controls */}
           <div className="flex items-center gap-4">
+            {/* Export Button */}
+            <button
+              onClick={handleExportCircuit}
+              className="px-2 py-1 bg-blue-100 rounded border border-blue-300 text-blue-800 text-sm font-medium shadow hover:bg-blue-200 transition-colors"
+              title="Export circuit as shareable link"
+            >
+              <FaLink className="inline-block mr-1" />
+              Export
+            </button>
+
+            {/* Import Button */}
+            <button
+              onClick={handleImportCircuit}
+              className="px-2 py-1 bg-green-100 rounded border border-green-300 text-green-800 text-sm font-medium shadow hover:bg-green-200 transition-colors"
+              title="Import circuit from link"
+            >
+              <FaUpload className="inline-block mr-1" />
+              Import
+            </button>
             {/* Color Palette */}
             <div title="Wire colour">
               <ColorPaletteDropdown
@@ -1577,63 +1640,7 @@ export default function CircuitCanvas() {
               </button>
             </div>
 
-            {/* Export/Import Buttons */}
-            <button
-              onClick={handleExportCircuit}
-              className="p-1 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-              title="Export circuit as shareable link"
-            >
-              <FaLink size={14} />
-              <span className="ml-1">Export</span>
-            </button>
-            <button
-              onClick={handleImportCircuit}
-              className="p-1 bg-gray-200 rounded hover:bg-gray-300 transition-colors"
-              title="Import circuit from link"
-            >
-              <FaUpload size={14} />
-              <span className="ml-1">Import</span>
-            </button>
-      {/* Import Modal */}
-      {showImportModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4 min-w-[340px] max-w-[90vw] relative">
-            {importLoading && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 rounded-2xl">
-                <div className="relative w-16 h-16 mb-2">
-                  <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
-                  <div className="absolute inset-0 border-4 border-transparent border-t-blue-600 rounded-full animate-spin"></div>
-                </div>
-                <span className="text-blue-700 font-semibold animate-pulse">Importing...</span>
-              </div>
-            )}
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Import Circuit from Link</h3>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              placeholder="Paste a shared circuit link here..."
-              value={importInput}
-              onChange={e => setImportInput(e.target.value)}
-              autoFocus
-              onKeyDown={e => { if (e.key === 'Enter') handleImportConfirm(); }}
-              disabled={importLoading}
-            />
-            {importError && <div className="text-red-600 text-sm w-full text-left">{importError}</div>}
-            <div className="flex gap-3 mt-2 w-full justify-end">
-              <button
-                onClick={handleImportCancel}
-                className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium"
-                disabled={importLoading}
-              >Cancel</button>
-              <button
-                onClick={handleImportConfirm}
-                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white font-semibold"
-                disabled={importLoading}
-              >Import</button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
             {/* Copy Button */}
             <button
@@ -2739,6 +2746,60 @@ export default function CircuitCanvas() {
         </div>
       )}
 
+      {/* Import Circuit Modal */}
+      {showImportModal && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-gray-900/30 dark:bg-black/40 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="import-circuit-title"
+          aria-describedby="import-circuit-desc"
+          onKeyDown={(e) => { if (e.key === 'Escape') handleImportCancel(); }}
+        >
+          <div className="w-[430px] max-w-[94vw] rounded-2xl bg-white text-gray-900 shadow-2xl border border-gray-200 p-5 animate-[fadeIn_.12s_ease-out]">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-green-50 text-green-600 border border-green-100">
+                {/* Import icon */}
+                <FaUpload size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 id="import-circuit-title" className="text-lg font-semibold tracking-tight">Import Circuit from Link</h3>
+                <p id="import-circuit-desc" className="mt-2 text-sm leading-6 text-gray-600">
+                  Paste a circuit link below to import a saved circuit layout and code.
+                </p>
+                <input
+                  type="text"
+                  className="mt-3 w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Paste circuit link here..."
+                  value={importInput}
+                  onChange={e => setImportInput(e.target.value)}
+                  autoFocus
+                  disabled={importLoading}
+                />
+                {importError && (
+                  <div className="mt-2 text-xs text-red-600">{importError}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={handleImportCancel}
+                className="px-3.5 py-2 rounded-md border border-gray-300 bg-white text-gray-800 text-sm shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                disabled={importLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportConfirm}
+                className="px-3.5 py-2 rounded-md bg-green-600 text-white text-sm font-medium shadow hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400"
+                disabled={importLoading}
+              >
+                {importLoading ? 'Importing...' : 'Import'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {showNewSessionModal && (
         <div
           className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/20 dark:bg-black/30 backdrop-blur-[2px]"

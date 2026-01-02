@@ -93,7 +93,7 @@ export const BASIC_BLOCKS: SharedBlockDefinition[] = [
       args0: [{ 
         type: "field_pause_time", 
         name: "TIME", 
-        value: 5000
+        value: 1000
       }], 
       previousStatement: null, 
       nextStatement: null, 

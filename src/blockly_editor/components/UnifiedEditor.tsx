@@ -617,13 +617,16 @@ export default function UnifiedEditor({
     } else {
       setIsConverting(true);
       setConversionType("toText");
+      let defaultCode = `def on_start():\n  pass\n\non_start()\n\n\ndef on_forever():\n  pass\nbasic.forever(on_forever)\n`;
       if (workspaceRef.current && bidirectionalConverter) {
         try {
           try { pythonGenerator.init(workspaceRef.current); } catch (e) { }
           const code = bidirectionalConverter.blocksToPython();
-          setLocalCode(code);
-          setControllerCodeMap(prev => ({ ...prev, [activeControllerId!]: code }));
-          textBaselineRef.current = (code ?? "");
+          // If code is empty, use default template
+          const codeToSet = code && code.trim().length > 0 ? code : defaultCode;
+          setLocalCode(codeToSet);
+          setControllerCodeMap(prev => ({ ...prev, [activeControllerId!]: codeToSet }));
+          textBaselineRef.current = (codeToSet ?? "");
           textModifiedRef.current = false;
           // Ensure editor mode is set after code is updated
           setTimeout(() => {
@@ -635,7 +638,10 @@ export default function UnifiedEditor({
         } catch (e) { }
       }
       if (!workspaceRef.current) {
-        textBaselineRef.current = (localCode ?? "");
+        // If localCode is empty, use default template
+        const codeToSet = localCode && localCode.trim().length > 0 ? localCode : defaultCode;
+        setLocalCode(codeToSet);
+        textBaselineRef.current = (codeToSet ?? "");
         textModifiedRef.current = false;
       }
       setEditorMode(newMode);

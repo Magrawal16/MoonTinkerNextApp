@@ -392,10 +392,285 @@ export default function PythonCodeEditor({ code, onChange, isSimulationOn = fals
     e.preventDefault();
     setIsDragOver(false);
     const codeSnippet = e.dataTransfer.getData("text/plain");
-    if (codeSnippet) {
-      const newCode = code + '\n\n' + codeSnippet;
-      onChange(newCode);
+    if (!codeSnippet) return;
+
+    const editor = editorRef.current;
+    const model = editor?.getModel?.();
+    if (editor && model) {
+      const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
+      const position = target?.position ?? editor.getPosition?.();
+      if (!position) return;
+
+      const getIndentUnit = () => {
+        try {
+          const opts = model.getOptions?.();
+          const indentSize: number = (opts?.indentSize as number) || 4;
+          return " ".repeat(Math.max(1, indentSize));
+        } catch {
+          return " ".repeat(4);
+        }
+      };
+
+      const computeIndentForLine = (lineNumber: number, indentUnit: string) => {
+        const getLine = (ln: number) => (model?.getLineContent?.(ln) ?? "") as string;
+        const lineText = getLine(lineNumber);
+        const currentIndent = (lineText.match(/^\s*/) || [""])[0];
+        if (lineText.trim().length > 0) return currentIndent;
+        if (currentIndent.length > 0) return currentIndent;
+        let ln = lineNumber - 1;
+        while (ln >= 1) {
+          const prev = getLine(ln);
+          if (prev.trim().length > 0) {
+            const prevIndent = (prev.match(/^\s*/) || [""])[0];
+            const prevEndsWithColon = /:\s*(#.*)?$/.test(prev.trimEnd());
+            return prevIndent + (prevEndsWithColon ? indentUnit : "");
+          }
+          ln--;
+        }
+        return "";
+      };
+
+      let lineContent: string = model.getLineContent(position.lineNumber) ?? "";
+      const normalized = codeSnippet.replace(/\r\n?/g, "\n").replace(/\n$/, "");
+      const indentUnit = getIndentUnit();
+
+      // If dropping on a Python block header (def/class/if/for/while/try/etc), do NOT insert on that line.
+      // Instead, snap to the block body, replacing `pass` / blank line when present.
+      const blockHeaderMatch = /^(\s*)(def|class|if|elif|else|for|while|try|except|finally|with)\b.*:\s*(#.*)?$/.exec(
+        lineContent
+      );
+      if (blockHeaderMatch) {
+        // Allow inserting code BEFORE the header by dropping in the gutter/left margin.
+        // This is how you place a snippet on line 1 when line 1 is `def on_start():`.
+        try {
+          const dom: HTMLElement | null = editor.getDomNode?.();
+          const rect = dom?.getBoundingClientRect?.();
+          const layout = editor.getLayoutInfo?.();
+          const contentLeft = (layout?.contentLeft as number) ?? 0;
+          const isInGutter = rect ? e.clientX < rect.left + contentLeft : false;
+          if (isInGutter) {
+            editor.executeEdits("drag-drop-python-insert-before-header", [
+              {
+                range: {
+                  startLineNumber: position.lineNumber,
+                  endLineNumber: position.lineNumber,
+                  startColumn: 1,
+                  endColumn: 1,
+                },
+                text: normalized + "\n",
+                forceMoveMarkers: true,
+              },
+            ]);
+
+            onChange(editor.getValue());
+            editor.focus();
+
+            const insertedLines = normalized.split("\n");
+            const newLineNumber = position.lineNumber + insertedLines.length - 1;
+            const lastLineText = insertedLines[insertedLines.length - 1] || "";
+            editor.setPosition({
+              lineNumber: newLineNumber,
+              column: Math.max(1, lastLineText.length + 1),
+            });
+            return;
+          }
+        } catch {
+          // ignore and fall through
+        }
+
+        const headerIndent = blockHeaderMatch[1] ?? "";
+        const bodyLineNumber = position.lineNumber + 1;
+        const lineCount = model.getLineCount?.() ?? 0;
+        const bodyLineContent = bodyLineNumber <= lineCount ? (model.getLineContent(bodyLineNumber) ?? "") : "";
+        const bodyIndent = (() => {
+          const bodyWs = (bodyLineContent.match(/^\s*/) || [""])[0];
+          return bodyWs.length ? bodyWs : headerIndent + indentUnit;
+        })();
+
+        const indented = normalized
+          .split("\n")
+          .map((ln) => (ln.length ? bodyIndent + ln : ln))
+          .join("\n");
+
+        const replaceOrInsertIntoBody = () => {
+          const isPass = /^\s*pass\s*$/.test(bodyLineContent);
+          const isBlank = bodyLineContent.trim().length === 0;
+          if (bodyLineNumber <= lineCount && (isPass || isBlank)) {
+            editor.executeEdits("drag-drop-python-snap-into-block", [
+              {
+                range: {
+                  startLineNumber: bodyLineNumber,
+                  endLineNumber: bodyLineNumber,
+                  startColumn: 1,
+                  endColumn: bodyLineContent.length + 1,
+                },
+                text: indented,
+                forceMoveMarkers: true,
+              },
+            ]);
+          } else if (bodyLineNumber <= lineCount) {
+            editor.executeEdits("drag-drop-python-snap-into-block", [
+              {
+                range: {
+                  startLineNumber: bodyLineNumber,
+                  endLineNumber: bodyLineNumber,
+                  startColumn: 1,
+                  endColumn: 1,
+                },
+                text: indented + "\n",
+                forceMoveMarkers: true,
+              },
+            ]);
+          } else {
+            // Body line doesn't exist yet (end of file) — append a newline + indented snippet.
+            editor.executeEdits("drag-drop-python-snap-into-block", [
+              {
+                range: {
+                  startLineNumber: position.lineNumber,
+                  endLineNumber: position.lineNumber,
+                  startColumn: lineContent.length + 1,
+                  endColumn: lineContent.length + 1,
+                },
+                text: "\n" + indented + "\n",
+                forceMoveMarkers: true,
+              },
+            ]);
+          }
+        };
+
+        replaceOrInsertIntoBody();
+        onChange(editor.getValue());
+        editor.focus();
+
+        const insertedLines = indented.split("\n");
+        const endLineNumber = Math.min(bodyLineNumber, model.getLineCount?.() ?? bodyLineNumber) + insertedLines.length - 1;
+        const lastLineText = insertedLines[insertedLines.length - 1] || "";
+        editor.setPosition({
+          lineNumber: endLineNumber,
+          column: Math.max(1, lastLineText.length + 1),
+        });
+        return;
+      }
+
+      // If dropping onto a placeholder `pass` line, replace it and keep indentation.
+      const passMatch = /^(\s*)pass\s*$/.exec(lineContent);
+      if (passMatch) {
+        const indentation = passMatch[1] ?? "";
+        const indented = normalized
+          .split("\n")
+          .map((ln) => (ln.length ? indentation + ln : ln))
+          .join("\n");
+
+        editor.executeEdits("drag-drop-python-replace-pass", [
+          {
+            range: {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: 1,
+              endColumn: lineContent.length + 1,
+            },
+            text: indented,
+            forceMoveMarkers: true,
+          },
+        ]);
+
+        onChange(editor.getValue());
+        editor.focus();
+
+        const insertedLines = indented.split("\n");
+        const newLineNumber = position.lineNumber + insertedLines.length - 1;
+        const lastLineText = insertedLines[insertedLines.length - 1] || "";
+        editor.setPosition({
+          lineNumber: newLineNumber,
+          column: Math.max(1, lastLineText.length + 1),
+        });
+        return;
+      }
+
+      // Avoid breaking an existing line: if the drop target is mid-line, snap to end-of-line and insert on a new line.
+      const indentPrefix = (lineContent.match(/^\s*/) || [""])[0];
+      const firstNonWhitespaceColumn = indentPrefix.length + 1;
+      const endColumn = lineContent.length + 1;
+      const hasCodeOnLine = lineContent.trim().length > 0;
+
+      // If dropping at the start/indentation of an indented line with code, insert ABOVE that line.
+      const insertAboveLine = (() => {
+        if (!hasCodeOnLine) return false;
+        // Only do this for indented lines (i.e., inside a block)
+        if (indentPrefix.length === 0) return false;
+
+        try {
+          const dom: HTMLElement | null = editor.getDomNode?.();
+          const rect = dom?.getBoundingClientRect?.();
+          const layout = editor.getLayoutInfo?.();
+          const contentLeft = (layout?.contentLeft as number) ?? 0;
+          const indentCoord = editor.getScrolledVisiblePosition?.({
+            lineNumber: position.lineNumber,
+            column: Math.max(1, firstNonWhitespaceColumn),
+          });
+          if (rect && indentCoord) {
+            const dropX = e.clientX - rect.left - contentLeft;
+            // If you dropped to the left of the first non-whitespace char, treat as indentation area
+            return dropX <= indentCoord.left + 2;
+          }
+        } catch {
+          // ignore and fall back
+        }
+
+        // Fallback: use column-based check
+        return position.column <= firstNonWhitespaceColumn;
+      })();
+
+      const effectiveIndent = computeIndentForLine(position.lineNumber, indentUnit);
+      const indentedToInsert = normalized
+        .split("\n")
+        .map((ln) => (ln.length ? effectiveIndent + ln : ln))
+        .join("\n");
+
+      const textToInsert = insertAboveLine
+        ? `${indentedToInsert}\n`
+        : hasCodeOnLine
+          ? `\n${indentedToInsert}\n`
+          : `${indentedToInsert}\n`;
+
+      const range = insertAboveLine
+        ? {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: 1,
+            endColumn: 1,
+          }
+        : {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: position.column >= endColumn ? position.column : endColumn,
+            endColumn: position.column >= endColumn ? position.column : endColumn,
+          };
+
+      editor.executeEdits("drag-drop-python-snippet", [
+        { range, text: textToInsert, forceMoveMarkers: true },
+      ]);
+
+      onChange(editor.getValue());
+      editor.focus();
+
+      const snippetLines = indentedToInsert.split("\n");
+      const newLineNumber = insertAboveLine
+        ? position.lineNumber + snippetLines.length - 1
+        : hasCodeOnLine
+          ? position.lineNumber + snippetLines.length
+          : position.lineNumber + snippetLines.length - 1;
+      const lastLineText = snippetLines[snippetLines.length - 1] || "";
+      editor.setPosition({
+        lineNumber: newLineNumber,
+        column: Math.max(1, lastLineText.length + 1),
+      });
+      return;
     }
+
+    // Fallback (non-Monaco editor): append to end
+    const newCode = code + "\n\n" + codeSnippet;
+    onChange(newCode);
   };
 
   // Status indicator

@@ -12,11 +12,13 @@ export default function Microbit({
   leds,
   onControllerInput,
   isSimulationOn,
+  isShorted,
   ...props
 }: MicrobitProps & BaseElementProps) {
   const [imgMicrobitWithBreakout, setImgMicrobitWithBreakout] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
+  const [explosionImg, setExplosionImg] = useState<HTMLImageElement | null>(null);
   // Track button press state
   const [buttonsPressed, setButtonsPressed] = useState<Set<"A" | "B" | "AB">>(new Set());
   const isPressing = useRef<{ [key in "A" | "B" | "AB"]: boolean }>({ A: false, B: false, AB: false });
@@ -51,6 +53,13 @@ export default function Microbit({
     image.src = "assets/circuit_canvas/elements/microbit_usb_off.svg";
     image.onload = () => setImgOffState(image);
     image.alt = "MicrobitWithBreakout";
+  }, []);
+
+  useEffect(() => {
+    const image = new window.Image();
+    image.src = "assets/circuit_canvas/elements/Explosion.svg";
+    image.onload = () => setExplosionImg(image);
+    image.alt = "MicrobitWithBreakout Explosion";
   }, []);
 
   const handleButtonDown = (btn: "A" | "B" | "AB") => {
@@ -167,6 +176,8 @@ export default function Microbit({
     // Hook for future logo touch event dispatch if needed
   };
 
+  const showExplosion = Boolean(isShorted && isSimulationOn && explosionImg);
+
   return (
     <BaseElement {...props} isSimulationOn={isSimulationOn}>
       <Group>
@@ -207,6 +218,8 @@ export default function Microbit({
             shadowOpacity={0}
           />
         )}
+
+        
 
         {/* 5x5 LED Grid (matrix is rows-first: leds[y][x])
             Render using the same layered glow + center LED used by the plain Microbit
@@ -454,6 +467,20 @@ export default function Microbit({
           <Rect width={10} height={15} x={5} y={5} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
+        {/* Explosion overlay when 3.3V and any GND are shorted */}
+        {showExplosion && explosionImg && (
+          <Image
+            listening={false}
+            image={explosionImg}
+            x={65}
+            y={30}
+            width={90}
+            height={90}
+            shadowColor="#000000"
+            shadowBlur={12}
+            shadowOpacity={0.2}
+          />
+        )}
       </Group>
     </BaseElement>
   );

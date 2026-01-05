@@ -114,16 +114,11 @@ div.blocklyToolboxDiv {
 }
 
 /* Ensure disabled Blockly blocks visibly fade even across custom themes */
-.blocklyDisabled,
-.blocklyDisabled g,
-.blocklyDisabled path,
 .blocklyDisabled path.blocklyBlockBackground,
 .blocklyDisabled .blocklyPath,
-.blocklyDisabled rect,
-.blocklyDisabled text,
-.blocklyDisabled tspan {
+.blocklyDisabled {
   opacity: 0.5 !important;
-  filter: grayscale(0.9) saturate(0.2) !important;
+  filter: grayscale(0.8) saturate(0.3) !important;
   transition: all 0.3s ease !important;
   pointer-events: none !important;
 }
@@ -133,21 +128,15 @@ div.blocklyToolboxDiv {
   opacity: 0.5 !important;
 }
 
-.blocklyDisabledPattern g,
-.blocklyDisabledPattern path,
-.blocklyDisabledPattern path.blocklyBlockBackground,
-.blocklyDisabledPattern .blocklyPath,
-.blocklyDisabledPattern rect {
+.blocklyDisabledPattern .blocklyPath {
+  /* fill-opacity: 0.5 !important; */
   stroke-opacity: 0.6 !important;
-  fill-opacity: 0.5 !important;
-  filter: grayscale(1) saturate(0) !important;
+  filter: grayscale(1) !important;
 }
 
 /* Ensure child blocks also appear disabled */
 .blocklyDisabled .blocklyBlock,
-.blocklyDisabledPattern .blocklyBlock,
-.blocklyDisabled g.blocklyDraggable,
-.blocklyDisabledPattern g.blocklyDraggable {
+.blocklyDisabledPattern .blocklyBlock {
   opacity: 0.5 !important;
   filter: grayscale(0.8) !important;
 }

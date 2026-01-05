@@ -265,6 +265,7 @@ export default function RenderElement(props: RenderElementProps) {
           selected={props.selectedElementId === element.id}
           draggable={false}
           isSimulationOn={props.isSimulationOn}
+          isShorted={!!element.computed?.shorted}
           pins={
             (element.controller?.pins as Record<
               string,
@@ -288,6 +289,7 @@ export default function RenderElement(props: RenderElementProps) {
           selected={props.selectedElementId === element.id}
           draggable={false}
           isSimulationOn={props.isSimulationOn}
+          isShorted={!!element.computed?.shorted}
           pins={
             (element.controller?.pins as Record<
               string,

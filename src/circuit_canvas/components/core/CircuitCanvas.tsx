@@ -2723,12 +2723,14 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                   return {
                     id: el.id,
                     label: `Micro:bit + Breakout ${breakoutCount}`,
+                    kind: "microbitWithBreakout" as const,
                   };
                 } else {
                   microbitCount++;
                   return {
                     id: el.id,
                     label: `Micro:bit ${microbitCount}`,
+                    kind: "microbit" as const,
                   };
                 }
               });

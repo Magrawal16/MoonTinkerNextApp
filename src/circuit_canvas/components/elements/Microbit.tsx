@@ -12,11 +12,13 @@ export default function Microbit({
   leds,
   onControllerInput,
   isSimulationOn,
+  isShorted,
   ...props
 }: MicrobitProps & BaseElementProps) {
   const [imgMicrobit, setImgMicrobit] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
+  const [explosionImg, setExplosionImg] = useState<HTMLImageElement | null>(null);
   const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
   // Logo (touch sensor) interaction state
   const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
@@ -48,6 +50,13 @@ export default function Microbit({
     image.src = "assets/circuit_canvas/elements/microbit_usb_off.svg";
     image.onload = () => setImgOffState(image);
     image.alt = "Microbit";
+  }, []);
+
+  useEffect(() => {
+    const image = new window.Image();
+    image.src = "assets/circuit_canvas/elements/Explosion.svg";
+    image.onload = () => setExplosionImg(image);
+    image.alt = "Microbit Explosion";
   }, []);
 
   // Button press/release handlers for hold logic
@@ -156,6 +165,9 @@ export default function Microbit({
   const onLogoClick = () => {
     // Hook for future logo touch event dispatch if needed
   };
+
+  const showExplosion = Boolean(isShorted && isSimulationOn && explosionImg);
+
   return (
     <BaseElement {...props} isSimulationOn={isSimulationOn}>
       <Group>
@@ -416,6 +428,21 @@ export default function Microbit({
           <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
+
+        {/* Explosion overlay when 3.3V and GND are shorted */}
+        {showExplosion && explosionImg && (
+          <Image
+            listening={false}
+            image={explosionImg}
+            x={65}
+            y={90}
+            width={90}
+            height={90}
+            shadowColor="#000000"
+            shadowBlur={12}
+            shadowOpacity={0.2}
+          />
+        )}
       </Group>
     </BaseElement>
   );

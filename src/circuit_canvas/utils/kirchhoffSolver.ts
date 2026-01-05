@@ -40,9 +40,10 @@ function solveSingleSubcircuit(
   wires: Wire[]
 ): CircuitElement[] {
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
+  const microbitShortMap = detectMicrobitRailShorts(elements, nodeEquivalenceMap);
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
   if (effectiveNodeIds.size === 0) {
-    return zeroOutComputed(elements);
+    return applyMicrobitShortFlags(zeroOutComputed(elements), microbitShortMap);
   }
 
   const { groundId, nonGroundIds, nodeIndex } =
@@ -93,7 +94,7 @@ function solveSingleSubcircuit(
 
     x = solveLinearSystem(A, z);
     if (!x) {
-      return zeroOutComputed(elements);
+      return applyMicrobitShortFlags(zeroOutComputed(elements), microbitShortMap);
     }
 
     nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
@@ -187,10 +188,11 @@ function solveSingleSubcircuit(
     n,
     limitedIds,
     false,
-    intactLedCurrentById
+    intactLedCurrentById,
+    microbitShortMap
   );
 
-  return results;
+  return applyMicrobitShortFlags(results, microbitShortMap);
 }
 
 function solveSubcircuitWithExplodedLedsIntact(
@@ -432,6 +434,49 @@ function zeroOutComputed(elements: CircuitElement[]) {
     ...el,
     computed: { current: 0, voltage: 0, power: 0, measurement: 0, forwardVoltage: 0, reverseVoltage: 0 },
   }));
+}
+
+function detectMicrobitRailShorts(
+  elements: CircuitElement[],
+  nodeMap: Map<string, string>
+): Map<string, boolean> {
+  const result = new Map<string, boolean>();
+  for (const el of elements) {
+    if (el.type !== "microbit" && el.type !== "microbitWithBreakout") continue;
+
+    const posRoots = el.nodes
+      ?.filter((n) => n.placeholder === "3.3V")
+      .map((n) => nodeMap.get(n.id))
+      .filter((id): id is string => !!id);
+
+    const negRoots = el.nodes
+      ?.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND"))
+      .map((n) => nodeMap.get(n.id))
+      .filter((id): id is string => !!id);
+
+    const shorted = (posRoots ?? []).some((root) => (negRoots ?? []).includes(root));
+    result.set(el.id, shorted);
+  }
+
+  return result;
+}
+
+function applyMicrobitShortFlags(
+  elements: CircuitElement[],
+  shortMap: Map<string, boolean>
+): CircuitElement[] {
+  if (!shortMap || shortMap.size === 0) return elements;
+
+  return elements.map((el) => {
+    if (el.type === "microbit" || el.type === "microbitWithBreakout") {
+      const shorted = shortMap.get(el.id) ?? false;
+      return {
+        ...el,
+        computed: { ...(el.computed ?? {}), shorted },
+      } as CircuitElement;
+    }
+    return el;
+  });
 }
 
 function getNodeMappings(effectiveNodeIds: Set<string>) {
@@ -889,7 +934,8 @@ function computeElementResults(
   n: number,
   currentLimitedIds?: Set<string>,
   ignoreExplodedLedsForResults?: boolean,
-  intactLedCurrentById?: Map<string, number>
+  intactLedCurrentById?: Map<string, number>,
+  microbitShortMap?: Map<string, boolean>
 ): CircuitElement[] {
   // Detect if subcircuit is externally powered (battery or microbit present)
   const externallyPowered = elements.some(
@@ -897,6 +943,8 @@ function computeElementResults(
   );
 
   return elements.map((el) => {
+    const isMicrobit = el.type === "microbit" || el.type === "microbitWithBreakout";
+    const shorted = isMicrobit ? microbitShortMap?.get(el.id) ?? false : false;
     const a = nodeMap.get(el.nodes?.[0]?.id ?? "");
     const b = nodeMap.get(el.nodes?.[1]?.id ?? "");
     const Va = a ? nodeVoltages[a] ?? 0 : 0;
@@ -1007,18 +1055,24 @@ function computeElementResults(
           : currentLimitedIds?.has(el.id) ? "CC" : "VC")
       : undefined;
 
+    const computedResult: any = {
+      voltage,
+      current,
+      power,
+      measurement,
+      supplyMode,
+      ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
+        ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }
+        : {}),
+    };
+
+    if (isMicrobit) {
+      computedResult.shorted = shorted;
+    }
+
     return {
       ...el,
-      computed: {
-        voltage,
-        current,
-        power,
-        measurement,
-        supplyMode,
-        ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
-          ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }
-          : {}),
-      },
+      computed: computedResult,
     } as any;
   });
 }

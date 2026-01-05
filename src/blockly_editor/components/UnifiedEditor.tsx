@@ -35,7 +35,7 @@ interface UnifiedEditorProps {
   stopSimulation: () => void;
   onSizeChange?: (size: { width: number; height: number }) => void;
   onClose?: () => void;
-  controllers?: Array<{ id: string; label: string }>;
+  controllers?: Array<{ id: string; label: string; kind?: "microbit" | "microbitWithBreakout" }>;
   onSelectController?: (id: string) => void;
   onResetRef?: React.MutableRefObject<(() => void) | null>; // Ref to expose reset functionality
   isSimulationOn?: boolean; // Disable editing when simulation is running
@@ -55,6 +55,7 @@ export default function UnifiedEditor({
 }: UnifiedEditorProps) {
   const EDITOR_MODE_STORAGE_KEY = "moontinker_lastEditorMode";
   const CONTROLLER_MODE_MAP_KEY = "moontinker_controllerEditorModeMap";
+  const ACTIVE_CONTROLLER_KIND_STORAGE_KEY = "moontinker_activeControllerKind";
   // Lockout state to prevent immediate switch back to text mode
   const [blockModeLockout, setBlockModeLockout] = useState(false);
   const blockModeLockoutRef = useRef(false);
@@ -164,6 +165,19 @@ export default function UnifiedEditor({
   useEffect(() => {
     activeControllerIdRef.current = activeControllerId;
   }, [activeControllerId]);
+
+  // Persist the selected controller kind so shared Blockly blocks (e.g., pin dropdowns)
+  // can adapt options based on whether the board is a breakout variant.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!activeControllerId) return;
+    const meta = controllers?.find((c) => c.id === activeControllerId);
+    const kind = meta?.kind;
+    if (!kind) return;
+    try {
+      localStorage.setItem(ACTIVE_CONTROLLER_KIND_STORAGE_KEY, kind);
+    } catch {}
+  }, [activeControllerId, controllers]);
 
   useEffect(() => {
     isUpdatingFromCodeRef.current = isUpdatingFromCode;

@@ -37,6 +37,7 @@ export type CircuitElement = {
     measurement?: number; // Specific reading for multimeter
     forwardVoltage?: number; // anode-to-cathode voltage used for diodes/LEDs
     reverseVoltage?: number; // cathode-to-anode voltage magnitude
+    shorted?: boolean; // Fault flag (e.g., micro:bit 3.3V-GND short)
     // For failed components that are opened in the main solver (e.g., exploded LED),
     // we can optionally provide a "what-if" current computed by solving the same
     // circuit as-if the device were still electrically intact. Used to match
@@ -186,6 +187,9 @@ export interface MicrobitProps {
   pins: Record<string, { digital?: number; analog?: number }>;
 
   isSimulationOn?: boolean;
+
+  // Fault flags from solver (e.g., direct 3V-to-GND short)
+  isShorted?: boolean;
 }
 
 export interface BaseElementProps {

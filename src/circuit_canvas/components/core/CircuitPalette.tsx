@@ -11,7 +11,7 @@ export default function CircuitPalette() {
         </h2>
       </div>
       <div className="flex flex-col gap-4">
-        {ELEMENT_PALETTE.map((el) => (
+        {ELEMENT_PALETTE.filter((el) => !el.hidden).map((el) => (
           <div
             key={el.type}
             className="cursor-grab active:cursor-grabbing flex items-center gap-3 p-3 rounded-lg border border-b-blue-950 shadow-sm hover:shadow-blue-950 transition-all duration-200"

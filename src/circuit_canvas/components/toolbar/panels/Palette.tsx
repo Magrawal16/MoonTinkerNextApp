@@ -8,7 +8,7 @@ export default function CircuitSelector() {
   const [search, setSearch] = useState("");
 
   const filteredElements = useMemo(() => {
-    return ELEMENT_PALETTE.filter((el) =>
+    return ELEMENT_PALETTE.filter((el) => !el.hidden).filter((el) =>
       el.label.toLowerCase().includes(search.toLowerCase())
     );
   }, [search]);
@@ -16,11 +16,12 @@ export default function CircuitSelector() {
   return (
     <Panel
       className={`w-full h-[510px] overflow-x-clip p-4
-      bg-white-500 bg-opacity-20
+      !bg-gray-300
       backdrop-blur-2xl
-      border border-red border-opacity-30
+      border border-gray-300 border-opacity-30
       rounded-xl
       shadow-lg
+      shadow-sky-200
       `}
     >
       <input

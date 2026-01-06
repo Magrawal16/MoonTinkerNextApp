@@ -107,7 +107,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
           handler: () => {
             setCreatingWireStartNode(null);
             setSelectedElement(null);
-            setActiveControllerId(null);
+            // Keep last active micro:bit so Code button reopens it
           },
         };
       case "ctrl+l":

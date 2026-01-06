@@ -588,7 +588,7 @@ export const MicrobitSimulationPanel: React.FC<
                     src={
                       element.type === "microbitWithBreakout"
                         ? "/assets/circuit_canvas/elements/microbit_with_breakout.svg"
-                        : "/assets/circuit_canvas/elements/microbit.svg"
+                        : "/assets/circuit_canvas/elements/microbit_red.svg"
                     }
                     alt="micro:bit preview"
                     className="block h-full w-full object-contain object-center"

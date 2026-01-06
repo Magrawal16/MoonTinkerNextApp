@@ -148,19 +148,199 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
     if (codeSnippet && editorRef.current) {
       const editor = editorRef.current;
       const model = editor.getModel?.();
-      const position = editor.getPosition();
+      const target = editor.getTargetAtClientPoint?.(e.clientX, e.clientY);
+      const position = target?.position ?? editor.getPosition?.();
       if (!model || !position) return;
+
+      // If dropping on a Python block header (def/class/if/for/while/try/etc), snap to the block body.
+      const dropLineContent: string = model.getLineContent(position.lineNumber) ?? "";
+      const blockHeaderMatch = /^(\s*)(def|class|if|elif|else|for|while|try|except|finally|with)\b.*:\s*(#.*)?$/.exec(
+        dropLineContent
+      );
+      if (blockHeaderMatch) {
+        // If user drops in the gutter/left margin of the header line, insert BEFORE the header.
+        try {
+          const dom: HTMLElement | null = editor.getDomNode?.();
+          const rect = dom?.getBoundingClientRect?.();
+          const layout = editor.getLayoutInfo?.();
+          const contentLeft = (layout?.contentLeft as number) ?? 0;
+          const isInGutter = rect ? e.clientX < rect.left + contentLeft : false;
+          if (isInGutter) {
+            const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, "\n");
+            const raw = normalizeNewlines(codeSnippet).replace(/\n$/, "");
+            editor.executeEdits("drag-drop-python-insert-before-header", [
+              {
+                range: {
+                  startLineNumber: position.lineNumber,
+                  endLineNumber: position.lineNumber,
+                  startColumn: 1,
+                  endColumn: 1,
+                },
+                text: raw + "\n",
+                forceMoveMarkers: true,
+              },
+            ]);
+
+            onChange(editor.getValue());
+            editor.focus();
+
+            const insertedLines = raw.split("\n");
+            const newLineNumber = position.lineNumber + insertedLines.length - 1;
+            const lastLineText = insertedLines[insertedLines.length - 1] || "";
+            editor.setPosition({
+              lineNumber: newLineNumber,
+              column: Math.max(1, lastLineText.length + 1),
+            });
+            return;
+          }
+        } catch {
+          // ignore and fall through
+        }
+
+        const opts = model.getOptions?.();
+        const indentSize: number = (opts?.indentSize as number) || 4;
+        const indentUnit = " ".repeat(Math.max(1, indentSize));
+        const headerIndent = blockHeaderMatch[1] ?? "";
+        const bodyLineNumber = position.lineNumber + 1;
+        const lineCount = model.getLineCount?.() ?? 0;
+        const bodyLineContent = bodyLineNumber <= lineCount ? (model.getLineContent(bodyLineNumber) ?? "") : "";
+        const bodyIndent = (() => {
+          const ws = (bodyLineContent.match(/^\s*/) || [""])[0];
+          return ws.length ? ws : headerIndent + indentUnit;
+        })();
+
+        const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, "\n");
+        const raw = normalizeNewlines(codeSnippet).replace(/\n$/, "");
+        const indented = raw
+          .split("\n")
+          .map((ln) => (ln.length ? bodyIndent + ln : ln))
+          .join("\n");
+
+        const isPass = /^\s*pass\s*$/.test(bodyLineContent);
+        const isBlank = bodyLineContent.trim().length === 0;
+        if (bodyLineNumber <= lineCount && (isPass || isBlank)) {
+          editor.executeEdits("drag-drop-python-snap-into-block", [
+            {
+              range: {
+                startLineNumber: bodyLineNumber,
+                endLineNumber: bodyLineNumber,
+                startColumn: 1,
+                endColumn: bodyLineContent.length + 1,
+              },
+              text: indented,
+              forceMoveMarkers: true,
+            },
+          ]);
+        } else if (bodyLineNumber <= lineCount) {
+          editor.executeEdits("drag-drop-python-snap-into-block", [
+            {
+              range: {
+                startLineNumber: bodyLineNumber,
+                endLineNumber: bodyLineNumber,
+                startColumn: 1,
+                endColumn: 1,
+              },
+              text: indented + "\n",
+              forceMoveMarkers: true,
+            },
+          ]);
+        } else {
+          editor.executeEdits("drag-drop-python-snap-into-block", [
+            {
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: dropLineContent.length + 1,
+                endColumn: dropLineContent.length + 1,
+              },
+              text: "\n" + indented + "\n",
+              forceMoveMarkers: true,
+            },
+          ]);
+        }
+
+        onChange(editor.getValue());
+        editor.focus();
+        const insertedLines = indented.split("\n");
+        const newLineNumber = Math.min(bodyLineNumber, model.getLineCount?.() ?? bodyLineNumber) + insertedLines.length - 1;
+        const lastLineText = insertedLines[insertedLines.length - 1] || "";
+        editor.setPosition({
+          lineNumber: newLineNumber,
+          column: Math.max(1, lastLineText.length + 1),
+        });
+        return;
+      }
 
       // Determine indentation context for the insertion
       const lineContent: string = model.getLineContent(position.lineNumber) ?? "";
       const currentIndent = (lineContent.match(/^\s*/) || [""])[0];
-      const isCursorAtLineStart = position.column <= (currentIndent.length + 1);
+      const firstNonWhitespaceColumn = currentIndent.length + 1;
+      const hasCodeOnLine = lineContent.trim().length > 0;
+      const insertAboveLine = (() => {
+        if (!hasCodeOnLine) return false;
+        if (currentIndent.length === 0) return false;
+
+        try {
+          const dom: HTMLElement | null = editor.getDomNode?.();
+          const rect = dom?.getBoundingClientRect?.();
+          const layout = editor.getLayoutInfo?.();
+          const contentLeft = (layout?.contentLeft as number) ?? 0;
+          const indentCoord = editor.getScrolledVisiblePosition?.({
+            lineNumber: position.lineNumber,
+            column: Math.max(1, firstNonWhitespaceColumn),
+          });
+          if (rect && indentCoord) {
+            const dropX = e.clientX - rect.left - contentLeft;
+            return dropX <= indentCoord.left + 2;
+          }
+        } catch {
+          // ignore and fall back
+        }
+
+        return position.column <= firstNonWhitespaceColumn;
+      })();
+      // When inserting above, we're effectively at the start of the line.
+      const isCursorAtLineStart = insertAboveLine || position.column <= firstNonWhitespaceColumn;
 
       const opts = model.getOptions?.();
       const indentSize: number = (opts?.indentSize as number) || 4;
       const indentUnit = " ".repeat(Math.max(1, indentSize));
       const kind = classifySnippet(codeSnippet);
       const effectiveIndent = kind === "top-level" ? "" : computeEffectiveIndent(model, position, indentUnit);
+
+      // If dropping onto a placeholder `pass` line inside a block, replace it.
+      const passMatch = /^(\s*)pass\s*$/.exec(lineContent);
+      if (passMatch && (kind === "block" || (passMatch[1]?.length ?? 0) > 0)) {
+        const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, "\n");
+        const raw = normalizeNewlines(codeSnippet).replace(/\n$/, "");
+        const lines = raw.split("\n");
+        const indented = lines
+          .map((ln) => (ln.length ? effectiveIndent + ln : ln))
+          .join("\n");
+
+        const replaceRange = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: 1,
+          endColumn: lineContent.length + 1,
+        };
+
+        editor.executeEdits("drag-drop-python-replace-pass", [
+          { range: replaceRange, text: indented, forceMoveMarkers: true },
+        ]);
+
+        onChange(editor.getValue());
+        editor.focus();
+
+        const insertedLines = indented.split("\n");
+        const newLineNumber = position.lineNumber + insertedLines.length - 1;
+        const lastLineText = insertedLines[insertedLines.length - 1] || "";
+        editor.setPosition({
+          lineNumber: newLineNumber,
+          column: Math.max(1, lastLineText.length + 1),
+        });
+        return;
+      }
 
       // Prepare snippet with indentation applied to each line
       const normalizeNewlines = (s: string) => s.replace(/\r\n?/g, "\n");
@@ -170,16 +350,30 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
         .map((ln) => (ln.length ? effectiveIndent + ln : ln))
         .join("\n");
 
-      // If dropping in the middle or end of a non-empty line, start on a new line first
-      const needLeadingNewline = !isCursorAtLineStart || /\S/.test(lineContent);
-      const textToInsert = (needLeadingNewline ? "\n" : "") + indented + "\n";
+      const endColumn = lineContent.length + 1;
+      // Insert rules:
+      // - Drop at indentation/start of an indented line with code => insert ABOVE.
+      // - Drop on a non-empty line elsewhere => insert AFTER line (avoid splitting code).
+      // - Drop on blank line => insert in place.
+      const textToInsert = insertAboveLine
+        ? indented + "\n"
+        : hasCodeOnLine
+          ? "\n" + indented + "\n"
+          : indented + "\n";
 
-      const range = {
-        startLineNumber: position.lineNumber,
-        endLineNumber: position.lineNumber,
-        startColumn: position.column,
-        endColumn: position.column,
-      };
+      const range = insertAboveLine
+        ? {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: 1,
+            endColumn: 1,
+          }
+        : {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: position.column >= endColumn ? position.column : endColumn,
+            endColumn: position.column >= endColumn ? position.column : endColumn,
+          };
 
       editor.executeEdits("drag-drop-python-indent", [
         { range, text: textToInsert, forceMoveMarkers: true },
@@ -191,10 +385,13 @@ export default function CodeEditor({ code, onChange }: StandaloneEditorProps) {
       editor.focus();
 
       // Compute new cursor position at end of inserted snippet
-      const insertedLines = textToInsert.split("\n");
-      const additionalLines = insertedLines.length - 1; // because we prefixed maybe a newline and always append newline
-      const newLineNumber = position.lineNumber + additionalLines;
-      const lastLineText = insertedLines[insertedLines.length - 2] || ""; // line before the final trailing newline
+      const snippetLines = indented.split("\n");
+      const newLineNumber = insertAboveLine
+        ? position.lineNumber + snippetLines.length - 1
+        : hasCodeOnLine
+          ? position.lineNumber + snippetLines.length
+          : position.lineNumber + snippetLines.length - 1;
+      const lastLineText = snippetLines[snippetLines.length - 1] || "";
       editor.setPosition({ lineNumber: newLineNumber, column: Math.max(1, lastLineText.length + 1) });
     }
   };

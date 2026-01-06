@@ -1,3 +1,5 @@
+import { SaveCircuit } from "@/circuit_canvas/utils/circuitStorage";
+  // (autosave feature removed)
 "use client";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Stage, Layer, Line, Circle } from "react-konva";
@@ -5,8 +7,9 @@ import type { KonvaEventObject } from "konva/lib/Node";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 import RenderElement from "@/circuit_canvas/components/core/RenderElement";
 import { DebugBox } from "@/common/components/debugger/DebugBox";
-import createElement from "@/circuit_canvas/utils/createElement";
+import createElement, { updateMicrobitNodes } from "@/circuit_canvas/utils/createElement";
 import solveCircuit from "@/circuit_canvas/utils/kirchhoffSolver";
+import { updateLedRuntime, createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
 import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
 import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
 import Konva from "konva";
@@ -14,6 +17,8 @@ import styles from "@/circuit_canvas/styles/CircuitCanvas.module.css";
 import AuthHeader from "@/components/AuthHeader";
 import CircuitStorage from "@/circuit_canvas/components/core/CircuitStorage";
 import useCircuitShortcuts from "@/circuit_canvas/hooks/useCircuitShortcuts";
+import { FaLink, FaDownload, FaUpload } from "react-icons/fa6";
+
 import { getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
 import {
   getCircuitShortcuts,
@@ -21,6 +26,7 @@ import {
 } from "@/circuit_canvas/utils/circuitShortcuts";
 import { SimulatorProxy as Simulator } from "@/python_code_editor/lib/SimulatorProxy";
 import CircuitSelector from "@/circuit_canvas/components/toolbar/panels/Palette";
+import { NotesTool } from "@/circuit_canvas/components/toolbar/NotesTool";
 import {
   FaArrowRight,
   FaCode,
@@ -29,6 +35,9 @@ import {
   FaRotateRight,
   FaRotateLeft,
   FaExpand,
+  FaCopy,
+  FaPaste,
+  FaTrash,
 } from "react-icons/fa6";
 import { VscDebug } from "react-icons/vsc";
 import Loader from "@/circuit_canvas/utils/loadingCircuit";
@@ -38,13 +47,32 @@ import {
 } from "@/circuit_canvas/components/toolbar/customization/ColorPallete";
 import UnifiedEditor from "@/blockly_editor/components/UnifiedEditor";
 import { useViewport } from "@/circuit_canvas/hooks/useViewport";
-import HighPerformanceGrid from "./HighPerformanceGrid";
+import GridLayer from "./layers/GridLayer";
 import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 import { useWireManagement } from "@/circuit_canvas/hooks/useWireManagement";
 import { useCircuitHistory } from "@/circuit_canvas/hooks/useCircuitHistory";
+import Note from "@/circuit_canvas/components/elements/Note";
+import { MicrobitSimulationPanel } from "../simulation/MicrobitSimulationPanel"; 
+import { AnimatePresence } from "framer-motion";
+import { useMicrobitSimulationPanelBridge } from "@/circuit_canvas/hooks/useMicrobitSimulationPanelBridge";
+import { useSimulationTimer } from "@/circuit_canvas/hooks/useSimulationTimer";
+import {
+  useHydrateCircuitFromLocalStorage,
+  useHydrationRedraw,
+  usePersistCircuitSessionToLocalStorage,
+} from "@/circuit_canvas/hooks/useCircuitLocalStorageSession";
+import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulators";
 
-export default function CircuitCanvas() {
+
+export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: string | null }) {
+  // Import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importInput, setImportInput] = useState("");
+  const [importError, setImportError] = useState<string | null>(null);
+
   // LocalStorage keys for session persistence
+    // Notification system
+    const { showMessage } = useMessage();
   const CIRCUIT_ELEMENTS_KEY = "mt_circuit_elements";
   const CIRCUIT_WIRES_KEY = "mt_circuit_wires";
   const CODE_MAP_KEY = "mt_controller_code_map";
@@ -58,6 +86,13 @@ export default function CircuitCanvas() {
     null
   );
   const [openCodeEditor, setOpenCodeEditor] = useState(false);
+  const [codeEditorSize, setCodeEditorSize] = useState<{ width: number; height: number }>({
+    width: 900,
+    height: 600,
+  });
+  const [viewportWidth, setViewportWidth] = useState<number>(
+    typeof window !== "undefined" ? window.innerWidth : 1920
+  );
   const [controllerCodeMap, setControllerCodeMap] = useState<
     Record<string, string>
   >({});
@@ -73,6 +108,19 @@ export default function CircuitCanvas() {
   const stageRef = useRef<Konva.Stage | null>(null);
   const wireLayerRef = useRef<Konva.Layer | null>(null);
 
+  const {
+    microbitNodeMapRef,
+    onMicrobitNode: handleMicrobitNode,
+    getPosition: getMicrobitPanelPosition,
+    setTemperature: setMicrobitTemperature,
+    setLightLevel: setMicrobitLightLevel,
+    triggerGesture: triggerMicrobitGesture,
+  } = useMicrobitSimulationPanelBridge(controllerMap);
+
+
+  // Ref to reset UnifiedEditor during new session
+  const editorResetRef = useRef<(() => void) | null>(null);
+
   // Viewport tracking for grid optimization
   const { viewport, updateViewport } = useViewport(stageRef);
 
@@ -87,7 +135,62 @@ export default function CircuitCanvas() {
 
   const [simulationRunning, setSimulationRunning] = useState(false);
   const simulationRunningRef = useRef(simulationRunning);
+  const simulationFrameRef = useRef<number | null>(null);
+  const lastTickRef = useRef<number | null>(null);
+  const { simulationTime, formatTime } = useSimulationTimer(simulationRunning);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
+  const [snapTarget, setSnapTarget] = useState<{ dragNodeId: string; targetNodeId: string; offset: { x: number; y: number } } | null>(null);
+  const dragStartWireCountRef = useRef(0);
+  const [copiedElement, setCopiedElement] = useState<CircuitElement | null>(null);
+  const [notesToolActive, setNotesToolActive] = useState(false);
+
+
+
+  // Auto-import if ?circuit= param is present or importedCircuit prop is set
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let encoded = null;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("circuit")) {
+      encoded = params.get("circuit");
+    } else if (importedCircuit) {
+      encoded = importedCircuit;
+    }
+    if (encoded) {
+      try {
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (data.elements && data.wires) {
+          // Debug: log imported data
+          console.log("[Import] Loaded circuit:", data);
+          pushToHistory(data.elements, data.wires);
+          resetState();
+          setElements(
+            data.elements.map((el: any) => {
+              if ((el.type === "microbit" || el.type === "microbitWithBreakout") && !simulationRunningRef.current) {
+                return {
+                  ...el,
+                  controller: {
+                    leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
+                    pins: {},
+                    logoTouched: false,
+                  },
+                };
+              }
+              return el;
+            })
+          );
+          setWires(data.wires);
+          if (data.controllerCodeMap) setControllerCodeMap(data.controllerCodeMap);
+        } else {
+          console.warn("[Import] No elements or wires in imported data", data);
+        }
+      } catch (e) {
+        console.error("[Import] Failed to decode circuit:", e);
+      }
+    }
+    // eslint-disable-next-line
+  }, [importedCircuit]);
 
   useEffect(() => {
     simulationRunningRef.current = simulationRunning;
@@ -113,6 +216,18 @@ export default function CircuitCanvas() {
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  // (note IDs computed on-demand; no counter needed)
+
+  // Keep editor selection in sync with the canvas selection
+  useEffect(() => {
+    if (
+      selectedElement &&
+      (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout")
+    ) {
+      setActiveControllerId(selectedElement.id);
+    }
+  }, [selectedElement]);
 
   // (moved below where `wires` is declared)
 
@@ -169,6 +284,8 @@ export default function CircuitCanvas() {
     updateWiresDirect,
     updateInProgressWire,
     handleNodeClick,
+    handleNodePointerDown,
+    handleNodePointerUp,
     handleStageClickForWire,
     handleWireEdit,
     getWireColor,
@@ -194,6 +311,16 @@ export default function CircuitCanvas() {
     stopSimulation,
   });
 
+  
+
+  const PROPERTIES_PANEL_WIDTH = 240;
+  const propertiesPanelRight = useMemo(() => {
+    const padding = 12;
+    const maxRight = Math.max(padding, viewportWidth - PROPERTIES_PANEL_WIDTH - padding);
+    if (!openCodeEditor) return padding;
+    return Math.min(codeEditorSize.width - 290, maxRight);
+  }, [openCodeEditor, codeEditorSize.width, viewportWidth]);
+
   // When undo/redo or any state change removes the currently selected entity,
   // fade out and close the Properties Panel gracefully.
   useEffect(() => {
@@ -213,266 +340,54 @@ export default function CircuitCanvas() {
   }, [elements, wires, selectedElement, showPropertiesPannel]);
 
   // Load saved circuit and code map from localStorage on first mount; else start clean
-  useEffect(() => {
-    try {
-      const elsRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CIRCUIT_ELEMENTS_KEY) : null;
-      const wiresRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CIRCUIT_WIRES_KEY) : null;
-      const codeMapRaw = typeof window !== 'undefined' ? window.localStorage.getItem(CODE_MAP_KEY) : null;
-  if (elsRaw || wiresRaw) {
-        // Show loading overlay while we hydrate and initialize simulators
-        setInitializing(true);
-        const savedEls: CircuitElement[] = elsRaw ? JSON.parse(elsRaw) : [];
-        // Sanitize transient runtime fields so visuals don't appear active after refresh
-        const sanitizedEls = (savedEls || []).map((el: any) => {
-          const isMicrobit = el?.type === 'microbit' || el?.type === 'microbitWithBreakout';
-          return {
-            ...el,
-            computed: {
-              current: undefined,
-              voltage: undefined,
-              power: undefined,
-              measurement: el?.computed?.measurement ?? undefined,
-            },
-            // Always clear controller visuals on hydration so displays/pins start off
-            controller: isMicrobit
-              ? {
-                  leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                  pins: {},
-                  logoTouched: false,
-                }
-              : el?.controller,
-          } as any;
-        });
-        const savedWires: Wire[] = wiresRaw ? JSON.parse(wiresRaw) : [];
-        setElements(sanitizedEls || []);
-  setWires(savedWires || []);
-    initializeHistory(sanitizedEls || [], savedWires || []);
-    setHydratedFromStorage(true);
-        // Load persisted controller code map (raw python) directly if available
-        let parsedCodeMap: Record<string,string> = {};
-        if (codeMapRaw) {
-          try { parsedCodeMap = JSON.parse(codeMapRaw) as Record<string,string>; } catch(e) { parsedCodeMap = {}; }
-        }
-        // Fallback: reconstruct missing entries immediately from stored workspaces (without opening editor)
-        const needReconstruct = sanitizedEls.filter(el => (el.type === 'microbit' || el.type === 'microbitWithBreakout') && !parsedCodeMap[el.id]).map(el => el.id);
-        if (needReconstruct.length) {
-          Promise.resolve().then(async () => {
-            try {
-              const BlocklyMod = await import('blockly');
-              const Blockly = (BlocklyMod as any).default || BlocklyMod;
-              const { pythonGenerator } = await import('blockly/python');
-              // Ensure shared custom blocks and fields are registered in this context
-              try {
-                const { BlocklyPythonIntegration } = await import('@/blockly_editor/utils/blocklyPythonConvertor');
-                // Initialize shared blocks/fields once (safe if called multiple times)
-                BlocklyPythonIntegration.initialize();
-                BlocklyPythonIntegration.setupPythonGenerators(pythonGenerator as any);
-              } catch (regErr) {
-                console.warn('⚠️ Failed to initialize Blockly shared blocks for reconstruction:', regErr);
-              }
-              const recovered: Record<string,string> = {};
-              needReconstruct.forEach(id => {
-                try {
-                  const xml = window.localStorage.getItem(`mt_workspace_${id}`);
-                  if (!xml) return;
-                  const tempWs = new Blockly.Workspace();
-                  try {
-                    const dom = new DOMParser().parseFromString(xml, 'text/xml');
-                    (Blockly.Xml as any).domToWorkspace(dom.documentElement, tempWs);
-                    const code = (pythonGenerator as any).workspaceToCode(tempWs) as string;
-                    if (code && code.trim()) recovered[id] = code;
-                  } finally { tempWs.dispose(); }
-                } catch(e) { /* ignore per-controller failure */ }
-              });
-              if (Object.keys(recovered).length) {
-                parsedCodeMap = { ...parsedCodeMap, ...recovered };
-              }
-              setControllerCodeMap(parsedCodeMap);
-            } catch(e) {
-              console.warn('⚠️ Failed proactive code reconstruction during hydration:', e);
-              setControllerCodeMap(parsedCodeMap); // still set any raw values we had
-            }
-          });
-        } else {
-          setControllerCodeMap(parsedCodeMap);
-        }
-        return; // Don't call resetState
-      }
-    } catch (e) {
-      console.warn("⚠️ Failed to load saved circuit from localStorage:", e);
-    }
-    resetState();
-  }, []);
+  useHydrateCircuitFromLocalStorage({
+    keys: {
+      elementsKey: CIRCUIT_ELEMENTS_KEY,
+      wiresKey: CIRCUIT_WIRES_KEY,
+      codeMapKey: CODE_MAP_KEY,
+    },
+    setInitializing,
+    setElements,
+    setWires,
+    initializeHistory,
+    setHydratedFromStorage,
+    setControllerCodeMap,
+    resetState,
+  });
 
   // After hydrating from storage, force wire geometry and redraw once Stage exists.
-  useEffect(() => {
-    if (!hydratedFromStorage) return;
-    let cancelled = false;
-    let attempts = 0;
-    const tryRedraw = () => {
-      if (cancelled) return;
-      const stage = stageRef.current;
-      const wireLayer = wireLayerRef.current;
-      if (stage && wireLayer) {
-        requestAnimationFrame(() => {
-          if (cancelled) return;
-          try {
-            updateWiresDirect();
-            wireLayer.batchDraw();
-            stage.batchDraw();
-            updateViewport(true);
-          } finally {
-            setHydratedFromStorage(false);
-          }
-        });
-      } else if (attempts < 20) {
-        attempts += 1;
-        setTimeout(tryRedraw, 25);
-      } else {
-        setHydratedFromStorage(false);
-      }
-    };
-    tryRedraw();
-    return () => {
-      cancelled = true;
-    };
-  }, [hydratedFromStorage, updateWiresDirect, updateViewport]);
+  useHydrationRedraw({
+    hydratedFromStorage,
+    setHydratedFromStorage,
+    stageRef,
+    wireLayerRef,
+    updateWiresDirect,
+    updateViewport,
+  });
 
-  // Persist circuit to localStorage whenever elements or wires change (debounced)
-  useEffect(() => {
-    const t = setTimeout(() => {
-      try {
-        if (typeof window !== 'undefined') {
-          // Save without transient computed runtime values
-          const sanitized = (elementsRef.current || []).map((el: any) => {
-            const isMicrobit = el?.type === 'microbit' || el?.type === 'microbitWithBreakout';
-            return {
-              ...el,
-              computed: {
-                current: undefined,
-                voltage: undefined,
-                power: undefined,
-                measurement: el?.computed?.measurement ?? undefined,
-              },
-              // Do not persist live controller visuals for programmable controllers
-              controller: isMicrobit
-                ? {
-                    leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                    pins: {},
-                    logoTouched: false,
-                  }
-                : el?.controller,
-            } as any;
-          });
-          window.localStorage.setItem(CIRCUIT_ELEMENTS_KEY, JSON.stringify(sanitized));
-          window.localStorage.setItem(CIRCUIT_WIRES_KEY, JSON.stringify(wiresRef.current || []));
-        }
-      } catch (e) {
-        console.warn("⚠️ Failed to save circuit to localStorage:", e);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [elements, wires]);
+  usePersistCircuitSessionToLocalStorage({
+    keys: {
+      elementsKey: CIRCUIT_ELEMENTS_KEY,
+      wiresKey: CIRCUIT_WIRES_KEY,
+      codeMapKey: CODE_MAP_KEY,
+    },
+    elements,
+    wires,
+    elementsRef,
+    wiresRef,
+    controllerCodeMap,
+  });
 
-  // Persist controller code map so it survives refreshes
-  useEffect(() => {
-    try {
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(CODE_MAP_KEY, JSON.stringify(controllerCodeMap));
-      }
-    } catch (e) {
-      console.warn("⚠️ Failed to persist controller code map:", e);
-    }
-  }, [controllerCodeMap]);
-
-  // Create simulators for micro:bit controllers that exist (after load or add) but have no simulator yet
-  const createAndAttachSimulator = useCallback(async (element: CircuitElement): Promise<Simulator | null> => {
-    try {
-      const controllerType = element.type === "microbit" ? "microbit" : "microbitWithBreakout";
-      const simulator = new Simulator({
-        language: "python",
-        controller: controllerType,
-        onEvent: async (event) => {
-          // Ignore any non-reset events when simulation isn't running to avoid stale updates
-          if (!simulationRunningRef.current && event.type !== "reset") return;
-          // Guard against redundant updates causing render loops
-          const applyControllerState = async () => {
-            const state = await simulator.getStates();
-            const key = JSON.stringify({ leds: state.leds, pins: state.pins, logo: !!state.logo });
-            if (controllerStateCacheRef.current[element.id] === key && event.type !== "reset") {
-              return; // Skip unchanged state
-            }
-            controllerStateCacheRef.current[element.id] = key;
-            React.startTransition(() => {
-              setElements((prev) => prev.map((el) => (
-                el.id === element.id
-                  ? { ...el, controller: { leds: state.leds, pins: state.pins, logoTouched: !!state.logo } }
-                  : el
-              )));
-            });
-          };
-
-          if (event.type === "reset") {
-            controllerStateCacheRef.current[element.id] = ""; // clear cache to force next update
-            React.startTransition(() => {
-              setElements((prev) => prev.map((el) => (
-                el.id === element.id
-                  ? {
-                      ...el,
-                      controller: {
-                        leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                        pins: {},
-                        logoTouched: false,
-                      },
-                    }
-                  : el
-              )));
-            });
-          } else if (event.type === "led-change" || event.type === "pin-change" || event.type === "logo-touch") {
-            void applyControllerState();
-          }
-        },
-      });
-
-      await simulator.initialize();
-      const states = await simulator.getStates();
-      setControllerMap((prev) => ({ ...prev, [element.id]: simulator }));
-      setElements((prev) =>
-        prev.map((el) =>
-          el.id === element.id
-            ? { ...el, controller: { leds: states.leds, pins: states.pins, logoTouched: !!states.logo } }
-            : el
-        )
-      );
-      return simulator;
-    } catch (e) {
-      console.warn(`⚠️ Failed to initialize simulator for ${element.id}:`, e);
-      return null;
-    }
-  }, []);
-
-  useEffect(() => {
-    const microbits = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
-    microbits.forEach((el) => {
-      if (!controllerMap[el.id]) {
-        void createAndAttachSimulator(el);
-      }
-    });
-    
-    // If we were initializing, hide loading screen when:
-    // 1. No microbits exist (empty canvas) OR
-    // 2. All microbits have simulators initialized
-    if (initializing) {
-      if (microbits.length === 0) {
-        // No micro:bits to initialize, dismiss immediately
-        setInitializing(false);
-      } else if (microbits.every(el => controllerMap[el.id])) {
-        // All micro:bits have simulators, dismiss after brief delay
-        const timer = setTimeout(() => setInitializing(false), 500);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [elements, controllerMap, createAndAttachSimulator, initializing]);
+  const { createAndAttachSimulator } = useMicrobitSimulators({
+    elements,
+    controllerMap,
+    setControllerMap,
+    setElements,
+    simulationRunningRef,
+    controllerStateCacheRef,
+    initializing,
+    setInitializing,
+  });
 
   // Start a new session: clear all app-local storage and reset editor/canvas
   const performNewSessionClear = useCallback(() => {
@@ -485,6 +400,8 @@ export default function CircuitCanvas() {
           if (k.startsWith('mt_')) keysToRemove.push(k);
         }
         keysToRemove.forEach((k) => window.localStorage.removeItem(k));
+        // Also remove blockly xml map key used by the Blockly editor
+        try { window.localStorage.removeItem('moontinker_controllerXmlMap'); } catch {}
       }
     } catch (e) {
       console.warn("⚠️ Failed to clear localStorage for new session:", e);
@@ -497,10 +414,18 @@ export default function CircuitCanvas() {
       return {};
     });
 
+    // Reset UnifiedEditor state
+    if (editorResetRef.current) {
+      try { editorResetRef.current(); } catch (e) {
+        console.warn("⚠️ Failed to reset editor:", e);
+      }
+    }
+
     // Reset app state
     setControllerCodeMap({});
     setActiveControllerId(null);
     setOpenCodeEditor(false);
+    setCopiedElement(null); 
     resetState();
     // Also reset history root to empty
     initializeHistory([], []);
@@ -559,6 +484,17 @@ export default function CircuitCanvas() {
       if (typeof window !== 'undefined') {
         window.localStorage.removeItem(`mt_workspace_${id}`);
         window.localStorage.removeItem(`mt_last_editor_mode_${id}`);
+        // Remove from moontinker_controllerXmlMap as well
+        try {
+          const raw = window.localStorage.getItem('moontinker_controllerXmlMap');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && id in parsed) {
+              delete parsed[id];
+              window.localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(parsed));
+            }
+          }
+        } catch {}
         // CODE_MAP_KEY save will happen automatically on next effect; removing entry is enough
       }
     } catch (_) {}
@@ -583,8 +519,12 @@ export default function CircuitCanvas() {
 
   // Update viewport on mount and resize
   useEffect(() => {
-    const handleResize = () => updateViewport(true);
+    const handleResize = () => {
+      updateViewport(true);
+      setViewportWidth(window.innerWidth);
+    };
     updateViewport(); // Initial update
+    setViewportWidth(window.innerWidth);
     window.addEventListener("resize", handleResize);
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -659,6 +599,11 @@ export default function CircuitCanvas() {
 
     // Synchronously update ref to avoid a brief window where events still think simulation is running
     simulationRunningRef.current = false;
+    if (simulationFrameRef.current) {
+      cancelAnimationFrame(simulationFrameRef.current);
+      simulationFrameRef.current = null;
+    }
+    lastTickRef.current = null;
     // Make UI responsive while applying batch updates
     React.startTransition(() => {
       setSimulationRunning(false);
@@ -672,6 +617,10 @@ export default function CircuitCanvas() {
             power: undefined,
             measurement: el.computed?.measurement ?? undefined,
           },
+          // Reset LED runtime to initial state (no explosion, no thermal energy)
+          runtime: el.type === "led"
+            ? { led: createInitialLedRuntime() }
+            : el.runtime,
           // Immediately clear controller visuals (LEDs off, pins cleared)
           controller: el.controller
             ? {
@@ -724,10 +673,22 @@ export default function CircuitCanvas() {
       } catch (regErr) {
         console.warn('⚠️ Failed to init shared blocks in ensureAllControllerCode:', regErr);
       }
+      
+      const centralizedXmlRaw = typeof window !== 'undefined' ? window.localStorage.getItem('moontinker_controllerXmlMap') : null;
+      let centralizedXmlMap: Record<string, string> = {};
+      if (centralizedXmlRaw) {
+        try { centralizedXmlMap = JSON.parse(centralizedXmlRaw); } catch(e) {}
+      }
+      
       const updated: Record<string,string> = {};
       idsNeeding.forEach(id => {
         try {
-          const xmlText = typeof window !== 'undefined' ? window.localStorage.getItem(`mt_workspace_${id}`) : '';
+          let xmlText = centralizedXmlMap[id];
+          
+          if (!xmlText && typeof window !== 'undefined') {
+            xmlText = window.localStorage.getItem(`mt_workspace_${id}`) || '';
+          }
+          
           if (!xmlText) return;
           const tempWs = new Blockly.Workspace();
           try {
@@ -762,14 +723,35 @@ export default function CircuitCanvas() {
     // Update ref synchronously so early simulator LED/pin events right after initialization are not dropped.
     simulationRunningRef.current = true;
     setSimulationRunning(true);
+    lastTickRef.current = null;
 
-    // Ensure every micro:bit has an initialized simulator BEFORE running user code
-    const microbitElements = elementsRef.current.filter(el => el.type === 'microbit' || el.type === 'microbitWithBreakout');
-    // Build an effective simulator map that includes any just-created simulators
+    setElements(prev => prev.map(el => {
+      if (el.type === 'powersupply') {
+        const isOn = (el.properties as any)?.isOn === true;
+        const vSet = (el.properties as any)?.vSet ?? el.properties?.voltage ?? 5;
+        return {
+          ...el,
+          properties: {
+            ...el.properties,
+            voltage: isOn ? vSet : 0,
+            ...(el.properties as any),
+            isOn,
+            vSet,
+          } as any,
+        };
+      }
+      return el;
+    }));
+
+    // Ensure every micro:bit has an initialized simulator BEFORE running user code.
+    // (Keep initialization behavior deterministic; we instead smooth the overlay dismissal
+    // and prewarm sims on drop to reduce perceived startup delay.)
+    const microbitElements = elementsRef.current.filter(
+      (el) => el.type === "microbit" || el.type === "microbitWithBreakout"
+    );
     const effectiveSims: Record<string, Simulator> = { ...controllerMap };
     for (const el of microbitElements) {
       if (!effectiveSims[el.id]) {
-        // Await creation so its reset state is applied before code executes
         const sim = await createAndAttachSimulator(el);
         if (sim) effectiveSims[el.id] = sim;
       }
@@ -894,18 +876,73 @@ export default function CircuitCanvas() {
     }
   }, [creatingWireStartNode, updateInProgressWire]);
 
+  // Place note at a specific canvas position
+  const placeNoteAtPosition = useCallback((canvasX: number, canvasY: number) => {
+    setElements((prev) => {
+      // Compute next ID based on current state to avoid race conditions
+      const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(`^${escape("note")}-(\\d+)$`);
+      const used = new Set<number>();
+      prev.forEach((el) => {
+        if (el.type !== "note") return;
+        const m = el.id.match(rx);
+        if (m) {
+          const n = Number(m[1]);
+          if (!Number.isNaN(n)) used.add(n);
+        }
+      });
+      let idNumber = 1;
+      while (used.has(idNumber)) idNumber += 1;
+
+      const newNote = createElement({
+        type: "note",
+        idNumber,
+        pos: { x: canvasX, y: canvasY },
+        properties: {
+          text: "",
+        },
+      });
+
+      if (!newNote) return prev;
+
+      const next = [...prev, newNote];
+      pushToHistory(next, wires);
+      setSelectedElement(newNote);
+      setShowPropertiesPannel(true);
+      return next;
+    });
+  }, [pushToHistory, wires]);
+
   const handleStageClick = useCallback((e: KonvaEventObject<MouseEvent>) => {
     const pos = e.target.getStage()?.getPointerPosition();
     if (!pos) return;
 
-    // If not wiring/editing and user clicked on empty canvas (Stage/Layer), clear selection
+    // Handle notes tool placement
+    if (notesToolActive) {
+      const className = e.target.getClassName?.();
+      const clickedEmpty = className === "Stage" || className === "Layer";
+      if (clickedEmpty) {
+        const stage = stageRef.current;
+        if (!stage) return;
+        const scale = stage.scaleX();
+        const stagePos = stage.position();
+        const canvasX = (pos.x - stagePos.x) / scale;
+        const canvasY = (pos.y - stagePos.y) / scale;
+        placeNoteAtPosition(canvasX, canvasY);
+        setNotesToolActive(false);
+        return;
+      }
+    }
+
+    // If not wiring/editing and user clicked on empty canvas (Stage/Layer), clear selection and close editor
       if (!creatingWireStartNode) {
         const className = e.target.getClassName?.();
         const clickedEmpty = className === "Stage" || className === "Layer";
-        if (clickedEmpty) {
+          if (clickedEmpty) {
           setSelectedElement(null);
           setShowPropertiesPannel(false);
-          setActiveControllerId(null);
+          setOpenCodeEditor(false);
+          // Keep last active controller id for quick reopen via Code button
           return; // do not process further
         }
       }
@@ -913,37 +950,158 @@ export default function CircuitCanvas() {
     if (creatingWireStartNode) {
       handleStageClickForWire(pos);
     }
-  }, [creatingWireStartNode, handleWireEdit, handleStageClickForWire]);
+  }, [creatingWireStartNode, handleWireEdit, handleStageClickForWire, notesToolActive, placeNoteAtPosition]);
 
   // Optimized drag move handler - updates wires directly without React re-render
   const handleElementDragMove = useCallback((e: KonvaEventObject<DragEvent>) => {
     e.cancelBubble = true;
-    const id = e.target.id();
-    const x = e.target.x();
-    const y = e.target.y();
+    // Normalize ID by removing microbit- prefix if present
+    const rawId = e.target.id();
+    const id = rawId.startsWith('microbit-') ? rawId.replace('microbit-', '') : rawId;
+    let x = e.target.x();
+    let y = e.target.y();
+
+    // Check for node snap targets
+    const SNAP_DIST = 25; // px - detection radius
+    const draggedEl = getElementById(id);
+    
+    if (draggedEl) {
+      let closestDist = Infinity;
+      let snapData: { dragNodeId: string; targetNodeId: string; offsetX: number; offsetY: number } | null = null;
+      
+      elementsRef.current.forEach((other) => {
+        if (other.id === draggedEl.id) return;
+        other.nodes.forEach((otherNode) => {
+          const otherPos = getAbsoluteNodePosition(otherNode, other);
+          draggedEl.nodes.forEach((dNode) => {
+            const dPos = getAbsoluteNodePosition(dNode, { ...draggedEl, x, y });
+            const dx = otherPos.x - dPos.x;
+            const dy = otherPos.y - dPos.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist <= SNAP_DIST && dist < closestDist) {
+              closestDist = dist;
+              snapData = { dragNodeId: dNode.id, targetNodeId: otherNode.id, offsetX: dx, offsetY: dy };
+            }
+          });
+        });
+      });
+
+      if (snapData) {
+        // Adjust position to snap
+        const snap: { dragNodeId: string; targetNodeId: string; offsetX: number; offsetY: number } = snapData;
+        x = x + snap.offsetX;
+        y = y + snap.offsetY;
+        e.target.x(x);
+        e.target.y(y);
+        setSnapTarget({ 
+          dragNodeId: snap.dragNodeId, 
+          targetNodeId: snap.targetNodeId, 
+          offset: { x: snap.offsetX, y: snap.offsetY } 
+        });
+      } else {
+        setSnapTarget(null);
+      }
+    }
 
     tempDragPositions.current[id] = { x, y };
 
     // Directly update wires in Konva without triggering React re-render
     updateWiresDirect();
-  }, [updateWiresDirect]);
+  }, [updateWiresDirect, getElementById]);
 
-  const computeCircuit = useCallback((wiresSnapshot: Wire[]) => {
-    setElements((prevElements) => {
+  const solveAndUpdateElements = useCallback(
+    (prevElements: CircuitElement[], wiresSnapshot: Wire[], dtSeconds: number) => {
       const solved = solveCircuit(prevElements, wiresSnapshot);
+      const solvedMap = new Map(solved.map((el) => [el.id, el] as const));
+      const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
 
       return prevElements.map((oldEl) => {
-        const updated = solved.find((e) => e.id === oldEl.id);
-        if (!updated) return oldEl; // If it's missing from the solved list, preserve it
+        const updated = solvedMap.get(oldEl.id);
+        if (!updated) return oldEl;
 
-        return {
-          ...oldEl, // keep everything (e.g., controller state, UI stuff)
-          ...updated, // overwrite any simulated data (like computed values)
-          controller: oldEl.controller, // explicitly preserve controller just in case
+        let next: CircuitElement = {
+          ...oldEl,
+          ...updated,
+          controller: oldEl.controller,
         };
+
+        if (updated.type === "led") {
+          const wasExploded = !!oldEl.runtime?.led?.exploded;
+          const currentForRuntime = wasExploded
+            ? (updated.computed?.explosionCurrentEstimate ?? updated.computed?.current ?? 0)
+            : (updated.computed?.current ?? 0);
+
+          const runtime = updateLedRuntime({
+            prev: oldEl.runtime?.led,
+            electrical: {
+              forwardVoltage: updated.computed?.forwardVoltage ?? updated.computed?.voltage ?? 0,
+              current: currentForRuntime,
+              power: updated.computed?.power ?? 0,
+              color: updated.properties?.color,
+            },
+            dt: dtSeconds,
+            nowMs,
+          });
+
+          next = {
+            ...next,
+            runtime: { ...(oldEl.runtime || {}), led: runtime },
+          };
+        }
+
+        return next;
       });
-    });
-  }, []);
+    },
+    []
+  );
+
+  const runSimulationStep = useCallback(
+    (dtSeconds: number, wiresSnapshot?: Wire[]) => {
+      const snapshot = wiresSnapshot ?? wiresRef.current ?? [];
+      setElements((prevElements) => {
+        const next = solveAndUpdateElements(prevElements, snapshot, dtSeconds);
+        elementsRef.current = next;
+        return next;
+      });
+    },
+    [solveAndUpdateElements, wiresRef]
+  );
+
+  const computeCircuit = useCallback(
+    (wiresSnapshot: Wire[], dtSeconds = 0) => {
+      runSimulationStep(dtSeconds, wiresSnapshot);
+    },
+    [runSimulationStep]
+  );
+
+  // Continuous simulation tick (dt-driven) for LED thermal model and circuit recompute
+  useEffect(() => {
+    if (!simulationRunning) {
+      if (simulationFrameRef.current) {
+        cancelAnimationFrame(simulationFrameRef.current);
+        simulationFrameRef.current = null;
+      }
+      lastTickRef.current = null;
+      return;
+    }
+
+    const tick = (timestamp: number) => {
+      if (!simulationRunningRef.current) return;
+      const last = lastTickRef.current ?? timestamp;
+      const dt = Math.max(0, (timestamp - last) / 1000);
+      lastTickRef.current = timestamp;
+      runSimulationStep(dt);
+      simulationFrameRef.current = requestAnimationFrame(tick);
+    };
+
+    simulationFrameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (simulationFrameRef.current) cancelAnimationFrame(simulationFrameRef.current);
+      simulationFrameRef.current = null;
+      lastTickRef.current = null;
+    };
+  }, [simulationRunning, runSimulationStep]);
 
   // handle resistance change for potentiometer
   const handleRatioChange = useCallback((elementId: string, ratio: number) => {
@@ -1046,78 +1204,23 @@ export default function CircuitCanvas() {
     // Select the newly dropped element (Tinkercad-like behavior)
     setSelectedElement(newElement);
     setShowPropertiesPannel(true);
-    setActiveControllerId(null);
     if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
       setActiveControllerId(newElement.id);
+      // Force block mode for this controller in localStorage
+      try {
+        // Set global last editor mode
+        localStorage.setItem("moontinker_lastEditorMode", "block");
+        // Set per-controller mode map
+        const CONTROLLER_MODE_MAP_KEY = "moontinker_controllerEditorModeMap";
+        const raw = localStorage.getItem(CONTROLLER_MODE_MAP_KEY);
+        const parsed = (raw ? JSON.parse(raw) : {}) || {};
+        parsed[newElement.id] = "block";
+        localStorage.setItem(CONTROLLER_MODE_MAP_KEY, JSON.stringify(parsed));
+      } catch {}
+      // Pre-warm micro:bit simulators immediately on drop so starting simulation is instant.
+      void createAndAttachSimulator(newElement);
     }
-
-    if (newElement.type === "microbit" || newElement.type === "microbitWithBreakout") {
-      // Init simulator in the background (non-blocking)
-      const controllerType = newElement.type === "microbit" ? "microbit" : "microbitWithBreakout";
-      void (async () => {
-        const simulator = new Simulator({
-          language: "python",
-          controller: controllerType,
-          onEvent: async (event) => {
-              // Ignore any non-reset events when simulation isn't running to avoid stale updates
-              if (!simulationRunningRef.current && event.type !== "reset") return;
-            const applyControllerState = async () => {
-              const state = await simulator.getStates();
-              const key = JSON.stringify({ leds: state.leds, pins: state.pins, logo: !!state.logo });
-              if (controllerStateCacheRef.current[newElement.id] === key && event.type !== "reset") {
-                return;
-              }
-              controllerStateCacheRef.current[newElement.id] = key;
-              React.startTransition(() => {
-                setElements((prev) => prev.map((el) => (
-                  el.id === newElement.id
-                    ? { ...el, controller: { leds: state.leds, pins: state.pins, logoTouched: !!state.logo } }
-                    : el
-                )));
-              });
-            };
-
-            if (event.type === "reset") {
-              controllerStateCacheRef.current[newElement.id] = "";
-              React.startTransition(() => {
-                setElements((prev) => prev.map((el) => (
-                  el.id === newElement.id
-                    ? {
-                        ...el,
-                        controller: {
-                          leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                          pins: {},
-                          logoTouched: false,
-                        },
-                      }
-                    : el
-                )));
-              });
-            } else if (event.type === "led-change" || event.type === "pin-change" || event.type === "logo-touch") {
-              void applyControllerState();
-            }
-          },
-        });
-
-        await simulator.initialize();
-
-        // Initial snapshot cache to avoid duplicate first update
-        const initialState = await simulator.getStates();
-        controllerStateCacheRef.current[newElement.id] = JSON.stringify({ leds: initialState.leds, pins: initialState.pins, logo: !!initialState.logo });
-
-
-        // Update map and controller LED state once (already cached)
-        setControllerMap((prev) => ({ ...prev, [newElement.id]: simulator }));
-        React.startTransition(() => {
-          setElements((prev) => prev.map((el) => (
-            el.id === newElement.id
-              ? { ...el, controller: { leds: initialState.leds, pins: initialState.pins, logoTouched: !!initialState.logo } }
-              : el
-          )));
-        });
-      })();
-    }
-  }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, setElements, setActiveControllerId, setControllerMap, setElements]);
+  }, [simulationRunning, stopSimulation, stageRef, createElement, pushToHistory, wires, getNextIdNumberForType, createAndAttachSimulator]);
 
   // for canvas zoom in and zoom out
   const handleWheel = (e: Konva.KonvaEventObject<WheelEvent>) => {
@@ -1282,6 +1385,111 @@ export default function CircuitCanvas() {
     }
   }, [creatingWireStartNode]);
 
+  // --- Export/Import logic (must be after all hooks/state) ---
+  // Export circuit as a shareable link
+  const handleExportCircuit = useCallback(() => {
+    try {
+      // Only include controllerCodeMap for micro:bit controllers present in the circuit
+      const microbitIds = elements
+        .filter(el => el.type === "microbit" || el.type === "microbitWithBreakout")
+        .map(el => el.id);
+      const filteredControllerCodeMap = Object.fromEntries(
+        Object.entries(controllerCodeMap).filter(([id]) => microbitIds.includes(id))
+      );
+      const data = {
+        elements,
+        wires,
+        controllerCodeMap: filteredControllerCodeMap,
+      };
+      const json = JSON.stringify(data);
+      const encoded = encodeURIComponent(btoa(json));
+      const url = `${window.location.origin}${window.location.pathname}?circuit=${encoded}`;
+      navigator.clipboard.writeText(url);
+      showMessage("Circuit link copied to clipboard!", "success");
+    } catch (e) {
+      showMessage("Failed to export circuit.", "error");
+    }
+  }, [elements, wires, controllerCodeMap, showMessage]);
+
+  // Import circuit from a link (show modal)
+  const handleImportCircuit = useCallback(() => {
+    setImportInput("");
+    setImportError(null);
+    setShowImportModal(true);
+  }, []);
+
+  // Confirm import from modal
+  const [importLoading, setImportLoading] = useState(false);
+  const handleImportConfirm = useCallback(() => {
+    if (!importInput) {
+      setImportError("Please paste a link.");
+      return;
+    }
+    setImportLoading(true);
+    setTimeout(() => {
+      try {
+        const url = new URL(importInput);
+        const encoded = url.searchParams.get("circuit");
+        if (!encoded) throw new Error("No circuit data found in link.");
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (!data.elements || !data.wires) throw new Error("Invalid circuit data.");
+        pushToHistory(elements, wires);
+        resetState();
+        setElements(data.elements);
+        setWires(data.wires);
+        // Only restore controllerCodeMap for micro:bit controllers present in the imported circuit
+        if (data.controllerCodeMap) {
+          const microbitIds = data.elements
+            .filter((el: any) => el.type === "microbit" || el.type === "microbitWithBreakout")
+            .map((el: any) => el.id);
+          const filteredControllerCodeMap = Object.fromEntries(
+            Object.entries(data.controllerCodeMap)
+              .filter(([id]) => microbitIds.includes(id))
+              .map(([id, val]) => [id, String(val)])
+          ) as Record<string, string>;
+          setControllerCodeMap(filteredControllerCodeMap);
+        }
+        setShowImportModal(false);
+        setImportInput("");
+        setImportError(null);
+        showMessage("Circuit imported from link!", "success");
+      } catch (e: any) {
+        setImportError(e?.message || "Failed to import circuit.");
+        showMessage("Failed to import circuit.", "error");
+      } finally {
+        setImportLoading(false);
+      }
+    }, 300);
+  }, [importInput, pushToHistory, elements, wires, resetState, setElements, setWires, setControllerCodeMap, showMessage]);
+
+  const handleImportCancel = useCallback(() => {
+    setShowImportModal(false);
+    setImportInput("");
+    setImportError(null);
+  }, []);
+
+  // Auto-import if ?circuit= param is present
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get("circuit");
+    if (encoded) {
+      try {
+        const json = atob(decodeURIComponent(encoded));
+        const data = JSON.parse(json);
+        if (data.elements && data.wires) {
+          pushToHistory(elements, wires);
+          resetState();
+          setElements(data.elements);
+          setWires(data.wires);
+          if (data.controllerCodeMap) setControllerCodeMap(data.controllerCodeMap);
+        }
+      } catch {}
+    }
+    // eslint-disable-next-line
+  }, []);
+
   return (
     <div
       className={styles.canvasContainer}
@@ -1324,28 +1532,60 @@ export default function CircuitCanvas() {
       {/* Left Side: Main Canvas */}
       <div className="flex-grow h-full flex flex-col">
         {/* Toolbar */}
-        <div className="w-full h-12 bg-[#F4F5F6] flex items-center px-4 space-x-4 py-2 justify-between mt-1">
+        <div
+          id="circuit-top-toolbar"
+          className="w-full h-12 bg-gray-100 flex items-center px-4 space-x-4 py-2 justify-between shadow-md"
+        >
           {/* Controls */}
           <div className="flex items-center gap-4">
+            {/* Export Button */}
+            <button
+              onClick={handleExportCircuit}
+              className="px-2 py-1 bg-blue-100 rounded border border-blue-300 text-blue-800 text-sm font-medium shadow hover:bg-blue-200 transition-colors"
+              title="Export circuit as shareable link"
+            >
+              <FaLink className="inline-block mr-1" />
+              Export
+            </button>
+
+            {/* Import Button */}
+            <button
+              onClick={handleImportCircuit}
+              className="px-2 py-1 bg-green-100 rounded border border-green-300 text-green-800 text-sm font-medium shadow hover:bg-green-200 transition-colors"
+              title="Import circuit from link"
+            >
+              <FaUpload className="inline-block mr-1" />
+              Import
+            </button>
             {/* Color Palette */}
-            <ColorPaletteDropdown
-              colors={defaultColors}
-              selectedColor={selectedWireColor}
-              onColorSelect={(color) => {
-                setSelectedWireColor(color);
-                const selectedId = selectedElement?.id;
-                if (!selectedId) return;
-                // If a wire is selected, change its color, push AFTER change
-                setWires((prev) => {
-                  const exists = prev.some((w) => w.id === selectedId);
-                  if (!exists) return prev;
-                  const next = prev.map((w) =>
-                    w.id === selectedId ? { ...w, color } : w
-                  );
-                  // Push AFTER mutation so undo only reverts the color
-                  pushToHistory(elementsRef.current, next);
-                  return next;
-                });
+            <div title="Wire colour">
+              <ColorPaletteDropdown
+                colors={defaultColors}
+                selectedColor={selectedWireColor}
+                onColorSelect={(color) => {
+                  setSelectedWireColor(color);
+                  const selectedId = selectedElement?.id;
+                  if (!selectedId) return;
+                  // If a wire is selected, change its color, push AFTER change
+                  setWires((prev) => {
+                    const exists = prev.some((w) => w.id === selectedId);
+                    if (!exists) return prev;
+                    const next = prev.map((w) =>
+                      w.id === selectedId ? { ...w, color } : w
+                    );
+                    // Push AFTER mutation so undo only reverts the color
+                    pushToHistory(elementsRef.current, next);
+                    return next;
+                  });
+                }}
+              />
+            </div>
+
+            {/* Notes Tool */}
+            <NotesTool
+              isActive={notesToolActive}
+              onClick={() => {
+                setNotesToolActive(!notesToolActive);
               }}
             />
 
@@ -1400,6 +1640,94 @@ export default function CircuitCanvas() {
               </button>
             </div>
 
+
+
+            {/* Copy Button */}
+            <button
+              onClick={() => {
+                if (!selectedElement || selectedElement.type === "wire") return;
+                setCopiedElement(selectedElement);
+              }}
+              disabled={!selectedElement || selectedElement.type === "wire"}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Copy"
+            >
+              <FaCopy size={14} />
+            </button>
+
+            {/* Paste Button */}
+            <button
+              onClick={() => {
+                if (!copiedElement) return;
+                if (simulationRunning) stopSimulation();
+                
+                const newElement = createElement({
+                  type: copiedElement.type,
+                  idNumber: getNextIdNumberForType(copiedElement.type),
+                  pos: { x: copiedElement.x + 50, y: copiedElement.y + 50 },
+                  properties: { ...copiedElement.properties },
+                });
+                
+                if (!newElement) return;
+                
+                setElements((prev) => {
+                  const next = [...prev, newElement];
+                  pushToHistory(next, wires);
+                  return next;
+                });
+                
+                setSelectedElement(newElement);
+                setShowPropertiesPannel(true);
+              }}
+              disabled={!copiedElement}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Paste"
+            >
+              <FaPaste size={14} />
+            </button>
+
+            {/* Delete/Trash Button */}
+            <button
+              onClick={() => {
+                if (!selectedElement) return;
+                if (simulationRunning) stopSimulation();
+                
+                if (selectedElement.type === "wire") {
+                  // Delete wire
+                  setWires((prev) => {
+                    const next = prev.filter((w) => w.id !== selectedElement.id);
+                    pushToHistory(elementsRef.current, next);
+                    return next;
+                  });
+                } else {
+                  if (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") {
+                    openDeleteControllerModal(selectedElement);
+                    return;
+                  }
+                  
+                  const elementNodeIds = selectedElement.nodes.map((n) => n.id);
+                  setWires((prev) => prev.filter((w) => 
+                    !elementNodeIds.includes(w.fromNodeId) && 
+                    !elementNodeIds.includes(w.toNodeId)
+                  ));
+                  setElements((prev) => {
+                    const next = prev.filter((el) => el.id !== selectedElement.id);
+                    pushToHistory(next, wiresRef.current);
+                    return next;
+                  });
+                }
+                
+                setSelectedElement(null);
+                setShowPropertiesPannel(false);
+                setCreatingWireStartNode(null);
+              }}
+              disabled={!selectedElement}
+              className="p-1 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300 transition-colors"
+              title="Delete"
+            >
+              <FaTrash size={14} />
+            </button>
+
             {/* Fit to View Button */}
             <button
               onClick={handleFitToView}
@@ -1410,15 +1738,20 @@ export default function CircuitCanvas() {
               <FaExpand size={14} />
             </button>
 
-            {/* Tooltip Group */}
-            <div className="relative group">
+            {/* Tooltip Group + Simulation Timer */}
+            <div className="relative group flex items-center gap-3">
               {/* Trigger Button */}
               <div className="w-6 h-6 flex items-center justify-center shadow-lg bg-gray-200 rounded-full cursor-pointer hover:shadow-blue-400 hover:scale-105 transition">
                 ?
               </div>
-
+              {/* Simulation Timer (only while running) */}
+              {simulationRunning && (
+                <div className="text-gray-500 font-semibold text-lg" style={{letterSpacing: '0.5px'}}>
+                  Simulator time: <span style={{fontFamily: 'monospace', fontWeight: 700}}>{formatTime(simulationTime)}</span>
+                </div>
+              )}
               {/* Tooltip Box */}
-              <div className="absolute backdrop-blur-sm bg-white/10 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+              <div className="absolute bg-gray-100 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
                 <div className="font-semibold text-sm mb-2 text-gray-800">
                   Keyboard Shortcuts
                 </div>
@@ -1494,36 +1827,49 @@ export default function CircuitCanvas() {
             </div>
 
             <button
-              onClick={() => setOpenCodeEditor((prev) => !prev)}
+              onClick={() => {
+                // Toggle: if editor is already open, close it
+                if (openCodeEditor) {
+                  setOpenCodeEditor(false);
+                  return;
+                }
+
+                // If a micro:bit is selected, open for that; else open editor with no active controller
+                if (selectedElement && (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout")) {
+                  setActiveControllerId(selectedElement.id);
+                } else {
+                  setActiveControllerId(null);
+                }
+                setOpenCodeEditor(true);
+              }}
+              title={(function(){
+                if (openCodeEditor) return "Close code editor";
+                if (selectedElement && (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout")) return "Open code editor for selected micro:bit";
+                return "Open code editor and select a micro:bit from dropdown";
+              })()}
               className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
             >
               <FaCode />
               <span>Code</span>
             </button>
 
-            {/* Debugger button hidden */}
-            {/* <button
+            <button
               onClick={() => setShowDebugBox((prev) => !prev)}
-              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105 me-2"
+              className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
             >
               <VscDebug />
               <span>Debugger</span>
-            </button> */}
+            </button>
 
             <button
               onClick={openNewSessionModal}
-              className="px-2 py-1 bg-red-50 border border-red-200 text-red-700 rounded-sm shadow hover:bg-red-100 transition-colors"
-              title="Clear saved circuit and editor data in this browser"
+              className="rounded-sm border-1 border-red-200 shadow-lg bg-red-50 hover:shadow-red-300 text-red-700 px-1 py-1 text-sm cursor-pointer flex items-center space-x-2 hover:scale-105"
+              // title="Clear saved circuit and editor data in this browser"
             >
-              Start a new session
+              <span>Start a new session</span>
             </button>
 
-            {/* Profile placed next to Debugger with a small gap */}
-            <div className="ml-2">
-              <AuthHeader inline />
-            </div>
-
-            {/* <CircuitStorage
+            <CircuitStorage
               onCircuitSelect={(circuitId) => {
                 const data = getCircuitById(circuitId);
                 if (!data) return;
@@ -1543,12 +1889,18 @@ export default function CircuitCanvas() {
               currentElements={elements}
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
-            /> */}
+            /> 
+
+            <AuthHeader inline />
+
             {/* auth dropdown removed (use global AuthHeader component) */}
           </div>
         </div>
         {selectedElement && showPropertiesPannel ? (
-          <div className={`absolute top-2 me-73 mt-12 right-3 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}>
+          <div
+            className={`absolute top-2 me-73 mt-12 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}
+            style={{ right: `${propertiesPanelRight}px` }}
+          >
             <div className="p-1">
               <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
                 <button
@@ -1588,11 +1940,18 @@ export default function CircuitCanvas() {
                   } else {
                     // Property edits should NOT affect history; apply without push
                     setElements((prev) => {
-                      const next = prev.map((el) =>
-                        el.id === updatedElement.id
-                          ? { ...el, ...updatedElement, x: el.x, y: el.y }
-                          : el
-                      );
+                      const next = prev.map((el) => {
+                        if (el.id === updatedElement.id) {
+                          let updated = { ...el, ...updatedElement, x: el.x, y: el.y };
+                          // If microbit color changed, update node positions
+                          if ((el.type === "microbit" || el.type === "microbitWithBreakout") && 
+                              el.properties?.color !== updatedElement.properties?.color) {
+                            updated = updateMicrobitNodes(updated);
+                          }
+                          return updated;
+                        }
+                        return el;
+                      });
                       // Keep property cache in sync so undo/redo retains these values
                       syncProperties(next);
                       elementsRef.current = next;
@@ -1657,7 +2016,7 @@ export default function CircuitCanvas() {
           {/* Stage Canvas */}
           {loadingSavedCircuit ? (
             <Loader />
-          ) : (
+          ) : (<>
             <Stage
               id="canvas-stage"
               width={window.innerWidth}
@@ -1676,7 +2035,7 @@ export default function CircuitCanvas() {
               draggable={draggingElement == null}
               onWheel={handleWheel}
             >
-              <HighPerformanceGrid viewport={viewport} gridSize={25} />
+              <GridLayer viewport={viewport} gridSize={25} />
               {/* Elements layer (no nodes) so bodies render below wires */}
               <Layer>
                 {elements.map((element) => (
@@ -1688,45 +2047,195 @@ export default function CircuitCanvas() {
                     elements={elements}
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
+                    handleNodePointerDown={handleNodePointerDown}
+                    handleNodePointerUp={handleNodePointerUp}
+                    snapTargetNodeId={snapTarget?.targetNodeId || null}
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
+                    onUpdateElementProperties={(id, properties) => {
+                      setElements((prev) => {
+                        const next = prev.map((el) =>
+                          el.id === id
+                            ? {
+                                ...el,
+                                properties: { ...el.properties, ...properties },
+                              }
+                            : el
+                        );
+                        elementsRef.current = next;
+                        pushToHistory(next, wiresRef.current);
+                        return next;
+                      });
+                    }}
+                    onPowerSupplySettingsChange={(id, settings) => {
+                      setElements((prev) =>
+                        prev.map((el) =>
+                          el.id === id
+                            ? {
+                                ...el,
+                                properties: {
+                                  ...el.properties,
+                                  voltage: settings.isOn ? settings.vSet : 0,
+                                  resistance: el.properties?.resistance ?? 0.2,
+                                  isOn: settings.isOn,
+                                  vSet: settings.vSet,
+                                  iLimit: settings.iLimit,
+                                },
+                              }
+                            : el
+                        )
+                      );
+                      if (simulationRunning) {
+                        computeCircuit(wiresRef.current || []);
+                      }
+                    }}
+                    // Body layer should not render nodes (nodes are in the overlay layer)
+                    showNodes={false}
+                    // Use the body group as the anchor for the micro:bit simulation panel
+                    onMicrobitNode={handleMicrobitNode}
                     onDragStart={() => {
                       pushToHistory(elements, wires);
                       setDraggingElement(element.id);
                       stageRef.current?.draggable(false);
+                      // Track initial wire count to detect disconnections
+                      dragStartWireCountRef.current = wiresRef.current.length;
                       if (!creatingWireStartNode) {
                         const current = getElementById(element.id) || element;
                         setSelectedElement(current);
                         setShowPropertiesPannel(true);
-                        setActiveControllerId(null);
                         if (element.type === "microbit" || element.type === "microbitWithBreakout") {
                           setActiveControllerId(element.id);
                         }
                       }
                     }}
                     onDragEnd={(e) => {
-                      setDraggingElement(null);
-                      stageRef.current?.draggable(true);
-                      const id = e.target.id();
+                      // Normalize ID by removing microbit- prefix if present
+                      const rawId = e.target.id();
+                      const draggedId = rawId.startsWith('microbit-') ? rawId.replace('microbit-', '') : rawId;
                       const x = e.target.x();
                       const y = e.target.y();
+
+                      // If snapping, create an invisible wire for the circuit solver
+                      if (snapTarget) {
+                        const { dragNodeId, targetNodeId } = snapTarget;
+                        // Check if an active wire already exists between these endpoints
+                        const activeIdx = wiresRef.current.findIndex(
+                          (w) =>
+                            !w.deleted &&
+                            ((w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
+                              (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId))
+                        );
+                        if (activeIdx === -1) {
+                          // If a deleted hidden wire exists, revive it; otherwise create a new one
+                          const deletedIdx = wiresRef.current.findIndex(
+                            (w) =>
+                              w.deleted &&
+                              ((w.fromNodeId === dragNodeId && w.toNodeId === targetNodeId) ||
+                                (w.fromNodeId === targetNodeId && w.toNodeId === dragNodeId))
+                          );
+
+                          if (deletedIdx !== -1) {
+                            const revived = {
+                              ...wiresRef.current[deletedIdx],
+                              deleted: false,
+                              hidden: true,
+                              joints: [],
+                              color: selectedWireColor,
+                            } as Wire;
+                            const nextWires = [...wiresRef.current];
+                            nextWires[deletedIdx] = revived;
+                            setWires(nextWires);
+                            pushToHistory(elementsRef.current, nextWires);
+                            stopSimulation();
+                          } else {
+                            const newWire: Wire = {
+                              id: `wire-${Date.now()}-${Math.random()}`,
+                              fromNodeId: dragNodeId,
+                              toNodeId: targetNodeId,
+                              joints: [],
+                              color: selectedWireColor,
+                              hidden: true, // Mark as hidden for visual purposes
+                            };
+                            const nextWires = [...wiresRef.current, newWire];
+                            setWires(nextWires);
+                            pushToHistory(elementsRef.current, nextWires);
+                            stopSimulation();
+                          }
+                        }
+                      }
+
                       setElements((prev) => {
                         const next = prev.map((el) =>
-                          el.id === id ? { ...el, x, y } : el
+                          el.id === draggedId ? { ...el, x, y } : el
                         );
-                        pushToHistory(next, wires);
+                        elementsRef.current = next;
+                        if (!snapTarget) {
+                          pushToHistory(next, wiresRef.current);
+                        }
                         return next;
                       });
+                      
+                      // When not snapped after drag, remove any hidden node-to-node
+                      // wires attached to this element whose endpoints are no longer
+                      // within snapping distance. This prevents ghost electrical
+                      // connections from lingering after visually disconnecting nodes.
+                      if (!snapTarget) {
+                        const draggedElement = getElementById(draggedId);
+                        if (draggedElement && Array.isArray(draggedElement.nodes)) {
+                          const draggedNodeIds = new Set(
+                            draggedElement.nodes.map((n) => n.id)
+                          );
+
+                          let changed = false;
+                          const updatedWires = wiresRef.current.map((w) => {
+                            if (!w.hidden || w.deleted) return w;
+                            const touchesDragged =
+                              draggedNodeIds.has(w.fromNodeId) ||
+                              draggedNodeIds.has(w.toNodeId);
+                            if (!touchesDragged) return w;
+
+                            const fromNode = getNodeById(w.fromNodeId);
+                            const toNode = getNodeById(w.toNodeId);
+                            const fromParent = fromNode ? getNodeParent(fromNode.id) : null;
+                            const toParent = toNode ? getNodeParent(toNode.id) : null;
+                            if (!fromNode || !toNode || !fromParent || !toParent) return w;
+
+                            const p1 = getAbsoluteNodePosition(fromNode, fromParent);
+                            const p2 = getAbsoluteNodePosition(toNode, toParent);
+                            const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+                            const UNSNAP_DIST = 25; // match snap detection radius
+                            if (dist > UNSNAP_DIST) {
+                              changed = true;
+                              return { ...w, deleted: true };
+                            }
+                            return w;
+                          });
+
+                          if (changed) {
+                            setWires(updatedWires);
+                            pushToHistory(elementsRef.current, updatedWires);
+                            stopSimulation();
+                          }
+                        }
+                      }
+
+                      setDraggingElement(null);
+                      setSnapTarget(null);
+                      stageRef.current?.draggable(true);
                     }}
                     onSelect={(id) => {
                       if (creatingWireStartNode) return;
                       const element = getElementById(id);
                       setSelectedElement(element ?? null);
                       setShowPropertiesPannel(true);
-                      setActiveControllerId(null);
-                      setOpenCodeEditor(false);
+                      // Prevent closing the code editor if it's already open and the same microbit is re-selected
                       if (element?.type === "microbit" || element?.type === "microbitWithBreakout") {
                         setActiveControllerId(element.id);
+                        // If editor is open, switch to the newly selected microbit and keep it open
+                        setOpenCodeEditor((prev) => prev ? true : false);
+                      } else {
+                        // Close editor when non-microbit is selected
+                        setOpenCodeEditor(false);
                       }
                     }}
                     selectedElementId={selectedElement?.id || null}
@@ -1751,8 +2260,6 @@ export default function CircuitCanvas() {
                         }
                       }
                     }}
-                    // Hide node rendering in this layer
-                    showNodes={false}
                     showBody={true}
                   />
                 ))}
@@ -1761,6 +2268,10 @@ export default function CircuitCanvas() {
               {/* Wires layer sits above element bodies */}
               <Layer ref={wireLayerRef}>
                 {wires.map((wire) => {
+                  // Skip rendering hidden wires (used for node-to-node snaps that are electrically connected)
+                  // Also skip deleted wires
+                  if (wire.hidden || wire.deleted) return null;
+
                   // Calculate wire points, considering if an endpoint is being dragged
                   let points = getWirePoints(wire);
 
@@ -1877,15 +2388,13 @@ export default function CircuitCanvas() {
                           }}
                           onDragMove={(e) => {
                             e.cancelBubble = true; // Prevent stage drag
-                            const x = e.target.x();
-                            const y = e.target.y();
-                            handleJointDragMove(wire.id, idx, { x, y });
+                            const newPos = e.target.position();
+                            handleJointDragMove(wire.id, idx, newPos);
                           }}
                           onDragEnd={(e) => {
                             e.cancelBubble = true; // Prevent stage drag
-                            const x = e.target.x();
-                            const y = e.target.y();
-                            handleJointDragEnd(wire.id, idx, { x, y });
+                            const finalPos = e.target.position();
+                            handleJointDragEnd(wire.id, idx, finalPos);
                           }}
                           onMouseEnter={(e) => {
                             const container = e.target.getStage()?.container();
@@ -1977,8 +2486,12 @@ export default function CircuitCanvas() {
                     elements={elements}
                     onDragMove={handleElementDragMove}
                     handleNodeClick={handleNodeClick}
+                    handleNodePointerDown={handleNodePointerDown}
+                    handleNodePointerUp={handleNodePointerUp}
+                    snapTargetNodeId={snapTarget?.targetNodeId || null}
                     handleRatioChange={handleRatioChange}
                     handleModeChange={handleModeChange}
+                    onPowerSupplySettingsChange={() => {}}
                     onDragStart={() => { }}
                     onDragEnd={() => { }}
                     onSelect={() => { }}
@@ -1996,7 +2509,7 @@ export default function CircuitCanvas() {
               <Layer>
                 {wires.map((wire) => {
                   const isSelected = selectedElement?.id === wire.id;
-                  if (!isSelected) return null;
+                  if (!isSelected || wire.deleted) return null;
 
                   const stage = stageRef.current;
                   const scaleFactor = stage ? 1 / stage.scaleX() : 1;
@@ -2116,14 +2629,53 @@ export default function CircuitCanvas() {
                   ];
                 })}
               </Layer>
+
             </Stage>
-          )}
+            <AnimatePresence>
+            {simulationRunning &&
+            Object.entries(microbitNodeMapRef.current).map(
+              ([id]) => {
+                const element = elements.find((el) => el.id === id);
+
+                if (
+                  !element ||
+                  (element.type !== "microbit" &&
+                    element.type !== "microbitWithBreakout")
+                ) {
+                  return null;
+                }
+
+                const simulator = controllerMap[id];
+                if (!simulator) return null;
+
+                return (
+                  <MicrobitSimulationPanel
+                    key={id}
+                    elementId={id}
+                    element={element}
+                    getPosition={getMicrobitPanelPosition}
+                    setTemperature={setMicrobitTemperature}
+                    setLightLevel={setMicrobitLightLevel}
+                    triggerGesture={triggerMicrobitGesture}
+                  />
+                );
+              }
+            )}
+            </AnimatePresence>
+            </>)}
         </div>
       </div>
 
+      {/* Notes tool instruction message */}
+      {notesToolActive && (
+        <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-50 bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg">
+          Click on the canvas to add a note
+        </div>
+      )}
+
       <div
-        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"
-          } `}
+        id="circuit-palette-panel"
+        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"}`}
         style={{
           pointerEvents: "auto",
           // Glass effect
@@ -2154,38 +2706,109 @@ export default function CircuitCanvas() {
         {showPalette && <CircuitSelector />}
       </div>
 
+      {/* Conditionally render editor only when open to properly clean up DOM (toolbox, etc.) */}
       {openCodeEditor && (
         <div
-          className="absolute right-0 top-10 h-[460px] w-[700px] bg-white border-l border-gray-300 shadow-xl z-50 transition-transform duration-300"
-          style={{
-            transform: openCodeEditor ? "translateX(0)" : "translateX(100%)",
-          }}
+          className="absolute right-0 top-13 z-50"
         >
-          {/* Header with close */}
-          <div className="flex justify-between items-center p-2 border-b border-gray-300 bg-gray-100">
-            <span className="font-semibold">Editor</span>
-            <button
-              className="text-sm text-gray-600 hover:text-black"
-              onClick={() => setOpenCodeEditor(false)}
-            >
-              ✕
-            </button>
-          </div>
+          <UnifiedEditor
+            controllerCodeMap={controllerCodeMap}
+            activeControllerId={activeControllerId}
+            setControllerCodeMap={setControllerCodeMap}
+            stopSimulation={stopSimulation}
+            onSizeChange={setCodeEditorSize}
+            onClose={() => setOpenCodeEditor(false)}
+            onResetRef={editorResetRef}
+            isSimulationOn={simulationRunning}
+            controllers={(() => {
+              const list = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
+              let microbitCount = 0;
+              let breakoutCount = 0;
+              return list.map((el) => {
+                if (el.type === "microbitWithBreakout") {
+                  breakoutCount++;
+                  return {
+                    id: el.id,
+                    label: `Micro:bit + Breakout ${breakoutCount}`,
+                    kind: "microbitWithBreakout" as const,
+                  };
+                } else {
+                  microbitCount++;
+                  return {
+                    id: el.id,
+                    label: `Micro:bit ${microbitCount}`,
+                    kind: "microbit" as const,
+                  };
+                }
+              });
+            })()}
+            onSelectController={(id) => {
+              // Switch active controller and reflect selection in canvas
+              setActiveControllerId(id);
+              const el = elements.find((e) => e.id === id) || null;
+              if (el) {
+                setSelectedElement(el);
+                setShowPropertiesPannel(true);
+              }
+            }}
+          />
+        </div>
+      )}
 
-          {/* Editor */}
-          <div className="flex flex-col h-full w-full">
-            <div className="flex-1 overflow-hidden">
-              <UnifiedEditor
-                controllerCodeMap={controllerCodeMap}
-                activeControllerId={activeControllerId}
-                setControllerCodeMap={setControllerCodeMap}
-                stopSimulation={stopSimulation}
-              />
+      {/* Import Circuit Modal */}
+      {showImportModal && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-gray-900/30 dark:bg-black/40 backdrop-blur-[2px]"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="import-circuit-title"
+          aria-describedby="import-circuit-desc"
+          onKeyDown={(e) => { if (e.key === 'Escape') handleImportCancel(); }}
+        >
+          <div className="w-[430px] max-w-[94vw] rounded-2xl bg-white text-gray-900 shadow-2xl border border-gray-200 p-5 animate-[fadeIn_.12s_ease-out]">
+            <div className="flex items-start gap-3">
+              <div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full bg-green-50 text-green-600 border border-green-100">
+                {/* Import icon */}
+                <FaUpload size={20} />
+              </div>
+              <div className="flex-1">
+                <h3 id="import-circuit-title" className="text-lg font-semibold tracking-tight">Import Circuit from Link</h3>
+                <p id="import-circuit-desc" className="mt-2 text-sm leading-6 text-gray-600">
+                  Paste a circuit link below to import a saved circuit layout and code.
+                </p>
+                <input
+                  type="text"
+                  className="mt-3 w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  placeholder="Paste circuit link here..."
+                  value={importInput}
+                  onChange={e => setImportInput(e.target.value)}
+                  autoFocus
+                  disabled={importLoading}
+                />
+                {importError && (
+                  <div className="mt-2 text-xs text-red-600">{importError}</div>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={handleImportCancel}
+                className="px-3.5 py-2 rounded-md border border-gray-300 bg-white text-gray-800 text-sm shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                disabled={importLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportConfirm}
+                className="px-3.5 py-2 rounded-md bg-green-600 text-white text-sm font-medium shadow hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-400"
+                disabled={importLoading}
+              >
+                {importLoading ? 'Importing...' : 'Import'}
+              </button>
             </div>
           </div>
         </div>
       )}
-
       {showNewSessionModal && (
         <div
           className="fixed inset-0 z-[999] flex items-center justify-center bg-gray-900/20 dark:bg-black/30 backdrop-blur-[2px]"

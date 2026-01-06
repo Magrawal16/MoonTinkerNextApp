@@ -6,11 +6,13 @@ export interface PaletteElement {
   type: PaletteElementType;
   label: string;
   iconPath: string; // Relative to public/assets
+  hidden?: boolean; // Hide from palette without removing support
   defaultProps?: {
     resistance?: number;
     voltage?: number;
     ratio?: number;
-  mode?: "voltage" | "current" | "resistance"; // For multimeters
+    color?: string;
+    mode?: "voltage" | "current" | "resistance"; // For multimeters
   };
 }
 
@@ -27,17 +29,30 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     iconPath: "assets/circuit_canvas/elements/battery.svg",
     defaultProps: { voltage: 9, resistance: 1.45 },
   },
-  // {
-  //   type: "powersupply",
-  //   label: "Power Supply",
-  //   iconPath: "assets/circuit_canvas/elements/power_supply.svg",
-  //   defaultProps: { voltage: 5, resistance: 0.2 },
-  // },
+  {
+    type: "cell3v",
+    label: "3V Cell",
+    iconPath: "assets/circuit_canvas/elements/cell3v.svg",
+    defaultProps: { voltage: 3, resistance: 0.8 },
+  },
+  {
+    type: "AA_battery",
+    label: "AA Battery",
+    iconPath: "assets/circuit_canvas/elements/AA_battery.svg",
+    defaultProps: { voltage: 1.5, resistance: 0.3 },
+  },
+  {
+    type: "powersupply",
+    label: "Power Supply",
+    iconPath: "assets/circuit_canvas/elements/power_supply.svg",
+    hidden: true,
+    defaultProps: { voltage: 5, resistance: 0.2 },
+  },
   {
     type: "resistor",
     label: "Resistor",
     iconPath: "assets/circuit_canvas/elements/resistor.svg",
-    defaultProps: { resistance: 5 },
+    defaultProps: { resistance: 1000 },
   },
   {
     type: "multimeter",
@@ -61,8 +76,8 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "microbit",
     label: "Microbit",
-    iconPath: "assets/circuit_canvas/elements/microbit.svg",
-    defaultProps: { voltage: 3.3, resistance: 0 },
+    iconPath: "assets/circuit_canvas/elements/microbit_red.svg",
+    defaultProps: { voltage: 3.3, resistance: 0, color: "red" },
   },
   {
     type: "microbitWithBreakout",

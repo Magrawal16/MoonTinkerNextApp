@@ -126,6 +126,7 @@ export class PythonInterpreter {
       "basic.show_leds",
       "music.play_tone",
       "music.rest",
+      "display.show",
     ];
 
     const lines = code.split("\n");
@@ -364,9 +365,8 @@ export class PythonInterpreter {
       if (onStartCallMatch) {
         onStartCallCount++;
         if (onStartCallCount === 1) {
-          // First on_start() call - always add await since on_start is async when it uses await functions
           const indent = onStartCallMatch[1] || '';
-          if (!line.includes('await')) {
+          if (hasAsyncOnStart && !line.includes('await')) {
             line = `${indent}await on_start()`;
           }
         } else {

@@ -37,11 +37,11 @@ const COLOR_MAP: Record<string, string> = {
 /**
  * Compute 4-band resistor colors:
  * returns [band1, band2, multiplier, tolerance]
- * fallback -> 5 Ω (brown, black, black, gold)
+ * fallback -> 1 kΩ (brown, black, red, gold)
  */
 function computeBands(resistance: number | null | undefined) {
   if (resistance == null || !Number.isFinite(resistance) || resistance <= 0) {
-    return ["brown", "black", "black", "gold"];
+    return ["brown", "black", "red", "gold"];
   }
 
   // Avoid zeros / negative; keep at least small positive

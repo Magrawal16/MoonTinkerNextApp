@@ -7,34 +7,43 @@ import {
 import { BaseElement } from "@/circuit_canvas/components/core/BaseElement";
 import { useEffect, useState, useRef } from "react";
 import { Group, Image, Rect, Text, Circle } from "react-konva";
+import { ShortCircuitNotification } from "./ShortCircuitNotification";
+import { getMicrobitCoordinates } from "@/circuit_canvas/utils/microbitCoordinateMap";
 
 export default function Microbit({
   leds,
   onControllerInput,
   isSimulationOn,
+  isShorted,
+  color = "red",
   ...props
 }: MicrobitProps & BaseElementProps) {
   const [imgMicrobit, setImgMicrobit] = useState<HTMLImageElement | null>(null);
   const [imgOnnState, setImgOnnState] = useState<HTMLImageElement | null>(null);
   const [imgOffState, setImgOffState] = useState<HTMLImageElement | null>(null);
+  const [explosionImg, setExplosionImg] = useState<HTMLImageElement | null>(null);
   const [btnPressed, setBtnPressed] = useState<"A" | "B" | "AB" | null>(null);
   // Logo (touch sensor) interaction state
   const [logoState, setLogoState] = useState<"idle" | "hover" | "pressed">("idle");
   const isPressingRef = useRef(false);
+  // Hover state for short-circuit notification
+  const [isHovered, setIsHovered] = useState(false);
 
-  // Tunable constants for logo overlay alignment
-  // Adjust LOGO_X / LOGO_Y to perfectly cover the SVG logo.
-  const LOGO_X = 95.2;     // horizontal position
-  const LOGO_Y = 91.2;     // vertical position (was 55; moved down to align)
-  const LOGO_W = 29.2;
-  const LOGO_H = 16.2;
+  const supportedColors = ["red", "yellow", "green", "blue"] as const;
+  const rawColor = (color ?? "").toLowerCase();
+  const microbitColor = (supportedColors as readonly string[]).includes(rawColor)
+    ? rawColor
+    : "red";
+
+  // Get all coordinates for the selected color variant
+  const coords = getMicrobitCoordinates(microbitColor);
 
   useEffect(() => {
     const image = new window.Image();
-    image.src = "assets/circuit_canvas/elements/microbit.svg";
+    image.src = `assets/circuit_canvas/elements/microbit_${microbitColor}.svg`;
     image.onload = () => setImgMicrobit(image);
     image.alt = "Microbit";
-  }, []);
+  }, [microbitColor]);
 
   useEffect(() => {
     const image = new window.Image();
@@ -48,6 +57,13 @@ export default function Microbit({
     image.src = "assets/circuit_canvas/elements/microbit_usb_off.svg";
     image.onload = () => setImgOffState(image);
     image.alt = "Microbit";
+  }, []);
+
+  useEffect(() => {
+    const image = new window.Image();
+    image.src = "assets/circuit_canvas/elements/Explosion.svg";
+    image.onload = () => setExplosionImg(image);
+    image.alt = "Microbit Explosion";
   }, []);
 
   // Button press/release handlers for hold logic
@@ -156,42 +172,66 @@ export default function Microbit({
   const onLogoClick = () => {
     // Hook for future logo touch event dispatch if needed
   };
+
+  const showExplosion = Boolean(isShorted && isSimulationOn && explosionImg);
+  const showShortNotification = Boolean(isShorted && isSimulationOn && isHovered);
+
   return (
-    <BaseElement {...props}>
-      <Group>
+    <BaseElement {...props} isSimulationOn={isSimulationOn}>
+      <Group
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+      >
+        {/* Custom hit area for selecting the microbit - covers only the main board */}
+        <Rect
+          x={coords.hitArea.x}
+          y={coords.hitArea.y}
+          width={coords.hitArea.width}
+          height={coords.hitArea.height}
+          fill="transparent"
+          listening={true}
+        />
+        
         {imgOffState && !isSimulationOn && (
           <Image
             image={imgOffState}
-            width={220}
-            height={220}
-            x={0}
-            y={-25}
+            width={coords.usbOff.width}
+            height={coords.usbOff.height}
+            x={coords.usbOff.x}
+            y={coords.usbOff.y}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 6 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
         {imgOnnState && isSimulationOn && (
           <Image
             image={imgOnnState}
-            width={220}
-            height={220}
+            width={coords.usbOn.width}
+            height={coords.usbOn.height}
+            x={coords.usbOn.x}
+            y={coords.usbOn.y}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
         {imgMicrobit && (
           <Image
             image={imgMicrobit}
-            width={220}
-            height={220}
+            width={coords.width}
+            height={coords.height}
+            x={coords.offsetX}
+            y={coords.offsetY}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 10 : 0}
             shadowOffset={{ x: 15, y: -15 }}
             shadowOpacity={0}
+            listening={false}
           />
         )}
 
@@ -200,10 +240,12 @@ export default function Microbit({
           row.map((_, x) => {
             const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
-            const brightness = on ? b / 255 : 0;
             
-            const centerX = 84 + x * 12.4;
-            const centerY = 114 + y * 12.4;
+            const normalizedBrightness = b / 255;
+            const brightness = on ? Math.pow(normalizedBrightness, 2.8) : 0;
+            
+            const centerX = coords.ledMatrix.startX + x * coords.ledMatrix.spacingX;
+            const centerY = coords.ledMatrix.startY + y * coords.ledMatrix.spacingY;
             
             return (
               <Group key={`${x}-${y}`}>
@@ -266,11 +308,11 @@ export default function Microbit({
                   width={5}
                   height={5}
                   fill={on ? "#FF3333" : "#545050ff"}
-                  opacity={on ? 0.9 : 0.5}
+                  opacity={on ? Math.min(0.9, 0.3 + brightness * 0.6) : 0.5}
                   cornerRadius={1.5}
                   shadowColor={on ? "#FF6666" : "#000000"}
                   shadowBlur={on ? 2 : 1}
-                  shadowOpacity={on ? 0.4 : 0.2}
+                  shadowOpacity={on ? 0.4 * brightness : 0.2}
                   shadowOffset={{ x: 0, y: 0 }}
                 />
                 {/* Bright center highlight - small square */}
@@ -292,8 +334,8 @@ export default function Microbit({
 
         {/* Touch (Logo) Sensor Overlay */}
         <Group
-          x={LOGO_X}
-          y={LOGO_Y}
+          x={coords.logo.x}
+          y={coords.logo.y}
           listening={true}
           onMouseEnter={onLogoEnter}
           onMouseLeave={onLogoLeave}
@@ -305,8 +347,8 @@ export default function Microbit({
         >
           {/* Outer oval */}
           <Rect
-            width={LOGO_W}
-            height={LOGO_H}
+            width={coords.logo.width}
+            height={coords.logo.height}
             cornerRadius={20}
             stroke={logoStroke}
             strokeWidth={3}
@@ -314,12 +356,12 @@ export default function Microbit({
             opacity={10}
           />
           {/* Inner pads */}
-          <Circle x={LOGO_W * 0.30} y={LOGO_H / 2} radius={2.5} fill={logoStroke} />
-          <Circle x={LOGO_W * 0.70} y={LOGO_H / 2} radius={2.5} fill={logoStroke} />
+          <Circle x={coords.logo.width * 0.30} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
+          <Circle x={coords.logo.width * 0.70} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
           {/* Invisible enlarged hit area */}
           <Rect
-            width={LOGO_W + 6}
-            height={LOGO_H + 6}
+            width={coords.logo.width + 6}
+            height={coords.logo.height + 6}
             x={-3}
             y={-3}
             cornerRadius={24}
@@ -329,8 +371,8 @@ export default function Microbit({
 
         {/* Button AB */}
         <Group
-          x={164}
-          y={96}
+          x={coords.buttons.AB.x}
+          y={coords.buttons.AB.y}
           onMouseDown={() => handleButtonDown("AB")}
           onMouseUp={() => handleButtonUp("AB")}
           onTouchStart={() => handleButtonDown("AB")}
@@ -354,8 +396,8 @@ export default function Microbit({
 
         {/* Button A */}
         <Group
-          x={35}
-          y={130}
+          x={coords.buttons.A.x}
+          y={coords.buttons.A.y}
           onMouseDown={() => handleButtonDown("A")}
           onMouseUp={() => handleButtonUp("A")}
           onTouchStart={() => handleButtonDown("A")}
@@ -379,8 +421,8 @@ export default function Microbit({
 
         {/* Button B */}
         <Group
-          x={165}
-          y={130}
+          x={coords.buttons.B.x}
+          y={coords.buttons.B.y}
           onMouseDown={() => handleButtonDown("B")}
           onMouseUp={() => handleButtonUp("B")}
           onTouchStart={() => handleButtonDown("B")}
@@ -401,6 +443,31 @@ export default function Microbit({
           <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
           <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
         </Group>
+
+        {/* Explosion overlay when 3.3V and GND are shorted */}
+        {showExplosion && explosionImg && (
+          <Image
+            listening={false}
+            image={explosionImg}
+            x={coords.explosion.x}
+            y={coords.explosion.y}
+            width={coords.explosion.width}
+            height={coords.explosion.height}
+            shadowColor="#000000"
+            shadowBlur={12}
+            shadowOpacity={0.2}
+          />
+        )}
+
+        {/* Short-circuit notification on hover */}
+        {showShortNotification && (
+          <ShortCircuitNotification
+            show={true}
+            message="micro:bit broke because of: Output current is 330 mA, while the maximum current is 90.0 mA."
+            offsetX={50}
+            offsetY={30}
+          />
+        )}
       </Group>
     </BaseElement>
   );

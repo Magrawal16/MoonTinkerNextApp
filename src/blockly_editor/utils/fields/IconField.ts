@@ -10,6 +10,22 @@ const ICON_PATTERNS: Record<string, string[]> = {
   SAD: ["00000", "01010", "01110", "10001", "00000"],
   YES: ["00001", "00010", "00100", "01000", "10000"],
   NO: ["10001", "01010", "00100", "01010", "10001"],
+  SMILE: ["00000", "00000", "00000", "10001", "01110"],
+  ASLEEP: ["00100", "00000", "01110", "00000", "11111"],
+  SURPRISED: ["00100", "00000", "01010", "00000", "00100"],
+  CONFUSED: ["00100", "00000", "01010", "00000", "01010"],
+  ANGRY: ["10001", "01010", "00100", "01010", "10001"],
+  FABULOUS: ["10001", "01010", "11111", "01010", "10001"],
+  MEH: ["00000", "01010", "00000", "01010", "00000"],
+  SILLY: ["00000", "01010", "00000", "00010", "00100"],
+  GIRAFFE: ["00100", "01110", "00100", "00100", "00100"],
+  DUCK: ["01110", "01010", "11111", "01010", "01010"],
+  RABBIT: ["01010", "01010", "11111", "10101", "10101"],
+  COW: ["11111", "10101", "11111", "10101", "11111"],
+  BUTTERFLY: ["10001", "01010", "00100", "01010", "10001"],
+  HOUSE: ["00100", "01110", "11111", "10101", "10101"],
+  STICKFIGURE: ["00100", "11111", "00100", "01010", "10001"],
+  SNAKE: ["00100", "01010", "10001", "01010", "00100"],
 };
 
 const ICON_ORDER = [
@@ -19,6 +35,22 @@ const ICON_ORDER = [
   "SAD",
   "YES",
   "NO",
+  "SMILE",
+  "ASLEEP",
+  "SURPRISED",
+  "CONFUSED",
+  "ANGRY",
+  "FABULOUS",
+  "MEH",
+  "SILLY",
+  "GIRAFFE",
+  "DUCK",
+  "RABBIT",
+  "COW",
+  "BUTTERFLY",
+  "HOUSE",
+  "STICKFIGURE",
+  "SNAKE",
 ] as const;
 
 export class IconField extends Blockly.Field {
@@ -88,7 +120,7 @@ export class IconField extends Blockly.Field {
           cell.style.width = "8px";
           cell.style.height = "8px";
           cell.style.borderRadius = "2px";
-          cell.style.background = on ? "#ffd54f" : "#2f2f2f";
+          cell.style.background = on ? "#f44336" : "#2f2f2f";
           cell.style.opacity = on ? "1" : "0.35";
           preview.appendChild(cell);
         }

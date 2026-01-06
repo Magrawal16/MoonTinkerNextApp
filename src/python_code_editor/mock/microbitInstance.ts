@@ -6,7 +6,6 @@ import { ButtonModule } from "./modules/buttonModule";
 import { LEDModule } from "./modules/ledModule";
 import { PinsModule } from "./modules/pinsModule";
 import { LogoTouchModule } from "./modules/logoTouchModule";
-import { GestureModule } from "./modules/gestureModule";
 import { BasicModule } from "./modules/basicModule";
 import { MusicModule } from "./modules/musicModule";
 import type { StateSnapshot, PythonModule } from "./interfaces";
@@ -17,11 +16,8 @@ export class MicrobitSimulator {
   private readonly ledModule: LEDModule;
   private readonly pinsModule: PinsModule;
   private readonly logoTouchModule: LogoTouchModule;
-  private readonly gestureModule: GestureModule;
   private readonly basicModule: BasicModule;
   private readonly musicModule: MusicModule;
-  private temperature = 25;   // default °C
-  private lightLevel = 128;   // default light level
   private audioCallback: ((cmd: string, ...args: any[]) => Promise<void>) | null = null;
 
   constructor(private readonly pyodide: PyodideInterface) {
@@ -30,10 +26,7 @@ export class MicrobitSimulator {
     this.ledModule = new LEDModule(pyodide, this.eventEmitter);
     this.pinsModule = new PinsModule(pyodide, this.eventEmitter);
     this.logoTouchModule = new LogoTouchModule(pyodide, this.eventEmitter);
-    this.gestureModule = new GestureModule(pyodide, this.eventEmitter);
     this.basicModule = new BasicModule(pyodide, this.ledModule);
-    // Provide the basic module with a reference to this simulator
-    this.basicModule.setMicrobit?.(this);
     this.musicModule = new MusicModule(pyodide);
     // initialize public APIs after modules exist
     this.pins = this.pinsModule.getAPI();
@@ -42,13 +35,11 @@ export class MicrobitSimulator {
     this.input = {
       ...this.buttonModule.getAPI(),
       ...this.logoTouchModule.getAPI(),
-      ...this.gestureModule.getAPI(),
       _clear: this.buttonModule.clearInputs.bind(this.buttonModule),
     };
     this.basic = this.basicModule.getAPI();
     this.music = this.musicModule.getAPI();
     this.DigitalPin = this.pinsModule.DigitalPin;
-    this.Gesture = this.gestureModule.Gesture;
   }
   // All pin/led/button/logo functionality is implemented in modules.
   // Leftover/duplicated code removed so the simulator delegates to modules only.
@@ -61,7 +52,6 @@ export class MicrobitSimulator {
   public readonly basic: any;
   public readonly music: any;
   public readonly DigitalPin: Record<string, string>;
-  public readonly Gesture: any;
 
   /**
    * Set the audio callback that will be called for music operations
@@ -81,7 +71,6 @@ export class MicrobitSimulator {
     this.ledModule.reset();
     this.pinsModule.reset();
     this.logoTouchModule.reset();
-    this.gestureModule.reset();
     this.basicModule.reset();
     this.musicModule.reset();
     this.eventEmitter.emit({ type: "reset" });
@@ -114,57 +103,18 @@ export class MicrobitSimulator {
   }
 
   getPythonModule(): PythonModule {
-    // Expose display and Image for display.show(Image.HEART) compatibility
-    const display = {
-      show: this.basicModule.showImage.bind(this.basicModule),
-      clear: this.ledModule.clearDisplay.bind(this.ledModule),
-    };
-    const Image = new Proxy({}, {
-      get: (_, icon: string) => icon
-    });
     return {
       pins: this.pinsModule.getAPI(),
       led: this.ledModule.getAPI(),
       input: {
         ...this.buttonModule.getAPI(),
         ...this.logoTouchModule.getAPI(),
-        ...this.gestureModule.getAPI(),
-        temperature: () => this.getTemperature(),
-        light_level: () => this.getLightLevel(),
         _clear: this.buttonModule.clearInputs.bind(this.buttonModule),
       },
       Button: this.buttonModule.Button,
-      Gesture: this.gestureModule.Gesture,
       DigitalPin: this.pinsModule.DigitalPin,
-      basic: {
-        ...this.basicModule.getAPI(),
-        temperature: () => this.getTemperature(),
-      },
+      basic: this.basicModule.getAPI(),
       music: this.musicModule.getAPI(),
-      display,
-      Image,
     };
-  }
-
-  getTemperature(): number {
-  return this.temperature;
-}
-  getLightLevel(): number {
-    return this.lightLevel;
-  }
-  // --- Runtime Sensor APIs ---
-
-  setTemperature(value: number): void {
-    this.temperature = value;
-  }
-
-  setLightLevel(value: number): void {
-  this.lightLevel = Math.max(0, Math.min(255, value));
-}
-  triggerGesture(gesture: string): void {
-    this.eventEmitter.emit({
-      type: "gesture",
-      gesture,
-    });
   }
 }

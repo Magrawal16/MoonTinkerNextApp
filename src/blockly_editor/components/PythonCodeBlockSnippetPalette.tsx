@@ -9,7 +9,6 @@ export default function PythonCodePalette({
   setShowCodePalette,
   onCodeInsert,
 }: CommandPaletteProps) {
-  const [searchTerm, setSearchTerm] = useState("");
   const [currentView, setCurrentView] = useState<string | null>(null); // null = main view, string = category view
   const [parameterValues, setParameterValues] = useState<Record<string, Record<string, string>>>({});
   const [isAnimating, setIsAnimating] = useState(false);
@@ -104,13 +103,6 @@ export default function PythonCodePalette({
       const buttonLower = buttonValue.toLowerCase();
       code = code.replace(new RegExp(`\\{button_lower\\}`, 'g'), buttonLower);
     }
-
-    // For gesture_lower: convert gesture value to lowercase
-    if (code.includes('{gesture_lower}')) {
-      const gestureValue = parameterValues[snippet.id]?.['gesture'] || 'SHAKE';
-      const gestureLower = gestureValue.toLowerCase();
-      code = code.replace(new RegExp(`\\{gesture_lower\\}`, 'g'), gestureLower);
-    }
     
     return code;
   };
@@ -195,48 +187,28 @@ export default function PythonCodePalette({
                 isAnimating ? 'opacity-50' : 'opacity-100'
               }`}
             >
-              {/* Search Field */}
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                placeholder="Search blocks..."
-                className="w-full px-3 py-2 mb-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                style={{marginBottom: 8}}
-              />
-              {searchTerm === "" ? (
-                currentView ? (
-                  // Category view header with back button
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={navigateBack}
-                      disabled={isAnimating}
-                      className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors duration-200 font-medium disabled:opacity-50"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                      Categories
-                    </button>
-                  </div>
-                ) : (
-                  // Main view header
-                  <>
-                    <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                      <span className="text-xl">🧩</span>
-                      Code Snippets
-                    </h3>
-                    <p className="text-sm text-gray-600 mt-1">Drag snippets into your code</p>
-                  </>
-                )
+              {currentView ? (
+                // Category view header with back button
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={navigateBack}
+                    disabled={isAnimating}
+                    className="flex items-center gap-2 text-indigo-600 hover:text-indigo-800 transition-colors duration-200 font-medium disabled:opacity-50"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Categories
+                  </button>
+                </div>
               ) : (
-                // Search results header
+                // Main view header
                 <>
                   <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                    <span className="text-xl">🔍</span>
-                    Search Results
+                    <span className="text-xl">🧩</span>
+                    Code Snippets
                   </h3>
-                  <p className="text-sm text-gray-600 mt-1">Drag a block to use it</p>
+                  <p className="text-sm text-gray-600 mt-1">Drag snippets into your code</p>
                 </>
               )}
             </div>
@@ -253,46 +225,29 @@ export default function PythonCodePalette({
                   : 'transform translate-x-0 opacity-100 scale-100'
               }`}
             >
-              {searchTerm === "" ? (
-                currentView ? (
-                  // Category-specific view
-                  <CategoryView 
-                    category={currentView}
-                    snippets={CODE_SNIPPETS.filter(snippet => snippet.category === currentView)}
-                    onDragStart={handleDragStart}
-                    getCategoryIcon={getCategoryIcon}
-                    getCategoryColor={getCategoryColor}
-                    parameterValues={parameterValues}
-                    onParameterChange={updateParameterValue}
-                    generateCode={generateCode}
-                    onCodeInsert={onCodeInsert}
-                  />
-                ) : (
-                  // Main categories view
-                  <CategoriesListView 
-                    categories={CATEGORIES}
-                    snippets={CODE_SNIPPETS}
-                    onCategoryClick={navigateToCategory}
-                    getCategoryIcon={getCategoryIcon}
-                    getCategoryColor={getCategoryColor}
-                    isAnimating={isAnimating}
-                  />
-                )
-              ) : (
-                // Search results view
-                <CategoryView
-                  category={"Search"}
-                  snippets={CODE_SNIPPETS.filter(snippet =>
-                    snippet.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    (snippet.description && snippet.description.toLowerCase().includes(searchTerm.toLowerCase()))
-                  )}
+              
+              {currentView ? (
+                // Category-specific view
+                <CategoryView 
+                  category={currentView}
+                  snippets={CODE_SNIPPETS.filter(snippet => snippet.category === currentView)}
                   onDragStart={handleDragStart}
                   getCategoryIcon={getCategoryIcon}
                   getCategoryColor={getCategoryColor}
                   parameterValues={parameterValues}
                   onParameterChange={updateParameterValue}
                   generateCode={generateCode}
-                  onCodeInsert={onCodeInsert}
+                  onCodeInsert={onCodeInsert} // Add this line
+                />
+              ) : (
+                // Main categories view
+                <CategoriesListView 
+                  categories={CATEGORIES}
+                  snippets={CODE_SNIPPETS}
+                  onCategoryClick={navigateToCategory}
+                  getCategoryIcon={getCategoryIcon}
+                  getCategoryColor={getCategoryColor}
+                  isAnimating={isAnimating}
                 />
               )}
             </div>
@@ -328,97 +283,48 @@ function CategoriesListView({
   getCategoryColor,
   isAnimating,
 }: CategoriesListViewProps) {
-  const getCategoryGradient = (category: string) => {
-    switch (category) {
-      case "Basic":
-        return "from-amber-400 to-orange-500";
-      case "Input":
-        return "from-purple-500 to-pink-600";
-      case "Led":
-        return "from-yellow-400 to-amber-500";
-      case "Logic":
-        return "from-cyan-500 to-blue-600";
-      case "Variables":
-        return "from-rose-500 to-red-600";
-      case "Maths":
-        return "from-indigo-500 to-purple-600";
-      case "Music":
-        return "from-pink-500 to-rose-600";
-      case "Display":
-        return "from-blue-400 to-blue-600";
-      case "Pins":
-        return "from-green-400 to-emerald-600";
-      case "Buttons":
-        return "from-purple-400 to-purple-600";
-      case "Loops":
-        return "from-orange-400 to-orange-600";
-      case "Timing":
-        return "from-red-400 to-red-600";
-      case "Imports":
-        return "from-gray-400 to-gray-600";
-      case "Sensor":
-        return "from-teal-400 to-teal-600";
-      default:
-        return "from-gray-400 to-gray-500";
-    }
-  };
-
-  // Map category to block color (should match block color in the editor)
-  const blockCategoryColor = (category: string) => {
-    switch (category) {
-      case "Display": return "bg-blue-500";
-      case "Pins": return "bg-green-500";
-      case "Buttons": return "bg-purple-500";
-      case "Sensor": return "bg-teal-500";
-      case "Loops": return "bg-orange-500";
-      case "Timing": return "bg-red-500";
-      case "Imports": return "bg-gray-500";
-      default: return "bg-gray-400";
-    }
-  };
-
   return (
-    <div className="space-y-1 px-0">
+    <div className="space-y-3">
       {categories.map((category) => {
         const categorySnippets = snippets.filter(
           (snippet) => snippet.category === category
         );
+        
         if (categorySnippets.length === 0) return null;
+        
         return (
           <button
             key={category}
             onClick={() => onCategoryClick(category)}
             disabled={isAnimating}
-            className="w-full group relative overflow-hidden rounded-xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed min-h-[44px]"
-            style={{padding: 0}}
+            className="w-full flex items-center justify-between p-5 rounded-2xl hover:bg-gray-50 transition-all duration-200 group border border-gray-100 hover:border-gray-200 hover:shadow-lg text-left disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {/* Single Color Bar (block color) */}
-            <div className={`absolute left-0 top-0 bottom-0 w-2 ${blockCategoryColor(category)} rounded-l-xl`}></div>
-            {/* Content with only one color bar */}
-            <div className={`absolute inset-0 bg-gradient-to-br ${getCategoryGradient(category)} opacity-90 group-hover:opacity-100 transition-opacity duration-300`}></div>
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
-            <div className="relative flex items-center justify-between py-2 pl-4 pr-3">
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="w-9 h-9 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-lg group-hover:bg-white/30 transition-colors duration-300">
-                  {getCategoryIcon(category)}
-                </div>
-                <div className="text-left flex-1 min-w-0">
-                  <h4 className="font-bold text-white text-sm mb-0.5 drop-shadow-sm">{category}</h4>
-                  <p className="text-xs text-white/90 leading-tight line-clamp-1">
-                    {categorySnippets.length} snippet{categorySnippets.length !== 1 ? 's' : ''}
-                  </p>
-                </div>
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-2xl ${getCategoryColor(category)} flex items-center justify-center text-white text-xl font-semibold shadow-lg`}>
+                {getCategoryIcon(category)}
               </div>
-              <svg 
-                className="w-4 h-4 text-white/80 group-hover:text-white group-hover:translate-x-1 transition-all duration-300 flex-shrink-0"
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-                strokeWidth={2.5}
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
+              <div className="text-left">
+                <h4 className="font-bold text-gray-800 text-lg mb-1">{category}</h4>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  {category === "Display" && "The micro:bit's LED display output"}
+                  {category === "Pins" && "Use digital and analog pins in code"}
+                  {category === "Buttons" && "Use button inputs in your code"}
+                  {category === "Loops" && "Count and repeat sets of commands"}
+                  {category === "Timing" && "Pause and timing functions"}
+                  {category === "Imports" && "Essential Python module imports"}
+                  {category === "Sensor" && "Use logo touch and sensor events"}
+
+                </p>
+              </div>
             </div>
+            <svg 
+              className="w-6 h-6 text-gray-400 group-hover:text-indigo-500 transition-colors"
+              fill="none" 
+              stroke="currentColor" 
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
           </button>
         );
       })}

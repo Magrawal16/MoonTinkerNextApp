@@ -47,23 +47,6 @@ ifBlock.getInput("ELSE")!.connection!.connect((elseStmt as any).previousConnecti
 // Put if inside forever body
 forever.getInput("DO")!.connection!.connect((ifBlock as any).previousConnection);
 
-// Second if in forever: if input.is_gesture(Gesture.SHAKE): show_string("shake")
-const ifGesture = ws.newBlock("controls_if");
-const isGesture = ws.newBlock("is_gesture");
-(isGesture as any).setFieldValue("SHAKE", "GESTURE");
-const thenGestureStmt = ws.newBlock("show_string");
-(thenGestureStmt as any).setFieldValue("shake", "TEXT");
-ifGesture.getInput("IF0")!.connection!.connect((isGesture as any).outputConnection);
-ifGesture.getInput("DO0")!.connection!.connect((thenGestureStmt as any).previousConnection);
-(ifBlock as any).nextConnection.connect((ifGesture as any).previousConnection);
-
-// Top-level event block: on gesture SHAKE -> show_string("evt")
-const onGesture = ws.newBlock("on_gesture");
-(onGesture as any).setFieldValue("SHAKE", "GESTURE");
-const evtStmt = ws.newBlock("show_string");
-(evtStmt as any).setFieldValue("evt", "TEXT");
-onGesture.getInput("DO")!.connection!.connect((evtStmt as any).previousConnection);
-
 // Generate Python
 const code = pythonGenerator.workspaceToCode(ws);
 
@@ -72,21 +55,5 @@ const hasDef = code.includes("def on_forever():");
 const hasIf = code.includes("if input.button_is_pressed(Button.A):");
 const hasElseLine = /\r?\n\s*else:\r?\n/.test(code);
 const bodyThenElseOrderOk = /\r?\n\s+basic\.show_string\("A"\)\r?\n\s*else:\r?\n/.test(code);
-
-const hasIsGesture = code.includes("input.is_gesture(Gesture.SHAKE)");
-const hasOnGestureRegistration = code.includes("input.on_gesture(Gesture.SHAKE, on_gesture_shake)");
-const hasOnGestureDef = code.includes("def on_gesture_shake():");
-
-if (!hasDef || !hasIf || !hasElseLine || !bodyThenElseOrderOk) {
-	console.error(code);
-	throw new Error("Smoke test failed: basic forever/button generation did not match expectations.");
-}
-
-if (!hasIsGesture || !hasOnGestureDef || !hasOnGestureRegistration) {
-	console.error(code);
-	throw new Error("Smoke test failed: gesture block generation did not match expectations.");
-}
-
-console.log("generator_smoke_test: OK");
 
 

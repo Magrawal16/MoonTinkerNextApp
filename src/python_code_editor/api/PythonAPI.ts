@@ -38,19 +38,6 @@ export const API = {
       snippet:
         "def ${1:on_logo_up}():\n    ${2:# your code}\n\ninput.on_logo_released(${1:on_logo_up})\n",
     },
-    on_gesture: {
-      sig: "input.on_gesture(gesture: Gesture, handler: () -> None) -> None",
-      doc: "Register a handler that runs when the gesture is detected.",
-      snippet:
-        "def ${1:on_gesture}():\n" +
-        "\t${2:# your code}\n\n" +
-        "input.on_gesture(Gesture.${3|SHAKE,LOGO_UP,LOGO_DOWN,SCREEN_UP,SCREEN_DOWN,TILT_LEFT,TILT_RIGHT,FREE_FALL,THREE_G,SIX_G,EIGHT_G|}, ${1})\n",
-    },
-    is_gesture: {
-      sig: "input.is_gesture(gesture: Gesture) -> bool",
-      doc: "Check whether the gesture is currently active.",
-      snippet: "is_gesture(Gesture.${1|SHAKE,LOGO_UP,LOGO_DOWN,SCREEN_UP,SCREEN_DOWN,TILT_LEFT,TILT_RIGHT,FREE_FALL,THREE_G,SIX_G,EIGHT_G|})\n",
-    },
   },
   basic: {
     show_string: {
@@ -84,19 +71,6 @@ export const API = {
     },
   },
   Button: ["A", "B", "AB"] as const,
-  Gesture: [
-    "SHAKE",
-    "LOGO_UP",
-    "LOGO_DOWN",
-    "SCREEN_UP",
-    "SCREEN_DOWN",
-    "TILT_LEFT",
-    "TILT_RIGHT",
-    "FREE_FALL",
-    "THREE_G",
-    "SIX_G",
-    "EIGHT_G",
-  ] as const,
   DigitalPin: DIGITAL_PINS,
 };
 

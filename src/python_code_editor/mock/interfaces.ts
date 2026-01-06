@@ -61,13 +61,9 @@ export interface PythonModule {
     input: {
         button_is_pressed: (button: any) => boolean;
         on_button_pressed: (button: any, handler: () => void) => void;
-        on_gesture: (gesture: any, handler: () => void) => void;
-        is_gesture: (gesture: any) => boolean;
         on_logo_pressed: (handler: () => void) => void;
         on_logo_released: (handler: () => void) => void;
         logo_is_touched: () => boolean;
-        temperature: () => number;
-        light_level: () => number;
         _clear: () => void;
     };
     Button: {
@@ -75,7 +71,6 @@ export interface PythonModule {
         B: any;
         AB: any;
     };
-    Gesture: Record<string, any>;
     DigitalPin: Record<string, string>;
     basic: {
         show_string: (text: string, interval?: number) => Promise<void>;
@@ -83,7 +78,6 @@ export interface PythonModule {
         show_leds: (pattern: string) => Promise<void>;
         forever: (callback: () => void) => void;
         pause: (ms: number) => Promise<void>;
-        temperature: () => number;
     };
     music: {
         play_tone: (frequency: number, durationBeats: number) => Promise<void>;
@@ -91,6 +85,4 @@ export interface PythonModule {
         rest: (durationBeats: number) => Promise<void>;
         stop: () => void;
     };
-    display?: any;
-    Image?: any;
 }

@@ -1,6 +1,5 @@
 import { CircuitElement, CircuitElementProps } from "../types/circuit";
 import { getLedNodePositions } from "../utils/ledNodeMap";
-import { createInitialLedRuntime, LED_INTERNAL_RESISTANCE } from "./ledBehavior";
 
 export default function createElement(
   props: CircuitElementProps
@@ -16,8 +15,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 28.7,
-        y: 31,
+        x: 1,
+        y: 43.5,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -25,8 +24,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 43,
-        y: 31,
+        x: 1,
+        y: 35.5,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -41,111 +40,6 @@ export default function createElement(
     displayProperties: [],
   };
 
-  const cell3vElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 55,
-        y: 3.5,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 55,
-        y: 150,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 3,
-      resistance: 0.8, 
-    },
-    displayProperties: [],
-  };
-
-  const AA_batteryElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 102.5,
-        y: 2,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 94.5,
-        y: 2,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 1.5,
-      resistance: 0.3, // AA cell internal resistance typical low value
-      // allow switching form-factor in Properties Panel (AA ↔ AAA)
-      // used only for rendering + default resistance; solver uses resistance value
-      batteryType: 'AA' as any,
-      // allow count selection (1-4 batteries in series)
-      batteryCount: 1,
-    },
-    // include custom tokens to enable the Update button in PropertiesPanel
-    displayProperties: ["batteryType", "batteryCount"],
-  };
-
-  const AAA_batteryElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 33.5,
-        y: 1,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 25.5,
-        y: 1,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 1.5,
-      resistance: 0.4, // AAA cell internal resistance slightly higher than AA
-    },
-    displayProperties: [],
-  };
-
   const powerSupplyElement: CircuitElement = {
     id,
     type: props.type,
@@ -155,8 +49,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 73,
-        y: 115,
+        x: 72,
+        y: 117,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -164,8 +58,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 87,
-        y: 115,
+        x: 86.5,
+        y: 117,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -173,14 +67,9 @@ export default function createElement(
       },
     ],
     properties: {
-      // Store effective output voltage separately; settings tracked via custom keys on properties using casting
       voltage: props.properties?.voltage ?? 5,
       resistance: props.properties?.resistance ?? 0.2,
-      // Bench supply control settings (non-schema; accessed via casting)
-      vSet: (props as any).properties?.vSet ?? props.properties?.voltage ?? 5,
-      iLimit: (props as any).properties?.iLimit ?? 1,
-      isOn: (props as any).properties?.isOn ?? false,
-    } as any,
+    },
     displayProperties: ["voltage"],
   };
 
@@ -201,7 +90,7 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 80.5,
+        x: 79,
         y: 140,
         parentId: id,
         placeholder: "Terminal 2",
@@ -267,7 +156,7 @@ export default function createElement(
             x: pos.right.x - 40,
             y: pos.right.y + 13,
             parentId: id,
-            placeholder: "Terminal 2",
+            placeholder: "Terminal 1",
             fillColor: "red",
           },
         ],
@@ -397,13 +286,10 @@ export default function createElement(
     properties: {
       ...{
         voltage: props.properties?.voltage,
-        resistance: props.properties?.resistance ?? LED_INTERNAL_RESISTANCE,
+        resistance: props.properties?.resistance ?? 1,
         color: props.properties?.color ?? 'red',
       },
       ...props.properties,
-    },
-    runtime: {
-      led: createInitialLedRuntime(),
     },
     displayProperties: ['resistance', 'color'],
   };
@@ -670,31 +556,31 @@ export default function createElement(
       {
         id: id + "-node-vcc",
         x: 75,
-        y: 105,
+        y: 90,
         parentId: id,
         placeholder: "VCC(+5V)",
         fillColor: "red",
       },
       {
         id: id + "-node-trig",
-        x: 84,
-        y: 105,
+        x: 98,
+        y: 90,
         parentId: id,
         placeholder: "TRIG",
         fillColor: "red",
       },
       {
         id: id + "-node-echo",
-        x: 94,
-        y: 105,
+        x: 121.7,
+        y: 90,
         parentId: id,
         placeholder: "ECHO",
         fillColor: "red",
       },
       {
         id: id + "-node-gnd",
-        x: 103,
-        y: 105,
+        x: 145.3,
+        y: 90,
         parentId: id,
         placeholder: "GND",
         fillColor: "red",
@@ -708,37 +594,11 @@ export default function createElement(
     displayProperties: [],
   };
 
-  const noteElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [], // Notes don't have nodes as they're not circuit elements
-    properties: {
-      text: props.properties?.text ?? "",
-      width: props.properties?.width ?? 150,
-      height: props.properties?.height ?? 100,
-      backgroundColor: props.properties?.backgroundColor ?? "#E8E8E8",
-      collapsed: props.properties?.collapsed ?? false,
-    },
-    displayProperties: ["text"],
-  };
-
   // switch based on type
   let element;
   switch (props.type) {
     case "battery":
       element = batteryElement;
-      break;
-    case "cell3v":
-      element = cell3vElement;
-      break;
-    case "AA_battery":
-      element = AA_batteryElement;
-      break;
-    case "AAA_battery":
-      element = AAA_batteryElement;
       break;
     case "powersupply":
       element = powerSupplyElement;
@@ -766,9 +626,6 @@ export default function createElement(
       break;
     case "microbitWithBreakout":
       element = microbitElementWithBreakout;
-      break;
-    case "note":
-      element = noteElement;
       break;
     default:
       element = null;

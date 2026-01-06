@@ -25,10 +25,8 @@ function getBoxSize(message: string) {
 
 export function ShortCircuitNotification({
     show,
-    message,
-    offsetX = 0,
-    offsetY = 0
-}: { show: boolean; message: string; offsetX?: number; offsetY?: number }) {
+    message
+}: { show: boolean; message: string }) {
     useComicFont();
     const [anim, setAnim] = useState({ opacity: show ? 1 : 0, scale: show ? 1 : 0.95 });
     useEffect(() => {
@@ -41,8 +39,8 @@ export function ShortCircuitNotification({
     return show ? (
         <Group scaleX={anim.scale} scaleY={anim.scale} listening={false}>
             <Rect
-                x={75 + offsetX}
-                y={-85 + offsetY}
+                x={75}
+                y={-85}
                 width={width}
                 height={height}
                 fill="#fff"
@@ -57,8 +55,8 @@ export function ShortCircuitNotification({
                 listening={false}
             />
             <Text
-                x={85 + offsetX}
-                y={-62 + offsetY}
+                x={85}
+                y={-62}
                 width={width - 28}
                 height={height - 20}
                 fill="#161616"

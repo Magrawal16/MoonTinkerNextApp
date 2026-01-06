@@ -45,7 +45,7 @@ export default function LoginPage() {
             // Ignore storage errors
           }
         }
-        router.push("/saved_circuits");
+        router.push("/");
       } else {
         setError("Invalid credentials.");
       }

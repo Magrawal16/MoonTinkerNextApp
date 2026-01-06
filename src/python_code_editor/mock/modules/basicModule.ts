@@ -1,8 +1,6 @@
 import type { PyodideInterface } from "pyodide";
 import { LEDModule } from "./ledModule";
-
 import { CHARACTER_PATTERNS } from "../characterPatterns";
-import { ImageModule } from "./imageModule";
 
 export class BasicModule {
     private foreverCallbacks: Set<any> = new Set();
@@ -16,39 +14,6 @@ export class BasicModule {
         private pyodide: PyodideInterface,
         private ledModule: LEDModule
     ) { }
-
-    // Optional reference to the owning microbit simulator (set by the simulator)
-    private microbit: any = null;
-
-    setMicrobit(microbit: any) {
-        this.microbit = microbit;
-    }
-
-    /**
-     * Show a built-in image by name, e.g. display.show(Image.HAPPY)
-     */
-    async showImage(icon: string): Promise<void> {
-        const myToken = ++this.currentDisplayToken;
-        this.displayPromise = new Promise<void>((resolve) => {
-            this.displayPromiseResolve = resolve;
-        });
-        const pattern = ImageModule.getPattern(icon);
-        // First unplot all LEDs (clear display)
-        for (let y = 0; y < 5; y++) {
-            for (let x = 0; x < 5; x++) {
-                this.ledModule.unplot(x, y);
-            }
-        }
-        // Then plot only the pixels for the icon
-        for (let y = 0; y < 5; y++) {
-            const row = pattern[y] || "00000";
-            for (let x = 0; x < 5; x++) {
-                if (row.charAt(x) === "1") this.ledModule.plot(x, y);
-            }
-        }
-        await new Promise((resolve) => setTimeout(resolve, 400));
-        if (myToken === this.currentDisplayToken) this.displayPromiseResolve?.();
-    }
 
     async showString(text: string, interval: number = 150): Promise<void> {
         // Start a new display session; cancel previous by advancing the token
@@ -306,10 +271,8 @@ export class BasicModule {
             show_string: this.showString.bind(this),
             show_number: this.showNumber.bind(this),
             show_leds: this.showLeds.bind(this),
-            show_image: this.showImage.bind(this),
             forever: this.forever.bind(this),
             pause: this.pause.bind(this),
-            temperature: () => this.microbit?.getTemperature?.() ?? 0,
         };
     }
 }

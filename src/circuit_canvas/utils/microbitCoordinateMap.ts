@@ -74,6 +74,13 @@ export interface MicrobitCoordinates {
     width: number;
     height: number;
   };
+
+  versionText: {
+    x: number;
+    y: number;
+    fontSize: number;
+    color?: string;
+  };
 }
 
 // Coordinate maps for each color variant
@@ -133,6 +140,12 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       width: 90,
       height: 90,
     },
+    versionText: {
+      x: 183,
+      y: 167,
+      fontSize: 6,
+      color: "#FFFFFF",
+    },
   },
   yellow: {
     width: 171,
@@ -188,6 +201,12 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       y: 90,
       width: 90,
       height: 90,
+    },
+    versionText: {
+      x: 158,
+      y: 96,
+      fontSize: 6,
+      color: "#FFFFFF",
     },
   },
   green: {
@@ -245,6 +264,12 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       width: 90,
       height: 90,
     },
+    versionText: {
+      x: 158,
+      y: 96,
+      fontSize: 6,
+      color: "#FFFFFF",
+    },
   },
   blue: {
     width: 171,
@@ -300,6 +325,12 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       y: 90,
       width: 90,
       height: 90,
+    },
+    versionText: {
+      x: 160,
+      y: 95,
+      fontSize: 6,
+      color: "#FFFFFF",
     },
   },
 };
@@ -397,6 +428,12 @@ export interface MicrobitWithBreakoutCoordinates {
     width: number;
     height: number;
   };
+  versionText: {
+    x: number;
+    y: number;
+    fontSize: number;
+    color?: string;
+  };
 }
 
 const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBreakoutCoordinates> = {
@@ -472,6 +509,12 @@ const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBrea
       width: 90,
       height: 90,
     },
+    versionText: {
+      x: 178,
+      y: 115,
+      fontSize: 6,
+      color: "#FFFFFF",
+    },
   },
   yellow:  {
     width: 226,
@@ -544,6 +587,12 @@ const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBrea
       y: 82,
       width: 90,
       height: 90,
+    },
+    versionText: {
+      x: 180,
+      y: 115,
+      fontSize: 6,
+      color: "#FFFFFF",
     },
   },
   green: {
@@ -618,6 +667,12 @@ const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBrea
       width: 90,
       height: 90,
     },
+    versionText: {
+      x: 180,
+      y: 115,
+      fontSize: 6,
+      color: "#FFFFFF",
+    },
   },
   blue:  {
     width: 226,
@@ -690,6 +745,12 @@ const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBrea
       y: 82,
       width: 90,
       height: 90,
+    },
+    versionText: {
+      x: 180,
+      y: 115,
+      fontSize: 6,
+      color: "#FFFFFF",
     },
   },
 };

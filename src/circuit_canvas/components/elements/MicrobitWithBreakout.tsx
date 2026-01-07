@@ -245,6 +245,17 @@ export default function Microbit({
           />
         )}
 
+        {/* Version label */}
+        <Text
+          text="V2"
+          x={coords.versionText.x}
+          y={coords.versionText.y}
+          fontSize={coords.versionText.fontSize}
+          fill={coords.versionText.color ?? "#FFFFFF"}
+          fontStyle="bold"
+          listening={false}
+        />
+
         
 
         {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}

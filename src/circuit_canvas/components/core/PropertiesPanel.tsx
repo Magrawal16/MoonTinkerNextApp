@@ -10,6 +10,7 @@ import {
 } from "@/circuit_canvas/components/toolbar/customization/ColorPallete";
 import { getLedNodePositions } from "@/circuit_canvas/utils/ledNodeMap";
 import { getBatteryNodePositions } from "@/circuit_canvas/utils/batteryNodeMap";
+import { updateMicrobitNodes } from "@/circuit_canvas/utils/createElement";
 
 export default function PropertiesPanel({
   selectedElement,
@@ -59,7 +60,8 @@ export default function PropertiesPanel({
   ) =>
     !selectedElement?.displayProperties ||
     selectedElement.displayProperties.includes(name) ||
-    (selectedElement?.type === "microbit" && name === "color");
+    (selectedElement?.type === "microbit" && name === "color") ||
+    (selectedElement?.type === "microbitWithBreakout" && name === "color");
 
   useEffect(() => {
     if (!selectedElement) return;
@@ -82,8 +84,8 @@ export default function PropertiesPanel({
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
     const nextColor =
-      selectedElement.type === "microbit"
-        ? selectedElement.properties?.color ?? "red"
+      selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout"
+        ? selectedElement.properties?.color ?? (selectedElement.type === "microbitWithBreakout" ? "green" : "red")
         : selectedElement.properties?.color ?? null;
     setColor(nextColor);
     // Normalize old "Select to edit" text to empty string
@@ -232,6 +234,12 @@ export default function PropertiesPanel({
           };
         }
       }
+
+      // For microbit/microbitWithBreakout, update node positions when color changes
+      if ((selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && color) {
+        updatedElement = updateMicrobitNodes(updatedElement);
+      }
+
       onElementEdit(updatedElement, false);
     }
 
@@ -405,6 +413,23 @@ export default function PropertiesPanel({
         </div>
       )}
 
+      {/* micro:bit with breakout shell color */}
+      {selectedElement.type === "microbitWithBreakout" && showProp("color") && (
+        <div className="flex flex-col text-xs">
+          <label>micro:bit Breakout Color:</label>
+          <select
+            value={color ?? "green"}
+            onChange={(e) => setColor(e.target.value)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="red">Red</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+          </select>
+        </div>
+      )}
+
       {/* LED-specific color */}
       {selectedElement.type === "led" && showProp("color") && (
         <div className="flex flex-col text-xs">
@@ -477,8 +502,7 @@ export default function PropertiesPanel({
 
       <div className="flex justify-between gap-2 text-xs">
         { 
-          selectedElement.type !== "wire" && 
-          selectedElement.type !== "microbitWithBreakout" &&
+          selectedElement.type !== "wire" &&
           Array.isArray(selectedElement.displayProperties) &&
           selectedElement.displayProperties.length > 0 && (
           <button

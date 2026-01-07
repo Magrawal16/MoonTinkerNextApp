@@ -76,15 +76,34 @@ export default function Microbit({
     onControllerInput?.({ type: "button", button: btn, state: "released" });
   };
 
-  // Logo stroke color logic
+  // Logo stroke color logic - match microbit shell color
+  const getLogoColor = () => {
+    const colorMap: Record<string, string> = {
+      red: "rgb(200,36,52)",
+      yellow: "rgb(255,193,7)",
+      green: "rgb(76,175,80)",
+      blue: "rgb(33,150,243)",
+    };
+    return colorMap[color] || "rgb(200,36,52)";
+  };
+
+  const darkenColor = (colorStr: string, factor: number = 0.7) => {
+    // Extract RGB values and adjust by factor
+    const match = colorStr.match(/\d+/g);
+    if (!match) return colorStr;
+    const [r, g, b] = match.map(Number);
+    return `rgb(${Math.floor(r * factor)},${Math.floor(g * factor)},${Math.floor(b * factor)})`;
+  };
+
+  const baseLogoColor = getLogoColor();
   const logoStroke =
     !isSimulationOn
-      ? "rgb(200,36,52)"
+      ? darkenColor(baseLogoColor, 0.6)  // Darker by default (60%)
       : logoState === "pressed"
-        ? "green"
+        ? baseLogoColor  // Full brightness when pressed (100%)
         : logoState === "hover"
-          ? "yellow"
-          : "rgb(200,36,52)";
+          ? darkenColor(baseLogoColor, 0.8)  // Medium brightness on hover (80%)
+          : darkenColor(baseLogoColor, 0.6);  // Darker by default (60%)
 
   const enableLogoInteraction = isSimulationOn;
 
@@ -351,7 +370,7 @@ export default function Microbit({
             height={coords.logo.height}
             cornerRadius={20}
             stroke={logoStroke}
-            strokeWidth={3}
+            strokeWidth={coords.logo.strokeWidth}
             fill="rgba(0,0,0,0.55)"
             opacity={10}
           />

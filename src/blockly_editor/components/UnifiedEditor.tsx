@@ -631,7 +631,8 @@ export default function UnifiedEditor({
     } else {
       setIsConverting(true);
       setConversionType("toText");
-      let defaultCode = `def on_start():\n  pass\n\non_start()\n\n\ndef on_forever():\n  pass\nbasic.forever(on_forever)\n`;
+      // Default code with just forever block (on_start generates inline code, so empty = nothing)
+      let defaultCode = `def on_forever():\n    pass\nbasic.forever(on_forever)\n`;
       if (workspaceRef.current && bidirectionalConverter) {
         try {
           try { pythonGenerator.init(workspaceRef.current); } catch (e) { }

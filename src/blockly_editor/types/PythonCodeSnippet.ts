@@ -136,8 +136,8 @@ export const CODE_SNIPPETS: CodeSnippet[] = [
   {
     id: "on_start",
     name: "On Start",
-    description: "Code that runs when the program starts",
-    code: `def on_start():\n    pass\n\nbasic.start(on_start)`,
+    description: "Code that runs when the program starts (appears before forever loop)",
+    code: `# On start code goes here\n`,
     category: "Basic",
   },
   {

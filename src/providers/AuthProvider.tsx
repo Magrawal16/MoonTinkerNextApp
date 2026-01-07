@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useEffect, useState } from "react";
 type AuthContextType = {
   isAuthenticated: boolean;
   userEmail?: string | null;
+  role?: string | null;
   initialized: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
@@ -30,21 +31,25 @@ export const AuthContext = createContext<AuthContextType>({
 
 const STORAGE_KEY = "mt:auth";
 const STORAGE_USER = "mt:user";
+const STORAGE_ROLE = "mt:role";
 
 export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
   children,
 }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     try {
       const stored = sessionStorage.getItem(STORAGE_KEY);
       const user = sessionStorage.getItem(STORAGE_USER);
+      const storedRole = sessionStorage.getItem(STORAGE_ROLE);
       if (stored === "1") {
         setIsAuthenticated(true);
         setUserEmail(user);
+        setRole(storedRole);
       }
       // mark that we finished checking storage
       setInitialized(true);
@@ -55,36 +60,59 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
-    // Frontend-only: hash the provided credentials (using SubtleCrypto) and
-    // compare to the stored hashes. We normalize the email to lower-case.
+    // Call the same-origin proxy which injects the required security-key
+    // and forwards to the external login API. Payload matches Postman screenshot.
+    const payload = {
+      userName: (email || "").trim(),
+      password: password || "",
+      rememberMe: false,
+      login_from: "moontinker",
+      isParent: false,
+    };
+
     try {
-      const encoder = new TextEncoder();
-      const bufE = encoder.encode((email || "").trim().toLowerCase());
-      const bufP = encoder.encode(password || "");
-      const digestE = await crypto.subtle.digest("SHA-256", bufE);
-      const digestP = await crypto.subtle.digest("SHA-256", bufP);
-      const hex = (buf: ArrayBuffer) =>
-        Array.from(new Uint8Array(buf))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("");
+      const res = await fetch(`/api/account/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      const emailHash = hex(digestE);
-      const passHash = hex(digestP);
+      const text = await res.text().catch(() => "");
+      let json: any = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch (e) {
+        // upstream returned non-JSON
+      }
 
-      if (emailHash === AUTH_EMAIL_HASH && passHash === AUTH_PASSWORD_HASH) {
+      if (!res.ok) {
+        console.error('[auth] login failed', res.status, json || text);
+        return false;
+      }
+
+      // Accept a few possible upstream shapes:
+      //  - { nErrorNumber: 0, Data: { ... } }
+      //  - { errorNumber: 0, Data: { ... } }
+      //  - { success: true, data: { ... } }
+      const data = json?.Data || json?.data || null;
+      const ok1 = json && (json.nErrorNumber === 0 || json.errorNumber === 0 || json.success === true);
+      if (ok1 && data) {
         try {
           sessionStorage.setItem(STORAGE_KEY, "1");
-          // store a display label only; do not persist the real email
-          sessionStorage.setItem(STORAGE_USER, "admin");
+          sessionStorage.setItem(STORAGE_USER, data.email || data.user_id || payload.userName || "user");
+          if (data.role) sessionStorage.setItem(STORAGE_ROLE, data.role);
         } catch (e) {
           // ignore storage errors
         }
         setIsAuthenticated(true);
-        setUserEmail("admin");
+        setUserEmail(data.email || data.user_id || payload.userName || "user");
+        setRole(data.role || null);
         return true;
       }
+
+      console.error('[auth] login response did not indicate success', json || text);
     } catch (e) {
-      // If Web Crypto fails for some reason, fall through to return false
+      console.error('[auth] login error', e);
     }
     return false;
   }, []);
@@ -93,16 +121,19 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     try {
       sessionStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem(STORAGE_USER);
+      sessionStorage.removeItem(STORAGE_ROLE);
     } catch (e) {
       // ignore
     }
     setIsAuthenticated(false);
     setUserEmail(null);
+    setRole(null);
   }, []);
 
   const ctx: AuthContextType = {
     isAuthenticated,
     userEmail,
+    role,
     initialized,
     login,
     logout,

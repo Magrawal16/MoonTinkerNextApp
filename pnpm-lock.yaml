@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@microbit/microbit-fs':
+        specifier: ^0.10.0
+        version: 0.10.0(tslib@2.8.1)
       '@monaco-editor/react':
         specifier: 4.7.0-rc.0
         version: 4.7.0-rc.0(monaco-editor@0.53.0)(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -20,6 +23,9 @@ importers:
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
+      dapjs:
+        specifier: ^2.3.0
+        version: 2.3.0
       framer-motion:
         specifier: ^12.23.26
         version: 12.23.26(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -1135,6 +1141,15 @@ packages:
   '@jridgewell/trace-mapping@0.3.29':
     resolution: {integrity: sha512-uw6guiW/gcAGPDhLmd77/6lW8QLeiV5RUTsAX46Db6oLhGaVj4lhnPwb184s1bkc8kdVg/+h988dro8GRDpmYQ==}
 
+  '@microbit/microbit-fs@0.10.0':
+    resolution: {integrity: sha512-n6DEVqqaQAL/EDLyXh+1nsdRV16ePFqROeFeNlOoTS23eB8zF8qhA+IaNHRT07sy0zgCGg3YCZgP+zcCIRzP6A==}
+
+  '@microbit/microbit-universal-hex@0.2.2':
+    resolution: {integrity: sha512-qyFt8ATgxAyPkNz9Yado4HXEeCctwP/8L1/v2hFLeVUqw/HFqVqV4piJbqRMmyOefMcQ9OyVPhLXjtbKn9063Q==}
+    engines: {node: '>=8.5', npm: '>=6.0', yarn: ^1.0}
+    peerDependencies:
+      tslib: '>=1.11.1'
+
   '@monaco-editor/loader@1.5.0':
     resolution: {integrity: sha512-hKoGSM+7aAc7eRTRjpqAZucPmoNOC4UUbknb/VNoTkEIkCPhqV8LfbsgM1webRM7S/z21eHEx9Fkwx8Z/C/+Xw==}
 
@@ -1403,6 +1418,9 @@ packages:
   '@types/json5@0.0.29':
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
 
+  '@types/node-hid@1.3.4':
+    resolution: {integrity: sha512-0ootpsYetN9vjqkDSwm/cA4fk/9yGM/PO0X8SLPE/BzXlUaBelImMWMymtF9QEoEzxY0pnhcROIJM0CNSUqO8w==}
+
   '@types/node@20.19.7':
     resolution: {integrity: sha512-1GM9z6BJOv86qkPvzh2i6VW5+VVrXxCLknfmTkWEqz+6DqosiY28XUWCTmBcJ0ACzKqx/iwdIREfo1fwExIlkA==}
 
@@ -1435,6 +1453,12 @@ packages:
 
   '@types/uglify-js@3.17.5':
     resolution: {integrity: sha512-TU+fZFBTBcXj/GpDpDaBmgWk/gn96kMZ+uocaFUlV2f8a6WdMzzI44QBCmGcCiYR0Y6ZlNRiyUyKKt5nl/lbzQ==}
+
+  '@types/usb@1.5.4':
+    resolution: {integrity: sha512-NOUza/8yuswu6RoECQyPHEjA34qpDaeONQ72fm+bCnnN2DJjDePAY+NsmV17H88oIlq4JlJ2mD5Kh5d6R2MwTQ==}
+
+  '@types/w3c-web-usb@1.0.13':
+    resolution: {integrity: sha512-N2nSl3Xsx8mRHZBvMSdNGtzMyeleTvtlEw+ujujgXalPqOjIA6UtrqcB6OzyUjkTbDm3J7P1RNK1lgoO7jxtsw==}
 
   '@types/webpack-sources@3.2.3':
     resolution: {integrity: sha512-4nZOdMwSPHZ4pTEZzSp0AsTM4K7Qmu40UKW4tJDiOVs20UzYF9l+qUe4s0ftfN0pin06n+5cWWDJXH+sbhAiDw==}
@@ -2019,6 +2043,10 @@ packages:
 
   damerau-levenshtein@1.0.8:
     resolution: {integrity: sha512-sdQSFB7+llfUcQHUQO3+B8ERRj0Oa4w9POWMI/puGtuf7gFywGmkaLCElnudfTiKZV+NvHqL0ifzdrI8Ro7ESA==}
+
+  dapjs@2.3.0:
+    resolution: {integrity: sha512-quanzq7+2xnqgGqqYgARz9o3iBcZ3Ir5r5mTA7WPsjrp9ilEqqCToSFGTL+8HuGP35dUIL7O+yMBloYHhHgZDA==}
+    engines: {node: '>=8.14.0'}
 
   data-urls@5.0.0:
     resolution: {integrity: sha512-ZYP5VBHshaDAiVZxjbRVcFJpc+4xGgT0bK3vzy1HLN8jTO975HEbuYzZJcHoQEY5K1a0z8YayJkyVETa08eNTg==}
@@ -3292,6 +3320,10 @@ packages:
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
+
+  nrf-intel-hex@1.4.0:
+    resolution: {integrity: sha512-q3+GGRIpe0VvCjUP1zaqW5rk6IpCZzhD0lu7Sguo1bgWwFcA9kZRjsaKUb0jBQMnefyOl5o0BBGAxvqMqYx8Sg==}
+    engines: {node: '>=6.0.0'}
 
   nwsapi@2.2.21:
     resolution: {integrity: sha512-o6nIY3qwiSXl7/LuOU0Dmuctd34Yay0yeuZRLFmDPrrdHpXKFndPj3hM+YEPVHYC5fx2otBx4Ilc/gyYSAUaIA==}
@@ -5394,6 +5426,17 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.4
 
+  '@microbit/microbit-fs@0.10.0(tslib@2.8.1)':
+    dependencies:
+      '@microbit/microbit-universal-hex': 0.2.2(tslib@2.8.1)
+      nrf-intel-hex: 1.4.0
+    transitivePeerDependencies:
+      - tslib
+
+  '@microbit/microbit-universal-hex@0.2.2(tslib@2.8.1)':
+    dependencies:
+      tslib: 2.8.1
+
   '@monaco-editor/loader@1.5.0':
     dependencies:
       state-local: 1.0.7
@@ -5626,6 +5669,10 @@ snapshots:
 
   '@types/json5@0.0.29': {}
 
+  '@types/node-hid@1.3.4':
+    dependencies:
+      '@types/node': 20.19.7
+
   '@types/node@20.19.7':
     dependencies:
       undici-types: 6.21.0
@@ -5655,6 +5702,12 @@ snapshots:
   '@types/uglify-js@3.17.5':
     dependencies:
       source-map: 0.6.1
+
+  '@types/usb@1.5.4':
+    dependencies:
+      '@types/node': 20.19.7
+
+  '@types/w3c-web-usb@1.0.13': {}
 
   '@types/webpack-sources@3.2.3':
     dependencies:
@@ -6317,6 +6370,12 @@ snapshots:
   csstype@3.1.3: {}
 
   damerau-levenshtein@1.0.8: {}
+
+  dapjs@2.3.0:
+    dependencies:
+      '@types/node-hid': 1.3.4
+      '@types/usb': 1.5.4
+      '@types/w3c-web-usb': 1.0.13
 
   data-urls@5.0.0:
     dependencies:
@@ -7804,6 +7863,8 @@ snapshots:
   node-releases@2.0.19: {}
 
   normalize-path@3.0.0: {}
+
+  nrf-intel-hex@1.4.0: {}
 
   nwsapi@2.2.21: {}
 

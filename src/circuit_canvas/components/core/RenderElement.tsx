@@ -287,6 +287,7 @@ export default function RenderElement(props: RenderElementProps) {
             (element.controller?.leds as number[][] | undefined) ??
             Array.from({ length: 5 }, () => Array(5).fill(0))
           }
+          color={(element.properties?.color as string | undefined) ?? "green"}
           selected={props.selectedElementId === element.id}
           draggable={false}
           isSimulationOn={props.isSimulationOn}
@@ -464,7 +465,12 @@ export default function RenderElement(props: RenderElementProps) {
                     pointerHeight={4}
                   />
                   <Text
-                    text={node.placeholder}
+                    text={
+                      (element.type === "microbitWithBreakout" && 
+                       ["P3", "P4", "P6", "P7", "P9", "P10", "P12", "P19", "P20"].includes(node.placeholder))
+                        ? "Not Supported"
+                        : node.placeholder
+                    }
                     fontSize={11}
                     fontFamily="Arial, sans-serif"
                     fontStyle="500"

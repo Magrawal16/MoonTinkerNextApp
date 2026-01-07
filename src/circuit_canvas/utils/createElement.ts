@@ -473,7 +473,8 @@ export default function createElement(
   };
 
   // Get coordinates for microbit with breakout
-  const breakoutCoords = getMicrobitWithBreakoutCoordinates();
+  const microbitWithBreakoutColor = props.properties?.color ?? "green";
+  const breakoutCoords = getMicrobitWithBreakoutCoordinates(microbitWithBreakoutColor);
   
   const microbitElementWithBreakout = {
     id,
@@ -532,130 +533,130 @@ export default function createElement(
       },
       {
         id: id + "-node-3",
-        x: 77.3,
-        y: 229.2,
+        x: breakoutCoords.pins.P3.x,
+        y: breakoutCoords.pins.P3.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P3",
         fillColor: "red",
       },
       {
         id: id + "-node-4",
-        x: 85,
-        y: 229.2,
+        x: breakoutCoords.pins.P4.x,
+        y: breakoutCoords.pins.P4.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P4",
         fillColor: "red",
       },
       {
         id: id + "-node-5",
-        x: 92,
-        y: 229.2,
+        x: breakoutCoords.pins.P5.x,
+        y: breakoutCoords.pins.P5.y,
         parentId: id,
         placeholder: "P5",
         fillColor: "red",
       },
       {
         id: id + "-node-6",
-        x: 100,
-        y: 229.2,
+        x: breakoutCoords.pins.P6.x,
+        y: breakoutCoords.pins.P6.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P6",
         fillColor: "red",
       },
       {
         id: id + "-node-7",
-        x: 107,
-        y: 229.2,
+        x: breakoutCoords.pins.P7.x,
+        y: breakoutCoords.pins.P7.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P7",
         fillColor: "red",
       },
       {
         id: id + "-node-8",
-        x: 114.3,
-        y: 229.2,
+        x: breakoutCoords.pins.P8.x,
+        y: breakoutCoords.pins.P8.y,
         parentId: id,
         placeholder: "P8",
         fillColor: "red",
       },
       {
         id: id + "-node-9",
-        x: 122,
-        y: 229.2,
+        x: breakoutCoords.pins.P9.x,
+        y: breakoutCoords.pins.P9.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P9",
         fillColor: "red",
       },
       {
         id: id + "-node-10",
-        x: 129,
-        y: 229.2,
+        x: breakoutCoords.pins.P10.x,
+        y: breakoutCoords.pins.P10.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P10",
         fillColor: "red",
       },
       {
         id: id + "-node-11",
-        x: 137,
-        y: 229.2,
+        x: breakoutCoords.pins.P11.x,
+        y: breakoutCoords.pins.P11.y,
         parentId: id,
         placeholder: "P11",
         fillColor: "red",
       },
       {
         id: id + "-node-12",
-        x: 144.8,
-        y: 229.2,
+        x: breakoutCoords.pins.P12.x,
+        y: breakoutCoords.pins.P12.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P12",
         fillColor: "red",
       },
       {
         id: id + "-node-13",
-        x: 152,
-        y: 229.2,
+        x: breakoutCoords.pins.P13.x,
+        y: breakoutCoords.pins.P13.y,
         parentId: id,
         placeholder: "P13",
         fillColor: "red",
       },
       {
         id: id + "-node-14",
-        x: 159.5,
-        y: 229.2,
+        x: breakoutCoords.pins.P14.x,
+        y: breakoutCoords.pins.P14.y,
         parentId: id,
         placeholder: "P14",
         fillColor: "red",
       },
       {
         id: id + "-node-15",
-        x: 166.8,
-        y: 229.2,
+        x: breakoutCoords.pins.P15.x,
+        y: breakoutCoords.pins.P15.y,
         parentId: id,
         placeholder: "P15",
         fillColor: "red",
       },
       {
         id: id + "-node-16",
-        x: 174,
-        y: 229.2,
+        x: breakoutCoords.pins.P16.x,
+        y: breakoutCoords.pins.P16.y,
         parentId: id,
         placeholder: "P16",
         fillColor: "red",
       },
       {
         id: id + "-node-19",
-        x: 181,
-        y: 229.2,
+        x: breakoutCoords.pins.P19.x,
+        y: breakoutCoords.pins.P19.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P19",
         fillColor: "red",
       },
       {
         id: id + "-node-20",
-        x: 188,
-        y: 229.2,
+        x: breakoutCoords.pins.P20.x,
+        y: breakoutCoords.pins.P20.y,
         parentId: id,
-        placeholder: "Not Supported",
+        placeholder: "P20",
         fillColor: "red",
       },
     ],
@@ -663,10 +664,11 @@ export default function createElement(
       voltage: props.properties?.voltage ?? 3.3,
       resistance: props.properties?.resistance ?? 0,
       temperature: props.properties?.temperature ?? 25, 
-      brightness: props.properties?.brightness ?? 128, 
+      brightness: props.properties?.brightness ?? 128,
+      color: props.properties?.color ?? "green",
       ...props.properties,
     },
-    displayProperties: ["temperature", "brightness"],
+    displayProperties: ["temperature", "brightness", "color"],
   };
 
   const ultraSonicSensor4P = {
@@ -809,7 +811,8 @@ export function updateMicrobitNodes(element: CircuitElement): CircuitElement {
       })
     };
   } else if (element.type === "microbitWithBreakout") {
-    const coords = getMicrobitWithBreakoutCoordinates();
+    const microbitWithBreakoutColor = element.properties?.color ?? "green";
+    const coords = getMicrobitWithBreakoutCoordinates(microbitWithBreakoutColor);
     
     return {
       ...element,
@@ -826,6 +829,38 @@ export function updateMicrobitNodes(element: CircuitElement): CircuitElement {
           return { ...node, x: coords.pins.P1.x, y: coords.pins.P1.y };
         } else if (node.placeholder === "P2") {
           return { ...node, x: coords.pins.P2.x, y: coords.pins.P2.y };
+        } else if (node.placeholder === "P3") {
+          return { ...node, x: coords.pins.P3.x, y: coords.pins.P3.y };
+        } else if (node.placeholder === "P4") {
+          return { ...node, x: coords.pins.P4.x, y: coords.pins.P4.y };
+        } else if (node.placeholder === "P5") {
+          return { ...node, x: coords.pins.P5.x, y: coords.pins.P5.y };
+        } else if (node.placeholder === "P6") {
+          return { ...node, x: coords.pins.P6.x, y: coords.pins.P6.y };
+        } else if (node.placeholder === "P7") {
+          return { ...node, x: coords.pins.P7.x, y: coords.pins.P7.y };
+        } else if (node.placeholder === "P8") {
+          return { ...node, x: coords.pins.P8.x, y: coords.pins.P8.y };
+        } else if (node.placeholder === "P9") {
+          return { ...node, x: coords.pins.P9.x, y: coords.pins.P9.y };
+        } else if (node.placeholder === "P10") {
+          return { ...node, x: coords.pins.P10.x, y: coords.pins.P10.y };
+        } else if (node.placeholder === "P11") {
+          return { ...node, x: coords.pins.P11.x, y: coords.pins.P11.y };
+        } else if (node.placeholder === "P12") {
+          return { ...node, x: coords.pins.P12.x, y: coords.pins.P12.y };
+        } else if (node.placeholder === "P13") {
+          return { ...node, x: coords.pins.P13.x, y: coords.pins.P13.y };
+        } else if (node.placeholder === "P14") {
+          return { ...node, x: coords.pins.P14.x, y: coords.pins.P14.y };
+        } else if (node.placeholder === "P15") {
+          return { ...node, x: coords.pins.P15.x, y: coords.pins.P15.y };
+        } else if (node.placeholder === "P16") {
+          return { ...node, x: coords.pins.P16.x, y: coords.pins.P16.y };
+        } else if (node.placeholder === "P19") {
+          return { ...node, x: coords.pins.P19.x, y: coords.pins.P19.y };
+        } else if (node.placeholder === "P20") {
+          return { ...node, x: coords.pins.P20.x, y: coords.pins.P20.y };
         }
         return node;
       })

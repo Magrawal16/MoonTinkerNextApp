@@ -156,21 +156,30 @@ export const BASIC_BLOCKS: SharedBlockDefinition[] = [
     type: "on_start",
     category: "Basic",
     blockDefinition: { type: "on_start", message0: "on start %1 %2", args0: [{ type: "input_dummy" }, { type: "input_statement", name: "DO" }], tooltip: "Runs once at the start" },
+    // The on_start block now outputs raw code (no function wrapper), so match code that appears
+    // before the forever block. This is a dummy pattern that won't match normal code lines
+    // since individual statements like basic.show_string are matched by their own patterns.
     pythonPattern: /(?:async\s+)?def\s+on_start\(\s*\)\s*:([\s\S]*?)(?=\n(?:\S|$))/g,
     pythonGenerator: (block, generator) => {
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
       const statements = generator.statementToCode(block, "DO");
-      let needsAsync = false;
-      try {
-        const doInput = block.getInputTargetBlock("DO");
-        if (doInput) {
-          const desc = doInput.getDescendants(false);
-          for (const d of desc) { if (d && d.type === "music_record_and_play") { needsAsync = true; break; } }
+      // If on_start has no statements, return empty string (don't output anything)
+      if (!statements || !statements.trim().length) {
+        return "";
+      }
+      // Output statements directly without function wrapper
+      // The statementToCode adds one level of indentation, so we need to remove it
+      // We use a smarter dedent that only removes leading indentation from the first level
+      const IND = ((generator as any)?.INDENT ?? "    ") as string;
+      const lines = statements.split("\n");
+      const dedentedLines = lines.map((line: string) => {
+        // Only dedent lines that start with the standard indent (not content inside multi-line strings)
+        if (line.startsWith(IND)) {
+          return line.slice(IND.length);
         }
-      } catch {}
-      const bodyIndented = statements && statements.trim().length ? statements : `${IND}pass\n`;
-      const asyncKeyword = needsAsync ? "async " : "";
-      return `${asyncKeyword}def on_start():\n${bodyIndented}\n${needsAsync ? "await " : ""}on_start()\n`;
+        return line;
+      });
+      // Trim trailing whitespace/newlines to avoid extra blank lines when joining with other code
+      return dedentedLines.join("\n").trimEnd();
     },
     pythonExtractor: (match) => ({ STATEMENTS: match[1].trim() }),
     blockCreator: (workspace) => workspace.newBlock("on_start"),

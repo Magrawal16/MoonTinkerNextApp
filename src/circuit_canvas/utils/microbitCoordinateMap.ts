@@ -25,6 +25,7 @@ export interface MicrobitCoordinates {
     y: number;
     width: number;
     height: number;
+    strokeWidth: number;
   };
 
   // USB on/off state overlays
@@ -93,6 +94,7 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       y: 91.2,
       width: 29.2,
       height: 16.2,
+      strokeWidth: 4,
     },
     usbOn: {
       x: 0,
@@ -144,10 +146,11 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       height: 135,
     },
     logo: {
-      x: 73,
-      y: 20,
-      width: 26,
+      x: 72.4,
+      y: 19.5,
+      width: 24.8,
       height: 14,
+      strokeWidth: 4,
     },
     usbOn: {
       x: -25,
@@ -188,52 +191,53 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
     },
   },
   green: {
-    width: 170,
-    height: 136,
+    width: 171,
+    height: 135,
     offsetX: 0,
     offsetY: 0,
     hitArea: {
-      x: 0,
-      y: 0,
-      width: 170,
-      height: 136,
+      x: 10,
+      y: 48,
+      width: 200,
+      height: 135,
     },
     logo: {
-      x: 70,
-      y: 25,
-      width: 29.2,
-      height: 16.2,
+      x: 72,
+      y: 19.8,
+      width: 26,
+      height: 14,
+      strokeWidth: 4,
     },
     usbOn: {
-      x: -26.6,
-      y: -67,
+      x: -25,
+      y: -72,
       width: 220,
       height: 220,
     },
     usbOff: {
-      x: -27,
-      y: -92.5,
+      x: -25,
+      y: -97.5,
       width: 220,
       height: 220,
     },
     ledMatrix: {
       startX: 60,
-      startY: 50,
+      startY: 45,
       spacingX: 12.4,
       spacingY: 12.4,
       ledRadius: 4.2,
     },
     buttons: {
-      AB: { x: 150, y: 96 },
-      A: { x: 9.2, y: 65.6 },
-      B: { x: 137.5, y: 65.6 },
+      AB: { x: 141, y: 24.5 },
+      A: { x: 9, y: 59.4 },
+      B: { x: 140.2, y: 59.4 },
     },
     pins: {
-      P0: { x: 18, y: 163 },
-      P1: { x: 49.8, y: 163 },
-      P2: { x: 86.4, y: 163 },
-      V3: { x: 123, y: 163 },
-      GND: { x: 155, y: 163 },
+      P0: { x: 16, y: 155 },
+      P1: { x: 49, y: 155 },
+      P2: { x: 85.5, y: 155 },
+      V3: { x: 122.5, y: 155 },
+      GND: { x: 154.5, y: 155 },
     },
     explosion: {
       x: 65,
@@ -243,10 +247,10 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
     },
   },
   blue: {
-    width: 220,
-    height: 220,
+    width: 171,
+    height: 135,
     offsetX: 0,
-    offsetY: -25,
+    offsetY: 0,
     hitArea: {
       x: 10,
       y: 48,
@@ -254,41 +258,42 @@ const MICROBIT_COORDINATES: Record<MicrobitColor, MicrobitCoordinates> = {
       height: 135,
     },
     logo: {
-      x: 95.2,
-      y: 91.2,
-      width: 29.2,
-      height: 16.2,
+      x: 72.8,
+      y: 20,
+      width: 26,
+      height: 14,
+      strokeWidth: 4,
     },
     usbOn: {
-      x: 0,
-      y: 0,
+      x: -25,
+      y: -72,
       width: 220,
       height: 220,
     },
     usbOff: {
-      x: 0,
-      y: -25,
+      x: -25,
+      y: -97.5,
       width: 220,
       height: 220,
     },
     ledMatrix: {
-      startX: 84,
-      startY: 114,
+      startX: 60,
+      startY: 45,
       spacingX: 12.4,
       spacingY: 12.4,
       ledRadius: 4.2,
     },
     buttons: {
-      AB: { x: 164, y: 96 },
-      A: { x: 35, y: 130 },
-      B: { x: 165, y: 130 },
+      AB: { x: 143, y: 24.5 },
+      A: { x: 8.5, y: 59 },
+      B: { x: 141.8, y: 59 },
     },
     pins: {
-      P0: { x: 42.9, y: 227 },
-      P1: { x: 74.8, y: 227 },
-      P2: { x: 111.4, y: 227 },
-      V3: { x: 148, y: 227 },
-      GND: { x: 180, y: 227 },
+      P0: { x: 15, y: 154 },
+      P1: { x: 49, y: 154 },
+      P2: { x: 85.5, y: 154 },
+      V3: { x: 122.5, y: 154 },
+      GND: { x: 154.5, y: 154 },
     },
     explosion: {
       x: 65,
@@ -326,6 +331,7 @@ export interface MicrobitWithBreakoutCoordinates {
     y: number;
     width: number;
     height: number;
+    strokeWidth: number;
   };
 
   // USB on/off state overlays
@@ -366,6 +372,22 @@ export interface MicrobitWithBreakoutCoordinates {
     P0: { x: number; y: number };
     P1: { x: number; y: number };
     P2: { x: number; y: number };
+    P3: { x: number; y: number };
+    P4: { x: number; y: number };
+    P5: { x: number; y: number };
+    P6: { x: number; y: number };
+    P7: { x: number; y: number };
+    P8: { x: number; y: number };
+    P9: { x: number; y: number };
+    P10: { x: number; y: number };
+    P11: { x: number; y: number };
+    P12: { x: number; y: number };
+    P13: { x: number; y: number };
+    P14: { x: number; y: number };
+    P15: { x: number; y: number };
+    P16: { x: number; y: number };
+    P19: { x: number; y: number };
+    P20: { x: number; y: number };
   };
 
   // Explosion overlay
@@ -377,63 +399,302 @@ export interface MicrobitWithBreakoutCoordinates {
   };
 }
 
-const MICROBIT_WITH_BREAKOUT_COORDINATES: MicrobitWithBreakoutCoordinates = {
-  width: 226,
-  height: 240,
-  offsetX: 0,
-  offsetY: 0,
-  hitArea: {
-    x: 16,
-    y: 40,
-    width: 193,
-    height: 145,
-  },
-  logo: {
-    x: 101,
-    y: 87.3,
-    width: 23.2,
-    height: 14,
-  },
-  usbOn: {
-    x: 0,
-    y: 0,
+const MICROBIT_WITH_BREAKOUT_COORDINATES: Record<MicrobitColor, MicrobitWithBreakoutCoordinates> = {
+  red: {
     width: 226,
     height: 240,
+    offsetX: 0,
+    offsetY: 0,
+    hitArea: {
+      x: 16,
+      y: 40,
+      width: 226,
+      height: 240,
+    },
+    logo: {
+      x: 100.8,
+      y: 24.4,
+      width: 23.4,
+      height: 14.7,
+      strokeWidth: 4.4,
+    },
+    usbOn: {
+      x: 3.5,
+      y: -72,
+      width: 220,
+      height: 220,
+    },
+    usbOff: {
+      x: 3.5,
+      y: -94.5,
+      width: 220,
+      height: 220,
+    },
+    ledMatrix: {
+      startX: 91.5,
+      startY: 55,
+      spacingX: 12,
+      spacingY: 12,
+      ledRadius: 3.4,
+    },
+    buttons: {
+      AB: { x: 161, y: 21.5 },
+      A: { x: 39.5, y: 66.2 },
+      B: { x: 162.5, y: 66.2 },
+    },
+    pins: {
+      GND1: { x: 32.5, y: 250.5 },
+      GND2: { x: 40.5, y: 250.5 },
+      V3: { x: 48, y: 250.5 },
+      P0: { x: 55.5, y: 250.5 },
+      P1: { x: 63, y: 250.5 },
+      P2: { x: 71, y: 250.5 },
+      P3: { x: 78.5, y: 250.5 },
+      P4: { x: 86, y: 250.5 },
+      P5: { x: 94, y: 250.5 },
+      P6: { x: 101.7, y: 250.5 },
+      P7: { x: 109.3, y: 250.5 },
+      P8: { x: 117, y: 250.5 },
+      P9: { x: 124.5, y: 250.5 },
+      P10: { x: 132, y: 250.5 },
+      P11: { x: 139.5, y: 250.5 },
+      P12: { x: 147.5, y: 250.5 },
+      P13: { x: 155, y: 250.5 },
+      P14: { x: 162.5, y: 250.5 },
+      P15: { x: 170, y: 250.5 },
+      P16: { x: 177.5, y: 250.5 },
+      P19: { x: 185, y: 250.5 },
+      P20: { x: 192.5, y: 250.5 },
+    },
+    explosion: {
+      x: 71,
+      y: 82,
+      width: 90,
+      height: 90,
+    },
   },
-  usbOff: {
-    x: 0,
-    y: 0,
+  yellow:  {
     width: 226,
     height: 240,
+    offsetX: 0,
+    offsetY: 0,
+    hitArea: {
+      x: 16,
+      y: 40,
+      width: 226,
+      height: 240,
+    },
+    logo: {
+      x: 102,
+      y: 24,
+      width: 23.2,
+      height: 14.6,
+      strokeWidth: 4.4,
+    },
+    usbOn: {
+      x: 3.5,
+      y: -72,
+      width: 220,
+      height: 220,
+    },
+    usbOff: {
+      x: 3.5,
+      y: -94.5,
+      width: 220,
+      height: 220,
+    },
+    ledMatrix: {
+      startX: 91.5,
+      startY: 55,
+      spacingX: 12,
+      spacingY: 12,
+      ledRadius: 3.4,
+    },
+    buttons: {
+      AB: { x: 161, y: 21.5 },
+      A: { x: 39.5, y: 66.2 },
+      B: { x: 162.5, y: 66.2 },
+    },
+    pins: {
+      GND1: { x: 32.5, y: 249 },
+      GND2: { x: 40.5, y: 249 },
+      V3: { x: 48, y: 249 },
+      P0: { x: 56, y: 249 },
+      P1: { x: 63.5, y: 249 },
+      P2: { x: 71.5, y: 249 },
+      P3: { x: 79, y: 249 },
+      P4: { x: 86.5, y: 249 },
+      P5: { x: 94.5, y: 249 },
+      P6: { x: 102, y: 249 },
+      P7: { x: 109.8, y: 249 },
+      P8: { x: 117.4, y: 249 },
+      P9: { x: 125.5, y: 249 },
+      P10: { x: 132.8, y: 249 },
+      P11: { x: 140.4, y: 249 },
+      P12: { x: 148.4, y: 249 },
+      P13: { x: 155.8, y: 249 },
+      P14: { x: 163.6, y: 249 },
+      P15: { x: 171.4, y: 249 },
+      P16: { x: 178.8, y: 249 },
+      P19: { x: 186.8, y: 249 },
+      P20: { x: 194.8, y: 249 },
+    },
+    explosion: {
+      x: 71,
+      y: 82,
+      width: 90,
+      height: 90,
+    },
   },
-  ledMatrix: {
-    startX: 90,
-    startY: 106,
-    spacingX: 9.9,
-    spacingY: 9.9,
-    ledRadius: 3.4,
+  green: {
+    width: 226,
+    height: 240,
+    offsetX: 0,
+    offsetY: 0,
+    hitArea: {
+      x: 16,
+      y: 40,
+      width: 226,
+      height: 240,
+    },
+    logo: {
+      x: 102,
+      y: 26.3,
+      width: 23.4,
+      height: 14.7,
+      strokeWidth: 4.2,
+    },
+    usbOn: {
+      x: 3.5,
+      y: -72,
+      width: 220,
+      height: 220,
+    },
+    usbOff: {
+      x: 3.5,
+      y: -94.5,
+      width: 220,
+      height: 220,
+    },
+    ledMatrix: {
+      startX: 91.5,
+      startY: 55,
+      spacingX: 12,
+      spacingY: 12,
+      ledRadius: 3.4,
+    },
+    buttons: {
+      AB: { x: 161.8, y: 22.4 },
+      A: { x: 41, y: 67 },
+      B: { x: 163.4, y: 67 },
+    },
+    pins: {
+      GND1: { x: 33.5, y: 247.5 },
+      GND2: { x: 41.5, y: 247.5 },
+      V3: { x: 49, y: 247.5 },
+      P0: { x: 56.5, y: 247.5 },
+      P1: { x: 64.5, y: 247.5 },
+      P2: { x: 72.5, y: 247.5 },
+      P3: { x: 80, y: 247.5 },
+      P4: { x: 87.5, y: 247.5 },
+      P5: { x: 95, y: 247.5 },
+      P6: { x: 102.7, y: 247.5 },
+      P7: { x: 110.3, y: 247.5 },
+      P8: { x: 118, y: 247.5 },
+      P9: { x: 125.5, y: 247.5 },
+      P10: { x: 133, y: 247.5 },
+      P11: { x: 140.5, y: 247.5 },
+      P12: { x: 148.5, y: 247.5 },
+      P13: { x: 156, y: 247.5 },
+      P14: { x: 163.5, y: 247.5 },
+      P15: { x: 171, y: 247.5 },
+      P16: { x: 178.5, y: 247.5 },
+      P19: { x: 186, y: 247.5 },
+      P20: { x: 193.5, y: 247.5 },
+    },
+    explosion: {
+      x: 71,
+      y: 82,
+      width: 90,
+      height: 90,
+    },
   },
-  buttons: {
-    AB: { x: 170, y: 88 },
-    A: { x: 41, y: 122 },
-    B: { x: 171, y: 122 },
-  },
-  pins: {
-    GND1: { x: 32.3, y: 229.2 },
-    GND2: { x: 40.5, y: 229.2 },
-    V3: { x: 47.5, y: 229.2 },
-    P0: { x: 55.5, y: 229.2 },
-    P1: { x: 62.5, y: 229.2 },
-    P2: { x: 70, y: 229.2 },
-  },
-  explosion: {
-    x: 71,
-    y: 82,
-    width: 90,
-    height: 90,
+  blue:  {
+    width: 226,
+    height: 240,
+    offsetX: 0,
+    offsetY: 0,
+    hitArea: {
+      x: 16,
+      y: 40,
+      width: 226,
+      height: 240,
+    },
+    logo: {
+      x: 101.8,
+      y: 25,
+      width: 23.6,
+      height: 15,
+      strokeWidth: 4.5,
+    },
+    usbOn: {
+      x: 3.5,
+      y: -72,
+      width: 220,
+      height: 220,
+    },
+    usbOff: {
+      x: 3.5,
+      y: -94.5,
+      width: 220,
+      height: 220,
+    },
+    ledMatrix: {
+      startX: 91.5,
+      startY: 55,
+      spacingX: 12,
+      spacingY: 12,
+      ledRadius: 3.4,
+    },
+    buttons: {
+      AB: { x: 163.5, y: 21.5 },
+      A: { x: 39.5, y: 66.2 },
+      B: { x: 165, y: 66.2 },
+    },
+    pins: {
+      GND1: { x: 32.5, y: 249 },
+      GND2: { x: 40.5, y: 249 },
+      V3: { x: 48, y: 249 },
+      P0: { x: 56, y: 249 },
+      P1: { x: 63.5, y: 249 },
+      P2: { x: 71.5, y: 249 },
+      P3: { x: 79, y: 249 },
+      P4: { x: 86.5, y: 249 },
+      P5: { x: 94.5, y: 249 },
+      P6: { x: 102, y: 249 },
+      P7: { x: 109.8, y: 249 },
+      P8: { x: 117.6, y: 249 },
+      P9: { x: 125.5, y: 249 },
+      P10: { x: 133, y: 249 },
+      P11: { x: 140.6, y: 249 },
+      P12: { x: 148.6, y: 249 },
+      P13: { x: 156.4, y: 249 },
+      P14: { x: 164, y: 249 },
+      P15: { x: 172, y: 249 },
+      P16: { x: 179.4, y: 249 },
+      P19: { x: 187.4, y: 249 },
+      P20: { x: 195.4, y: 249 },
+    },
+    explosion: {
+      x: 71,
+      y: 82,
+      width: 90,
+      height: 90,
+    },
   },
 };
 
-export function getMicrobitWithBreakoutCoordinates(): MicrobitWithBreakoutCoordinates {
-  return MICROBIT_WITH_BREAKOUT_COORDINATES;
+export function getMicrobitWithBreakoutCoordinates(color?: string): MicrobitWithBreakoutCoordinates {
+  const normalizedColor = (color ?? "green").toLowerCase() as MicrobitColor;
+  return MICROBIT_WITH_BREAKOUT_COORDINATES[normalizedColor] || MICROBIT_WITH_BREAKOUT_COORDINATES.green;
 }

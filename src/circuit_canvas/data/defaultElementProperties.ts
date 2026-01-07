@@ -82,7 +82,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "microbitWithBreakout",
     label: "Microbit with Breakout",
-    iconPath: "assets/circuit_canvas/elements/microbit_with_breakout.svg",
+    iconPath: "assets/circuit_canvas/elements/microbit_with_breakout_green.svg",
     defaultProps: { voltage: 3.3, resistance: 0 },
   },
   {

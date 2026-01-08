@@ -35,8 +35,8 @@ export default function Lightbulb(props: LightbulbProps) {
   const OVERLOAD_POWER_W = 7.5;
   const EXTINGUISH_THRESHOLD_W = 0.02;
   const GAMMA = 1.25;
-  const HEAT_RISE_MS = 80;
-  const COOL_FALL_MS = 80;
+  const HEAT_RISE_MS = 250;
+  const COOL_FALL_MS = 400;
   const FRAME_INTERVAL_MS = 1000 / 60;
 
   // Compute instantaneous target brightness (0..1)
@@ -75,22 +75,14 @@ export default function Lightbulb(props: LightbulbProps) {
   const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
   const tColor = displayBrightness;
   const r = 255;
-  // Keep the bulb distinctly yellow even at low brightness.
-  const g = Math.round(lerp(180, 255, tColor));
-  const b = Math.round(lerp(35, 0, tColor));
+  const g = Math.round(lerp(100, 215, tColor));
+  const b = Math.round(lerp(20, 0, tColor));
   const tint = `rgba(${r},${g},${b},1)`;
 
   // Glow sizing & opacity
-  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
-  const outerRadius = 16 + 94 * displayBrightness;
-  const outerOpacity = clamp01(0.24 + 1.35 * displayBrightness);
-  const shadowOpacity = clamp01(0.35 + 0.75 * displayBrightness);
-  const innerRadius = 11 + 30 * displayBrightness;
-  const innerOpacity = clamp01(0.12 + 0.75 * displayBrightness);
-  const glassFillOpacity = clamp01(0.12 + 0.85 * displayBrightness);
-  const glassFillSoftOpacity = clamp01(0.05 + 0.35 * displayBrightness);
-  const showGlow = displayBrightness > 0.004;
-  const showGlassFill = displayBrightness > 0.01;
+  const outerRadius = 10 + 70 * displayBrightness;
+  const outerOpacity = 0.1 + 0.7 * displayBrightness;
+  const showGlow = displayBrightness > 0.01;
 
   return (
     <BaseElement {...props}>
@@ -127,17 +119,6 @@ export default function Lightbulb(props: LightbulbProps) {
           // Normal glow
           showGlow && (
             <Group listening={false}>
-              {/* Core glow (helps visibility at low power) */}
-              <Circle
-                x={75}
-                y={60}
-                radius={innerRadius}
-                fill={tint}
-                opacity={innerOpacity}
-                shadowColor={tint}
-                shadowBlur={24 + 56 * displayBrightness}
-                shadowOpacity={shadowOpacity}
-              />
               <Circle
                 x={75}
                 y={60}
@@ -145,8 +126,8 @@ export default function Lightbulb(props: LightbulbProps) {
                 fill={tint}
                 opacity={outerOpacity}
                 shadowColor={tint}
-                shadowBlur={38 + 96 * displayBrightness}
-                shadowOpacity={shadowOpacity}
+                shadowBlur={20 + 40 * displayBrightness}
+                shadowOpacity={0}
               />
             </Group>
           )
@@ -154,51 +135,19 @@ export default function Lightbulb(props: LightbulbProps) {
 
         {/* Bulb image */}
         {img && (
-          <>
-            <Image
-              image={img}
-              width={150}
-              height={150}
-              shadowColor={props.selected ? "#000000" : undefined}
-              shadowBlur={props.selected ? 12 : 0}
-              shadowOffset={{ x: 15, y: -15 }}
-              shadowOpacity={0}
-              opacity={isOverloaded ? 0.8 : 1}
-              // Hover handlers
-              onMouseEnter={() => setIsHovered(true)}
-              onMouseLeave={() => setIsHovered(false)}
-            />
-
-            {/*
-              Glass fill tint: makes the whole bulb dome look illuminated.
-              Drawn after the image with source-atop so it only appears where the bulb pixels exist.
-              Visual-only; does not change electrical logic.
-            */}
-            {!isOverloaded && showGlassFill && glassFillOpacity > 0 && (
-              <>
-                {/* Main dome fill */}
-                <Circle
-                  listening={false}
-                  x={75}
-                  y={56}
-                  radius={62}
-                  fill={tint}
-                  opacity={glassFillOpacity}
-                  globalCompositeOperation="source-atop"
-                />
-                {/* Softer halo fill to even out the glass */}
-                <Circle
-                  listening={false}
-                  x={75}
-                  y={56}
-                  radius={72}
-                  fill={tint}
-                  opacity={glassFillSoftOpacity}
-                  globalCompositeOperation="source-atop"
-                />
-              </>
-            )}
-          </>
+          <Image
+            image={img}
+            width={150}
+            height={150}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 12 : 0}
+            shadowOffset={{ x: 15, y: -15 }}
+            shadowOpacity={0}
+            opacity={isOverloaded ? 0.8 : 1}
+            // Hover handlers
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          />
         )}
       </Group>
     </BaseElement>

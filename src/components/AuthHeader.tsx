@@ -100,12 +100,7 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
               className={inline ? dropdownInlineClass : styles.dropdown}
             >
               <div className={inline ? dropdownHeaderClass : styles.dropdownHeader}>
-                <div>Signed in as: <strong>{auth.userEmail ? auth.userEmail.split('@')[0].charAt(0).toUpperCase() + auth.userEmail.split('@')[0].slice(1) : 'User'}</strong></div>
-                {auth.role && (
-                  <div style={{ marginTop: 4, fontSize: '12px', color: '#6b7280' }}>
-                    Role: <strong>{auth.role.charAt(0).toUpperCase() + auth.role.slice(1)}</strong>
-                  </div>
-                )}
+                Signed in as <strong>{auth.userEmail}</strong>
               </div>
               <button
                 onClick={handleSignOut}

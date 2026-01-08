@@ -169,31 +169,6 @@ for task in asyncio.all_tasks():
     if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at press button.");
     return this.microbit.pressButton(button);
   }
-
-  // --- SENSOR API ---
-
-  async setTemperature(value: number) {
-    if (!this.microbit) {
-      throw new Error("Microbit not initialized");
-    }
-    this.microbit.setTemperature(value);
-  }
-
-  async setLightLevel(value: number) {
-  if (!this.microbit) {
-    throw new Error("Microbit not initialized");
-  }
-  this.microbit.setLightLevel(value);
-  }
-
-
-  async triggerGesture(gesture: string) {
-    if (!this.microbit) {
-      throw new Error("Microbit not initialized");
-    }
-    this.microbit.triggerGesture(gesture);
-  }
-
 }
 
 Comlink.expose(Simulator);

@@ -4,7 +4,6 @@ import "@/app/globals.css";
 import { MessageProvider } from "@/common/components/ui/GenericMessagePopup";
 import { AuthProvider } from "@/providers/AuthProvider";
 import AuthGuard from "@/components/AuthGuard";
-import { MouseBehaviorInitializer } from "@/common/components/MouseBehaviorInitializer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,11 +26,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <MouseBehaviorInitializer />
         <AuthProvider>
           <MessageProvider>
             <AuthGuard>{children}</AuthGuard>

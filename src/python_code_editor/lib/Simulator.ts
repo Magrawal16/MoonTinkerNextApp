@@ -108,30 +108,4 @@ export class Simulator {
     if (!this.microbit) throw new Error(this.options.controller + " controller not initialized at release logo.");
     return this.microbit.releaseLogo();
   }
-
-  // --- SENSOR API ---
-
-  setTemperature(value: number) {
-    if (!this.microbit) {
-      throw new Error("Microbit not initialized at setTemperature.");
-    }
-    this.microbit.setTemperature(value);
-  }
-
-  setLightLevel(value: number) {
-  if (!this.microbit) {
-    throw new Error("Microbit not initialized at setLightLevel.");
-  }
-  this.microbit.setLightLevel(value);
-  }
-
-  /*
-  triggerGesture(gesture: string) {
-    if (!this.microbit) {
-      throw new Error("Microbit not initialized at triggerGesture.");
-    }
-    this.microbit.triggerGesture(gesture);
-  }
-    */
-
 }

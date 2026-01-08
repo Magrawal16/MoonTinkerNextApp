@@ -182,28 +182,4 @@ export class SimulatorProxy {
     this.audio.dispose();
     this.worker.terminate();
   }
-
-  // --- SENSOR API ---
-
-  async setTemperature(value: number) {
-    if (!this.simulatorRemoteInstance) {
-      throw new Error("Not initialized at setTemperature.");
-    }
-    return this.simulatorRemoteInstance.setTemperature(value);
-  }
-
-  async setLightLevel(value: number) {
-    if (!this.simulatorRemoteInstance) {
-      throw new Error("Not initialized at setLightLevel.");
-    }
-    return this.simulatorRemoteInstance.setLightLevel(value);
-  }
-
-  async triggerGesture(gesture: string) {
-    if (!this.simulatorRemoteInstance) {
-      throw new Error("Not initialized at triggerGesture.");
-    }
-    return this.simulatorRemoteInstance.triggerGesture(gesture);
-  }
-
 }

@@ -173,12 +173,12 @@ export class LedMatrixField extends Blockly.Field {
         cell.style.height = "18px";
         cell.style.borderRadius = "3px";
         cell.style.background = on 
-          ? "linear-gradient(135deg, #FF5252 0%, #F44336 100%)" 
+          ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 100%)" 
           : "linear-gradient(135deg, #475569 0%, #334155 100%)";
         cell.style.boxShadow = on 
-          ? "0 0 12px rgba(244, 67, 54, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.3)" 
+          ? "0 0 12px rgba(255, 193, 7, 0.8), inset 0 1px 2px rgba(255, 255, 255, 0.3)" 
           : "inset 0 2px 4px rgba(0,0,0,0.4)";
-        cell.style.border = on ? "1px solid #FF8A80" : "1px solid #1E293B";
+        cell.style.border = on ? "1px solid #FFE082" : "1px solid #1E293B";
         cell.style.transition = "all 0.2s ease";
         
         this.previewEl.appendChild(cell);
@@ -193,7 +193,6 @@ export class LedMatrixField extends Blockly.Field {
     // Create editor container with blue theme and transparency to match block
     const editor = document.createElement("div");
     editor.style.padding = "16px";
-    editor.style.width = "255px";
     editor.style.backgroundColor = "rgba(72, 72, 203, 0.7)"; // Blue theme matching block - more transparent
     editor.style.backdropFilter = "blur(12px)";
     (editor.style as any).webkitBackdropFilter = "blur(12px)"; // Safari support
@@ -236,12 +235,12 @@ export class LedMatrixField extends Blockly.Field {
         cell.style.height = "36px";
         cell.style.borderRadius = "6px";
         cell.style.background = on 
-          ? "linear-gradient(135deg, #FF5252 0%, #F44336 50%, #E53935 100%)" 
+          ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 50%, #FFB300 100%)" 
           : "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)"; // Brighter blue when off
         cell.style.boxShadow = on 
-          ? "0 0 20px rgba(244, 67, 54, 0.9), 0 4px 12px rgba(244, 67, 54, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
+          ? "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
           : "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
-        cell.style.border = on ? "2px solid #FF8A80" : "2px solid rgba(255,255,255,0.2)";
+        cell.style.border = on ? "2px solid #FFE082" : "2px solid rgba(255,255,255,0.2)";
         cell.style.cursor = "pointer";
         cell.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
         
@@ -257,12 +256,12 @@ export class LedMatrixField extends Blockly.Field {
           // Update visual with gradient
           const newState = row[x] === "#";
           cell.style.background = newState 
-            ? "linear-gradient(135deg, #FF5252 0%, #F44336 50%, #E53935 100%)" 
+            ? "linear-gradient(135deg, #FFD93D 0%, #FFC107 50%, #FFB300 100%)" 
             : "linear-gradient(135deg, #5A5AFF 0%, #4848CB 100%)"; // Brighter blue when off
           cell.style.boxShadow = newState 
-            ? "0 0 20px rgba(244, 67, 54, 0.9), 0 4px 12px rgba(244, 67, 54, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
+            ? "0 0 20px rgba(255, 193, 7, 0.9), 0 4px 12px rgba(255, 193, 7, 0.5), inset 0 1px 3px rgba(255, 255, 255, 0.3)" 
             : "inset 0 2px 6px rgba(0,0,0,0.3), 0 1px 3px rgba(0,0,0,0.2)";
-          cell.style.border = newState ? "2px solid #FF8A80" : "2px solid rgba(255,255,255,0.2)";
+          cell.style.border = newState ? "2px solid #FFE082" : "2px solid rgba(255,255,255,0.2)";
           
           const newValue = this.pattern.join("\n");
           
@@ -323,16 +322,14 @@ export class LedMatrixField extends Blockly.Field {
     
     const clearBtn = document.createElement("button");
     clearBtn.textContent = "🗑️ Clear";
-    clearBtn.style.padding = "6px 10px";
-    clearBtn.style.flex = "1";
+    clearBtn.style.padding = "8px 18px";
     clearBtn.style.backgroundColor = "rgba(72, 72, 203, 0.6)"; // Matching blue theme - more transparent
     clearBtn.style.color = "#FFFFFF";
     clearBtn.style.border = "1px solid rgba(255,255,255,0.3)";
     clearBtn.style.borderRadius = "8px";
     clearBtn.style.cursor = "pointer";
-    clearBtn.style.fontSize = "11px";
+    clearBtn.style.fontSize = "12px";
     clearBtn.style.fontWeight = "600";
-    clearBtn.style.whiteSpace = "nowrap";
     clearBtn.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
     clearBtn.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
     clearBtn.style.backdropFilter = "blur(4px)";
@@ -383,16 +380,14 @@ export class LedMatrixField extends Blockly.Field {
     
     const invertBtn = document.createElement("button");
     invertBtn.textContent = "🔄 Invert";
-    invertBtn.style.padding = "6px 10px";
-    invertBtn.style.flex = "1";
+    invertBtn.style.padding = "8px 18px";
     invertBtn.style.backgroundColor = "rgba(255, 193, 7, 0.7)";
     invertBtn.style.color = "#000000";
     invertBtn.style.border = "1px solid rgba(255,255,255,0.25)";
     invertBtn.style.borderRadius = "8px";
     invertBtn.style.cursor = "pointer";
-    invertBtn.style.fontSize = "11px";
+    invertBtn.style.fontSize = "12px";
     invertBtn.style.fontWeight = "600";
-    invertBtn.style.whiteSpace = "nowrap";
     invertBtn.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
     invertBtn.style.boxShadow = "0 2px 8px rgba(255, 193, 7, 0.4), 0 0 20px rgba(255, 193, 7, 0.2)";
     invertBtn.style.backdropFilter = "blur(4px)";
@@ -450,42 +445,8 @@ export class LedMatrixField extends Blockly.Field {
       this.updateInlinePreview();
     });
     
-    const okBtn = document.createElement("button");
-    okBtn.textContent = "✓OK";
-    okBtn.style.padding = "6px 10px";
-    okBtn.style.flex = "1";
-    okBtn.style.backgroundColor = "rgba(76, 175, 80, 0.8)";
-    okBtn.style.color = "#ffffff";
-    okBtn.style.border = "1px solid rgba(255,255,255,0.25)";
-    okBtn.style.borderRadius = "8px";
-    okBtn.style.cursor = "pointer";
-    okBtn.style.fontSize = "11px";
-    okBtn.style.fontWeight = "600";
-    okBtn.style.whiteSpace = "nowrap";
-    okBtn.style.transition = "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)";
-    okBtn.style.boxShadow = "0 2px 8px rgba(76, 175, 80, 0.4), 0 0 20px rgba(76, 175, 80, 0.2)";
-    okBtn.style.backdropFilter = "blur(4px)";
-    okBtn.style.textShadow = "0 1px 2px rgba(0,0,0,0.3)";
-    
-    // Hover effects for OK button
-    okBtn.addEventListener("mouseenter", () => {
-      okBtn.style.backgroundColor = "rgba(102, 187, 106, 0.9)";
-      okBtn.style.transform = "translateY(-2px)";
-      okBtn.style.boxShadow = "0 4px 16px rgba(76, 175, 80, 0.6), 0 0 30px rgba(76, 175, 80, 0.3)";
-    });
-    okBtn.addEventListener("mouseleave", () => {
-      okBtn.style.backgroundColor = "rgba(76, 175, 80, 0.8)";
-      okBtn.style.transform = "translateY(0)";
-      okBtn.style.boxShadow = "0 2px 8px rgba(76, 175, 80, 0.4), 0 0 20px rgba(76, 175, 80, 0.2)";
-    });
-    okBtn.addEventListener("click", () => {
-      // Close the dropdown editor
-      DropDownDiv.hideIfOwner(this);
-    });
-    
     actions.appendChild(clearBtn);
     actions.appendChild(invertBtn);
-    actions.appendChild(okBtn);
     editor.appendChild(actions);
     
     // Show the editor with blue-themed transparent background

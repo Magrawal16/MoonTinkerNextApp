@@ -7,8 +7,8 @@ import {
 import Konva from "konva";
 
 // Sensor and UI constants - Updated dimensions to match real sensor proportions
-const SENSOR_IMG_WIDTH = 180;  // Represents 45mm
-const SENSOR_IMG_HEIGHT = 115; // Represents 20mm (45mm/20mm = 2.25:1 ratio)
+const SENSOR_IMG_WIDTH = 225;  // Represents 45mm
+const SENSOR_IMG_HEIGHT = 100; // Represents 20mm (45mm/20mm = 2.25:1 ratio)
 
 // Real-world sensor limits
 const SENSOR_MIN_CM = 2;
@@ -258,7 +258,7 @@ useEffect(() => {
   };
 
   return (
-    <BaseElement {...props} isSimulationOn={props.isSimulation}>
+    <BaseElement {...props}>
       {img && (
         <Group>
           {/* Sensor image */}
@@ -276,9 +276,9 @@ useEffect(() => {
           {props.isSimulation && (
             <Group>
               <Circle
-                x={SENSOR_IMG_WIDTH + 6}
-                y={28}
-                radius={6}
+                x={SENSOR_IMG_WIDTH - 20}
+                y={20}
+                radius={8}
                 fill={getConnectionStatusColor()}
                 stroke="black"
                 strokeWidth={1}

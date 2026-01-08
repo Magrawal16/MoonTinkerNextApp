@@ -8,7 +8,7 @@ type PanelProps = {
 
 export default function Panel({ children, className }: PanelProps) {
   return (
-    <div className={`overflow-y-auto backdrop-blur-sm bg-white/10 border-1 border-sky-500 ${className}`}>
+    <div className={`overflow-y-auto backdrop-blur-sm bg-white/10 border-1 border-gray-500 ${className}`}>
       {children}
     </div>
   );

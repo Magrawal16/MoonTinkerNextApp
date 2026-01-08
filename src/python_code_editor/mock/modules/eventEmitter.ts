@@ -9,8 +9,7 @@ export type MicrobitEvent =
     | { type: "button-press"; button: "A" | "B" | "AB" }
     | { type: "button-release"; button: "A" | "B" | "AB" }
     | { type: "logo-touch"; state: "pressed" | "released" }
-    | { type: "reset" }
-    | { type: "gesture"; gesture: string };
+    | { type: "reset" };
 
 type MicrobitEventCallback = (event: MicrobitEvent) => void;
 

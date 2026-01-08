@@ -1,7 +1,5 @@
 import { CircuitElement, CircuitElementProps } from "../types/circuit";
 import { getLedNodePositions } from "../utils/ledNodeMap";
-import { createInitialLedRuntime, LED_INTERNAL_RESISTANCE } from "./ledBehavior";
-import { getMicrobitCoordinates, getMicrobitWithBreakoutCoordinates } from "./microbitCoordinateMap";
 
 export default function createElement(
   props: CircuitElementProps
@@ -17,8 +15,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 28.7,
-        y: 31,
+        x: 1,
+        y: 43.5,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -26,8 +24,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 43,
-        y: 31,
+        x: 1,
+        y: 35.5,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -42,111 +40,6 @@ export default function createElement(
     displayProperties: [],
   };
 
-  const cell3vElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 55,
-        y: 3.5,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 55,
-        y: 150,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 3,
-      resistance: 0.8, 
-    },
-    displayProperties: [],
-  };
-
-  const AA_batteryElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 102.5,
-        y: 2,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 94.5,
-        y: 2,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 1.5,
-      resistance: 0.3, // AA cell internal resistance typical low value
-      // allow switching form-factor in Properties Panel (AA ↔ AAA)
-      // used only for rendering + default resistance; solver uses resistance value
-      batteryType: 'AA' as any,
-      // allow count selection (1-4 batteries in series)
-      batteryCount: 1,
-    },
-    // include custom tokens to enable the Update button in PropertiesPanel
-    displayProperties: ["batteryType", "batteryCount"],
-  };
-
-  const AAA_batteryElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [
-      {
-        id: id + "-node-1",
-        x: 33.5,
-        y: 1,
-        parentId: id,
-        polarity: "positive" as const,
-        placeholder: "Positive",
-        fillColor: "green",
-      },
-      {
-        id: id + "-node-2",
-        x: 25.5,
-        y: 1,
-        parentId: id,
-        polarity: "negative" as const,
-        placeholder: "Negative",
-        fillColor: "red",
-      },
-    ],
-    properties: {
-      voltage: 1.5,
-      resistance: 0.4, // AAA cell internal resistance slightly higher than AA
-    },
-    displayProperties: [],
-  };
-
   const powerSupplyElement: CircuitElement = {
     id,
     type: props.type,
@@ -156,8 +49,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 73,
-        y: 115,
+        x: 72,
+        y: 117,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -165,8 +58,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 87,
-        y: 115,
+        x: 86.5,
+        y: 117,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -174,14 +67,9 @@ export default function createElement(
       },
     ],
     properties: {
-      // Store effective output voltage separately; settings tracked via custom keys on properties using casting
       voltage: props.properties?.voltage ?? 5,
       resistance: props.properties?.resistance ?? 0.2,
-      // Bench supply control settings (non-schema; accessed via casting)
-      vSet: (props as any).properties?.vSet ?? props.properties?.voltage ?? 5,
-      iLimit: (props as any).properties?.iLimit ?? 1,
-      isOn: (props as any).properties?.isOn ?? false,
-    } as any,
+    },
     displayProperties: ["voltage"],
   };
 
@@ -202,7 +90,7 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 80.5,
+        x: 79,
         y: 140,
         parentId: id,
         placeholder: "Terminal 2",
@@ -268,7 +156,7 @@ export default function createElement(
             x: pos.right.x - 40,
             y: pos.right.y + 13,
             parentId: id,
-            placeholder: "Terminal 2",
+            placeholder: "Terminal 1",
             fillColor: "red",
           },
         ],
@@ -398,21 +286,14 @@ export default function createElement(
     properties: {
       ...{
         voltage: props.properties?.voltage,
-        resistance: props.properties?.resistance ?? LED_INTERNAL_RESISTANCE,
+        resistance: props.properties?.resistance ?? 1,
         color: props.properties?.color ?? 'red',
       },
       ...props.properties,
     },
-    runtime: {
-      led: createInitialLedRuntime(),
-    },
     displayProperties: ['resistance', 'color'],
   };
 
-  // Get coordinates for the selected microbit color
-  const microbitColor = props.properties?.color ?? "red";
-  const microbitCoords = getMicrobitCoordinates(microbitColor);
-  
   const microbitElement = {
     id,
     type: props.type,
@@ -422,40 +303,40 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-0",
-        x: microbitCoords.pins.P0.x,
-        y: microbitCoords.pins.P0.y,
+        x: 42.9,
+        y: 227,
         parentId: id,
         placeholder: "P0",
         fillColor: "red",
       },
       {
         id: id + "-node-1",
-        x: microbitCoords.pins.P1.x,
-        y: microbitCoords.pins.P1.y,
+        x: 74.8,
+        y: 227,
         parentId: id,
         placeholder: "P1",
         fillColor: "red",
       },
       {
         id: id + "-node-2",
-        x: microbitCoords.pins.P2.x,
-        y: microbitCoords.pins.P2.y,
+        x: 111.4,
+        y: 227,
         parentId: id,
         placeholder: "P2",
         fillColor: "red",
       },
       {
         id: id + "-node-3V",
-        x: microbitCoords.pins.V3.x,
-        y: microbitCoords.pins.V3.y,
+        x: 148,
+        y: 227,
         parentId: id,
         placeholder: "3.3V",
         fillColor: "red",
       },
       {
         id: id + "-node-GND",
-        x: microbitCoords.pins.GND.x,
-        y: microbitCoords.pins.GND.y,
+        x: 180,
+        y: 227,
         parentId: id,
         placeholder: "GND",
         fillColor: "red",
@@ -466,16 +347,11 @@ export default function createElement(
       resistance: props.properties?.resistance ?? 0,
       temperature: props.properties?.temperature ?? 25, 
       brightness: props.properties?.brightness ?? 128, 
-      color: props.properties?.color ?? "red",
       ...props.properties,
     },
-    displayProperties: ["temperature", "brightness", "color"],
+    displayProperties: ["temperature", "brightness"],
   };
 
-  // Get coordinates for microbit with breakout
-  const microbitWithBreakoutColor = props.properties?.color ?? "green";
-  const breakoutCoords = getMicrobitWithBreakoutCoordinates(microbitWithBreakoutColor);
-  
   const microbitElementWithBreakout = {
     id,
     type: props.type,
@@ -485,178 +361,178 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-GND1",
-        x: breakoutCoords.pins.GND1.x,
-        y: breakoutCoords.pins.GND1.y,
+        x: 32.3,
+        y: 229.2,
         parentId: id,
         placeholder: "GND",
         fillColor: "red",
       },
       {
         id: id + "-node-GND2",
-        x: breakoutCoords.pins.GND2.x,
-        y: breakoutCoords.pins.GND2.y,
+        x: 40.5,
+        y: 229.2,
         parentId: id,
         placeholder: "GND",
         fillColor: "red",
       },
       {
         id: id + "-node-3V",
-        x: breakoutCoords.pins.V3.x,
-        y: breakoutCoords.pins.V3.y,
+        x: 47.5,
+        y: 229.2,
         parentId: id,
         placeholder: "3.3V",
         fillColor: "red",
       },
       {
         id: id + "-node-0",
-        x: breakoutCoords.pins.P0.x,
-        y: breakoutCoords.pins.P0.y,
+        x: 55.5,
+        y: 229.2,
         parentId: id,
         placeholder: "P0",
         fillColor: "red",
       },
       {
         id: id + "-node-1",
-        x: breakoutCoords.pins.P1.x,
-        y: breakoutCoords.pins.P1.y,
+        x: 62.5,
+        y: 229.2,
         parentId: id,
         placeholder: "P1",
         fillColor: "red",
       },
       {
         id: id + "-node-2",
-        x: breakoutCoords.pins.P2.x,
-        y: breakoutCoords.pins.P2.y,
+        x: 70,
+        y: 229.2,
         parentId: id,
         placeholder: "P2",
         fillColor: "red",
       },
       {
         id: id + "-node-3",
-        x: breakoutCoords.pins.P3.x,
-        y: breakoutCoords.pins.P3.y,
+        x: 77.3,
+        y: 229.2,
         parentId: id,
-        placeholder: "P3",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-4",
-        x: breakoutCoords.pins.P4.x,
-        y: breakoutCoords.pins.P4.y,
+        x: 85,
+        y: 229.2,
         parentId: id,
-        placeholder: "P4",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-5",
-        x: breakoutCoords.pins.P5.x,
-        y: breakoutCoords.pins.P5.y,
+        x: 92,
+        y: 229.2,
         parentId: id,
         placeholder: "P5",
         fillColor: "red",
       },
       {
         id: id + "-node-6",
-        x: breakoutCoords.pins.P6.x,
-        y: breakoutCoords.pins.P6.y,
+        x: 100,
+        y: 229.2,
         parentId: id,
-        placeholder: "P6",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-7",
-        x: breakoutCoords.pins.P7.x,
-        y: breakoutCoords.pins.P7.y,
+        x: 107,
+        y: 229.2,
         parentId: id,
-        placeholder: "P7",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-8",
-        x: breakoutCoords.pins.P8.x,
-        y: breakoutCoords.pins.P8.y,
+        x: 114.3,
+        y: 229.2,
         parentId: id,
         placeholder: "P8",
         fillColor: "red",
       },
       {
         id: id + "-node-9",
-        x: breakoutCoords.pins.P9.x,
-        y: breakoutCoords.pins.P9.y,
+        x: 122,
+        y: 229.2,
         parentId: id,
-        placeholder: "P9",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-10",
-        x: breakoutCoords.pins.P10.x,
-        y: breakoutCoords.pins.P10.y,
+        x: 129,
+        y: 229.2,
         parentId: id,
-        placeholder: "P10",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-11",
-        x: breakoutCoords.pins.P11.x,
-        y: breakoutCoords.pins.P11.y,
+        x: 137,
+        y: 229.2,
         parentId: id,
         placeholder: "P11",
         fillColor: "red",
       },
       {
         id: id + "-node-12",
-        x: breakoutCoords.pins.P12.x,
-        y: breakoutCoords.pins.P12.y,
+        x: 144.8,
+        y: 229.2,
         parentId: id,
-        placeholder: "P12",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-13",
-        x: breakoutCoords.pins.P13.x,
-        y: breakoutCoords.pins.P13.y,
+        x: 152,
+        y: 229.2,
         parentId: id,
         placeholder: "P13",
         fillColor: "red",
       },
       {
         id: id + "-node-14",
-        x: breakoutCoords.pins.P14.x,
-        y: breakoutCoords.pins.P14.y,
+        x: 159.5,
+        y: 229.2,
         parentId: id,
         placeholder: "P14",
         fillColor: "red",
       },
       {
         id: id + "-node-15",
-        x: breakoutCoords.pins.P15.x,
-        y: breakoutCoords.pins.P15.y,
+        x: 166.8,
+        y: 229.2,
         parentId: id,
         placeholder: "P15",
         fillColor: "red",
       },
       {
         id: id + "-node-16",
-        x: breakoutCoords.pins.P16.x,
-        y: breakoutCoords.pins.P16.y,
+        x: 174,
+        y: 229.2,
         parentId: id,
         placeholder: "P16",
         fillColor: "red",
       },
       {
         id: id + "-node-19",
-        x: breakoutCoords.pins.P19.x,
-        y: breakoutCoords.pins.P19.y,
+        x: 181,
+        y: 229.2,
         parentId: id,
-        placeholder: "P19",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
       {
         id: id + "-node-20",
-        x: breakoutCoords.pins.P20.x,
-        y: breakoutCoords.pins.P20.y,
+        x: 188,
+        y: 229.2,
         parentId: id,
-        placeholder: "P20",
+        placeholder: "Not Supported",
         fillColor: "red",
       },
     ],
@@ -664,11 +540,10 @@ export default function createElement(
       voltage: props.properties?.voltage ?? 3.3,
       resistance: props.properties?.resistance ?? 0,
       temperature: props.properties?.temperature ?? 25, 
-      brightness: props.properties?.brightness ?? 128,
-      color: props.properties?.color ?? "green",
+      brightness: props.properties?.brightness ?? 128, 
       ...props.properties,
     },
-    displayProperties: ["temperature", "brightness", "color"],
+    displayProperties: ["temperature", "brightness"],
   };
 
   const ultraSonicSensor4P = {
@@ -681,31 +556,31 @@ export default function createElement(
       {
         id: id + "-node-vcc",
         x: 75,
-        y: 105,
+        y: 90,
         parentId: id,
         placeholder: "VCC(+5V)",
         fillColor: "red",
       },
       {
         id: id + "-node-trig",
-        x: 84,
-        y: 105,
+        x: 98,
+        y: 90,
         parentId: id,
         placeholder: "TRIG",
         fillColor: "red",
       },
       {
         id: id + "-node-echo",
-        x: 94,
-        y: 105,
+        x: 121.7,
+        y: 90,
         parentId: id,
         placeholder: "ECHO",
         fillColor: "red",
       },
       {
         id: id + "-node-gnd",
-        x: 103,
-        y: 105,
+        x: 145.3,
+        y: 90,
         parentId: id,
         placeholder: "GND",
         fillColor: "red",
@@ -719,37 +594,11 @@ export default function createElement(
     displayProperties: [],
   };
 
-  const noteElement: CircuitElement = {
-    id,
-    type: props.type,
-    x: props.pos.x,
-    y: props.pos.y,
-    rotation: props.rotation ?? 0,
-    nodes: [], // Notes don't have nodes as they're not circuit elements
-    properties: {
-      text: props.properties?.text ?? "",
-      width: props.properties?.width ?? 150,
-      height: props.properties?.height ?? 100,
-      backgroundColor: props.properties?.backgroundColor ?? "#E8E8E8",
-      collapsed: props.properties?.collapsed ?? false,
-    },
-    displayProperties: ["text"],
-  };
-
   // switch based on type
   let element;
   switch (props.type) {
     case "battery":
       element = batteryElement;
-      break;
-    case "cell3v":
-      element = cell3vElement;
-      break;
-    case "AA_battery":
-      element = AA_batteryElement;
-      break;
-    case "AAA_battery":
-      element = AAA_batteryElement;
       break;
     case "powersupply":
       element = powerSupplyElement;
@@ -778,94 +627,9 @@ export default function createElement(
     case "microbitWithBreakout":
       element = microbitElementWithBreakout;
       break;
-    case "note":
-      element = noteElement;
-      break;
     default:
       element = null;
   }
 
-  return element;
-}
-
-export function updateMicrobitNodes(element: CircuitElement): CircuitElement {
-  if (element.type === "microbit") {
-    const microbitColor = element.properties?.color ?? "red";
-    const coords = getMicrobitCoordinates(microbitColor);
-    
-    return {
-      ...element,
-      nodes: element.nodes.map(node => {
-        if (node.placeholder === "P0") {
-          return { ...node, x: coords.pins.P0.x, y: coords.pins.P0.y };
-        } else if (node.placeholder === "P1") {
-          return { ...node, x: coords.pins.P1.x, y: coords.pins.P1.y };
-        } else if (node.placeholder === "P2") {
-          return { ...node, x: coords.pins.P2.x, y: coords.pins.P2.y };
-        } else if (node.placeholder === "3.3V") {
-          return { ...node, x: coords.pins.V3.x, y: coords.pins.V3.y };
-        } else if (node.placeholder === "GND") {
-          return { ...node, x: coords.pins.GND.x, y: coords.pins.GND.y };
-        }
-        return node;
-      })
-    };
-  } else if (element.type === "microbitWithBreakout") {
-    const microbitWithBreakoutColor = element.properties?.color ?? "green";
-    const coords = getMicrobitWithBreakoutCoordinates(microbitWithBreakoutColor);
-    
-    return {
-      ...element,
-      nodes: element.nodes.map(node => {
-        if (node.placeholder === "GND" && node.id.includes("GND1")) {
-          return { ...node, x: coords.pins.GND1.x, y: coords.pins.GND1.y };
-        } else if (node.placeholder === "GND" && node.id.includes("GND2")) {
-          return { ...node, x: coords.pins.GND2.x, y: coords.pins.GND2.y };
-        } else if (node.placeholder === "3.3V") {
-          return { ...node, x: coords.pins.V3.x, y: coords.pins.V3.y };
-        } else if (node.placeholder === "P0") {
-          return { ...node, x: coords.pins.P0.x, y: coords.pins.P0.y };
-        } else if (node.placeholder === "P1") {
-          return { ...node, x: coords.pins.P1.x, y: coords.pins.P1.y };
-        } else if (node.placeholder === "P2") {
-          return { ...node, x: coords.pins.P2.x, y: coords.pins.P2.y };
-        } else if (node.placeholder === "P3") {
-          return { ...node, x: coords.pins.P3.x, y: coords.pins.P3.y };
-        } else if (node.placeholder === "P4") {
-          return { ...node, x: coords.pins.P4.x, y: coords.pins.P4.y };
-        } else if (node.placeholder === "P5") {
-          return { ...node, x: coords.pins.P5.x, y: coords.pins.P5.y };
-        } else if (node.placeholder === "P6") {
-          return { ...node, x: coords.pins.P6.x, y: coords.pins.P6.y };
-        } else if (node.placeholder === "P7") {
-          return { ...node, x: coords.pins.P7.x, y: coords.pins.P7.y };
-        } else if (node.placeholder === "P8") {
-          return { ...node, x: coords.pins.P8.x, y: coords.pins.P8.y };
-        } else if (node.placeholder === "P9") {
-          return { ...node, x: coords.pins.P9.x, y: coords.pins.P9.y };
-        } else if (node.placeholder === "P10") {
-          return { ...node, x: coords.pins.P10.x, y: coords.pins.P10.y };
-        } else if (node.placeholder === "P11") {
-          return { ...node, x: coords.pins.P11.x, y: coords.pins.P11.y };
-        } else if (node.placeholder === "P12") {
-          return { ...node, x: coords.pins.P12.x, y: coords.pins.P12.y };
-        } else if (node.placeholder === "P13") {
-          return { ...node, x: coords.pins.P13.x, y: coords.pins.P13.y };
-        } else if (node.placeholder === "P14") {
-          return { ...node, x: coords.pins.P14.x, y: coords.pins.P14.y };
-        } else if (node.placeholder === "P15") {
-          return { ...node, x: coords.pins.P15.x, y: coords.pins.P15.y };
-        } else if (node.placeholder === "P16") {
-          return { ...node, x: coords.pins.P16.x, y: coords.pins.P16.y };
-        } else if (node.placeholder === "P19") {
-          return { ...node, x: coords.pins.P19.x, y: coords.pins.P19.y };
-        } else if (node.placeholder === "P20") {
-          return { ...node, x: coords.pins.P20.x, y: coords.pins.P20.y };
-        }
-        return node;
-      })
-    };
-  }
-  
   return element;
 }

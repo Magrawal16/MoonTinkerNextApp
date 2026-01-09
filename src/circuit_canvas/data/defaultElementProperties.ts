@@ -105,4 +105,10 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     iconPath: "assets/circuit_canvas/elements/PushButton.svg",
     defaultProps: { resistance: 1e9 }, // Very high resistance (open) by default
   },
+  {
+    type: "slideswitch",
+    label: "Slide Switch",
+    iconPath: "assets/circuit_canvas/elements/SlideSwitch.svg",
+    defaultProps: { resistance: 0.01 }, // Low resistance when connected
+  },
 ];

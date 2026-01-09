@@ -206,4 +206,13 @@ export class SimulatorProxy {
     return this.simulatorRemoteInstance.triggerGesture(gesture);
   }
 
+  // --- PIN VALUE API (for circuit integration) ---
+
+  async setExternalPinValue(pin: string, value: number, type: "digital" | "analog" = "digital") {
+    if (!this.simulatorRemoteInstance) {
+      throw new Error("Not initialized at setExternalPinValue.");
+    }
+    return this.simulatorRemoteInstance.setExternalPinValue(pin, value, type);
+  }
+
 }

@@ -104,6 +104,12 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const [controllerMap, setControllerMap] = useState<Record<string, Simulator>>(
     {}
   );
+  const controllerMapRef = useRef<Record<string, Simulator>>({});
+
+  // Keep controllerMapRef in sync with controllerMap state
+  useEffect(() => {
+    controllerMapRef.current = controllerMap;
+  }, [controllerMap]);
 
   const stageRef = useRef<Konva.Stage | null>(null);
   const wireLayerRef = useRef<Konva.Layer | null>(null);
@@ -1009,11 +1015,147 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     updateWiresDirect();
   }, [updateWiresDirect, getElementById]);
 
+  // Update micro:bit pin values based on solved circuit
+  const updateMicrobitPinValues = useCallback(
+    async (elements: CircuitElement[], wires: Wire[]) => {
+      // Find all micro:bit elements
+      const microbits = elements.filter(
+        (el) => el.type === "microbit" || el.type === "microbitWithBreakout"
+      );
+
+      for (const microbit of microbits) {
+        const simulator = controllerMapRef.current[microbit.id];
+        if (!simulator) continue;
+
+        // Build a union-find structure for node equivalence classes
+        const allNodes = elements.flatMap((el) => el.nodes || []);
+        const nodeParent = new Map<string, string>();
+        
+        // Initialize each node as its own parent
+        for (const node of allNodes) {
+          if (!node) continue;
+          nodeParent.set(node.id, node.id);
+        }
+
+        // Union-Find helper functions
+        const find = (nodeId: string): string => {
+          if (nodeParent.get(nodeId) !== nodeId) {
+            nodeParent.set(nodeId, find(nodeParent.get(nodeId)!));
+          }
+          return nodeParent.get(nodeId)!;
+        };
+
+        const union = (nodeId1: string, nodeId2: string) => {
+          const root1 = find(nodeId1);
+          const root2 = find(nodeId2);
+          if (root1 !== root2) {
+            nodeParent.set(root1, root2);
+          }
+        };
+
+        // Merge nodes connected by wires
+        for (const wire of wires) {
+          if (wire.hidden || wire.deleted) continue;
+          
+          const fromNodeId = (wire as any).fromNodeId;
+          const toNodeId = (wire as any).toNodeId;
+          
+          const hasFrom = nodeParent.has(fromNodeId);
+          const hasTo = nodeParent.has(toNodeId);
+          
+          if (hasFrom && hasTo) {
+            union(fromNodeId, toNodeId);
+          }
+        }
+
+        // Merge nodes connected through closed switches
+        for (const element of elements) {
+          if (element.type === "slideswitch" && element.nodes && element.nodes.length >= 3) {
+            const position = element.properties?.switchPosition ?? "left";
+            const terminal1 = element.nodes[0];
+            const common = element.nodes[1];
+            const terminal2 = element.nodes[2];
+
+            if (position === "left" && terminal1 && common) {
+              union(terminal1.id, common.id);
+            } else if (position === "right" && terminal2 && common) {
+              union(terminal2.id, common.id);
+            }
+          } else if (element.type === "pushbutton" && element.nodes && element.nodes.length >= 2) {
+            const isPressed = element.properties?.pressed ?? false;
+            if (isPressed) {
+              const node1 = element.nodes[0];
+              const node2 = element.nodes[1];
+              if (node1 && node2) {
+                union(node1.id, node2.id);
+              }
+            }
+          }
+        }
+
+        // Force path compression for all nodes before checking equivalence
+        for (const [nodeId] of nodeParent) {
+          find(nodeId);
+        }
+
+        // Now check each pin on the micro:bit
+        const pinNodes = microbit.nodes?.filter(
+          (node) => node?.placeholder && node.placeholder.match(/^P\d+$/)
+        );
+
+        if (!pinNodes) continue;
+
+        for (const pinNode of pinNodes) {
+          if (!pinNode) continue;
+          const pinName = pinNode.placeholder;
+          if (!pinName) continue;
+
+          let pinVoltage = 0;
+
+          // Get the root of the equivalence class for this pin
+          const pinRoot = find(pinNode.id);
+
+          // Find all nodes in the same equivalence class
+          const equivalentNodes = allNodes.filter(
+            (node) => node && find(node.id) === pinRoot
+          );
+
+          // Check if any node in the equivalence class is a 3V or GND node
+          for (const node of equivalentNodes) {
+            if (!node) continue;
+
+            if (node.placeholder === "3V" || node.placeholder === "3.3V") {
+              pinVoltage = 3.3;
+              break;
+            } else if (node.placeholder === "GND") {
+              pinVoltage = 0;
+              break;
+            }
+          }
+
+          // Convert voltage to digital value (threshold at 1.65V for 3.3V logic)
+          const digitalValue = pinVoltage >= 1.65 ? 1 : 0;
+
+          // Update the simulator's external pin value
+          try {
+            await simulator.setExternalPinValue(pinName, digitalValue, "digital");
+          } catch (error) {
+            // Silently ignore errors during pin value updates
+          }
+        }
+      }
+    },
+    [controllerMapRef]
+  );
+
   const solveAndUpdateElements = useCallback(
     (prevElements: CircuitElement[], wiresSnapshot: Wire[], dtSeconds: number) => {
       const solved = solveCircuit(prevElements, wiresSnapshot);
       const solvedMap = new Map(solved.map((el) => [el.id, el] as const));
       const nowMs = typeof performance !== "undefined" ? performance.now() : Date.now();
+
+      // Update micro:bit pin values based on the circuit topology
+      void updateMicrobitPinValues(solved, wiresSnapshot);
 
       return prevElements.map((oldEl) => {
         const updated = solvedMap.get(oldEl.id);
@@ -1052,7 +1194,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         return next;
       });
     },
-    []
+    [updateMicrobitPinValues]
   );
 
   const runSimulationStep = useCallback(

@@ -22,6 +22,7 @@ import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
 import PowerSupply from "@/circuit_canvas/components/elements/PowerSupply";
 import Note from "@/circuit_canvas/components/elements/Note";
 import PushButton from "@/circuit_canvas/components/elements/PushButton";
+import SlideSwitch from "@/circuit_canvas/components/elements/SlideSwitch";
 
 interface RenderElementProps {
   element: CircuitElement;
@@ -343,6 +344,22 @@ export default function RenderElement(props: RenderElementProps) {
             props.onUpdateElementProperties?.(element.id, { 
               pressed,
               resistance: pressed ? 0.01 : 1e9
+            });
+          }}
+          isSimulationOn={props.isSimulationOn}
+        />
+      )}
+      {props.showBody !== false && element.type === "slideswitch" && (
+        <SlideSwitch
+          id={element.id}
+          x={0}
+          y={0}
+          draggable={false}
+          selected={props.selectedElementId === element.id}
+          position={element.properties?.switchPosition ?? "left"}
+          onPositionChange={(position) => {
+            props.onUpdateElementProperties?.(element.id, { 
+              switchPosition: position
             });
           }}
           isSimulationOn={props.isSimulationOn}

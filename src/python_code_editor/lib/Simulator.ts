@@ -125,6 +125,20 @@ export class Simulator {
   this.microbit.setLightLevel(value);
   }
 
+  // --- PIN VALUE API (for circuit integration) ---
+
+  setExternalPinValue(pin: string, value: number, type: "digital" | "analog" = "digital") {
+    if (!this.microbit) {
+      throw new Error("Microbit not initialized at setExternalPinValue.");
+    }
+    const pinController = this.microbit.getPinController();
+    if (type === "digital") {
+      pinController.setDigitalValue(pin, value);
+    } else {
+      pinController.setAnalogValue(pin, value);
+    }
+  }
+
   /*
   triggerGesture(gesture: string) {
     if (!this.microbit) {

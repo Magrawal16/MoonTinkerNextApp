@@ -478,6 +478,26 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
         if (n1a && n1b) union(n1a.id, n1b.id);
         if (n2a && n2b) union(n2a.id, n2b.id);
       }
+
+      // For 3-pin slideswitch: connect terminals based on switch position
+      if (e.type === "slideswitch") {
+        const position = e.properties?.switchPosition ?? "left";
+        const terminal1 = e.nodes.find((n) => 
+          n.placeholder && (n.placeholder.includes("Terminal 1") || n.placeholder.includes("Left"))
+        );
+        const common = e.nodes.find((n) => 
+          n.placeholder && (n.placeholder.includes("Common") || n.placeholder.includes("Middle"))
+        );
+        const terminal2 = e.nodes.find((n) => 
+          n.placeholder && (n.placeholder.includes("Terminal 2") || n.placeholder.includes("Right"))
+        );
+
+        if (position === "left" && terminal1 && common) {
+          union(terminal1.id, common.id);
+        } else if (position === "right" && terminal2 && common) {
+          union(terminal2.id, common.id);
+        }
+      }
     }
   });
 

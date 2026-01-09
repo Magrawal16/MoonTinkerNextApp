@@ -161,6 +161,11 @@ export class MicrobitSimulator {
   setLightLevel(value: number): void {
   this.lightLevel = Math.max(0, Math.min(255, value));
 }
+
+  getPinController() {
+    return this.pinsModule.getPinController();
+  }
+
   triggerGesture(gesture: string): void {
     this.eventEmitter.emit({
       type: "gesture",

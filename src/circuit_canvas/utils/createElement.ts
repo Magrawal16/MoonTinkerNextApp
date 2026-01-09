@@ -830,6 +830,48 @@ export default function createElement(
     displayProperties: [],
   };
 
+  const slideSwitchElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    nodes: [
+      {
+        id: id + "-node-terminal1",
+        x: 22,
+        y: 86,
+        parentId: id,
+        placeholder: "Terminal 1 (Left)",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-common",
+        x: 74,
+        y: 86,
+        parentId: id,
+        placeholder: "Common (Middle)",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-terminal2",
+        x: 126.5,
+        y: 86,
+        parentId: id,
+        placeholder: "Terminal 2 (Right)",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: props.properties?.voltage,
+      // When position is "left": terminal1-common has low resistance, terminal2-common has high resistance
+      // When position is "right": terminal2-common has low resistance, terminal1-common has high resistance
+      switchPosition: "left", // default position
+      resistance: props.properties?.resistance ?? 0.01, // resistance when connected
+    },
+    displayProperties: [],
+  };
+
   const noteElement: CircuitElement = {
     id,
     type: props.type,
@@ -894,6 +936,9 @@ export default function createElement(
       break;
     case "pushbutton":
       element = pushButtonElement;
+      break;
+    case "slideswitch":
+      element = slideSwitchElement;
       break;
     case "note":
       element = noteElement;

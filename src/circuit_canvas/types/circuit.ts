@@ -30,6 +30,7 @@ export type CircuitElement = {
     backgroundColor?: string; // note background color
     collapsed?: boolean; // note collapsed state
     pressed?: boolean; // push button state
+    switchPosition?: "left" | "right"; // slide switch position
     // For RGB LED - common cathode or common anode
     rgbLedType?: "common-cathode" | "common-anode";
   };
@@ -170,6 +171,7 @@ export type PaletteElementType =
   | "ultrasonicsensor4p"
   | "microbitWithBreakout"
   | "pushbutton"
+  | "slideswitch"
   | "note";
 
 export type PropertiesPanelProps = {

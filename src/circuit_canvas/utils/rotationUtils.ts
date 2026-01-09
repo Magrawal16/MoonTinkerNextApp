@@ -73,12 +73,16 @@ export function getElementCenter(element: CircuitElement): {
       return { x: 26, y: 20 }; // Approximate center of potentiometer
     case "led":
       return { x: 34, y: 30 }; // Approximate center of LED
+    case "rgbled":
+      return { x: 52, y: 55 }; // Approximate center of RGB LED (105x110)
     case "microbit":
       return { x: 111, y: 113 }; // Approximate center of microbit
     case "microbitWithBreakout":
       return { x: 111, y: 113 }; // Approximate center of microbit with breakout
     case "ultrasonicsensor4p":
       return { x: 60, y: 30 }; // Approximate center of ultrasonic sensor
+    case "pushbutton":
+      return { x: 30.5, y: 40.5 }; // Approximate center of push button (61x81)
     default:
       return { x: 0, y: 0 };
   }
@@ -106,12 +110,16 @@ export function getElementDimensions(element: CircuitElement): {
       return { width: 52, height: 40 };
     case "led":
       return { width: 68, height: 60 };
+    case "rgbled":
+      return { width: 105, height: 110 };
     case "microbit":
       return { width: 222, height: 226 };
     case "microbitWithBreakout":
       return { width: 222, height: 226 };
     case "ultrasonicsensor4p":
       return { width: 120, height: 40 };
+    case "pushbutton":
+      return { width: 61, height: 81 };
     default:
       return { width: 50, height: 50 };
   }

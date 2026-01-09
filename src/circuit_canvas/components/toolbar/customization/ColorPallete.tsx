@@ -42,6 +42,7 @@ export function ColorPaletteDropdown({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        title={`Wire color: ${selectedColor || ""}`}
       >
         <div
           className="w-4 h-4 rounded-full border"
@@ -52,6 +53,9 @@ export function ColorPaletteDropdown({
 
       {isOpen && (
         <div className="absolute mt-2 left-0 bg-white border border-gray-300 rounded-sm shadow-sm z-10 p-1 w-40 flex flex-col">
+          <div className="px-2 pb-2 text-[11px] font-semibold tracking-wide text-gray-600 uppercase">
+            Wire color
+          </div>
           {colors.map(({ name, hex }) => (
             <div
               key={hex}

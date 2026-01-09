@@ -30,7 +30,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       if (!email || !password) {
-        setError("Please enter email and password.");
+        setError("Please enter email/username and password.");
         setLoading(false);
         return;
       }
@@ -45,7 +45,7 @@ export default function LoginPage() {
             // Ignore storage errors
           }
         }
-        router.push("/");
+        router.push("/saved_circuits");
       } else {
         setError("Invalid credentials.");
       }
@@ -110,11 +110,11 @@ export default function LoginPage() {
               color: "#374151",
               marginBottom: 8 
             }}>
-              Email address
+              Email or Username
             </label>
             <input
               ref={emailRef}
-              type="email"
+              type="text"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               onKeyDown={(e) => {
@@ -123,7 +123,7 @@ export default function LoginPage() {
                   e.preventDefault();
                 }
               }}
-              placeholder="Enter your email"
+              placeholder="Enter your email or username"
               style={{
                 width: "100%",
                 padding: "12px 16px",

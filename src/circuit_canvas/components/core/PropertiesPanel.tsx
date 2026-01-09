@@ -9,6 +9,9 @@ import {
   defaultColors,
 } from "@/circuit_canvas/components/toolbar/customization/ColorPallete";
 import { getLedNodePositions } from "@/circuit_canvas/utils/ledNodeMap";
+import { getBatteryNodePositions } from "@/circuit_canvas/utils/batteryNodeMap";
+import { getRgbLedNodePositions, getRgbLedNodePolarities } from "@/circuit_canvas/utils/rgbLedNodeMap";
+import { updateMicrobitNodes } from "@/circuit_canvas/utils/createElement";
 
 export default function PropertiesPanel({
   selectedElement,
@@ -28,17 +31,19 @@ export default function PropertiesPanel({
   const [resistanceInput, setResistanceInput] = useState<string>("");
   const [voltage, setVoltage] = useState<number | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
-  const [temperature, setTemperature] = useState<number | null>(null);
-  const [brightness, setBrightness] = useState<number | null>(null);
   const [color, setColor] = useState<string | null>(null);
   const [selectedWireColor, setSelectedWireColor] = useState<string>(
     wireColor || defaultColors[0].hex
   );
+  // AA/AAA battery selector state
+  const [batteryType, setBatteryType] = useState<"AA" | "AAA">("AA");
+  const [batteryCount, setBatteryCount] = useState<number>(1);
   const [showUpdateMessage, setShowUpdateMessage] = useState(false);
+  // Note text state
+  const [noteText, setNoteText] = useState<string>("");
+  // RGB LED type state
+  const [rgbLedType, setRgbLedType] = useState<"common-cathode" | "common-anode">("common-cathode");
 
-  // Gesture control
-  const [showGesturePanel, setShowGesturePanel] = useState(false);
-  const [selectedGesture, setSelectedGesture] = useState("");
 
   // Parse numeric input safely: empty string => null, invalid => null
   const parseNumber = (v: string): number | null => {
@@ -47,34 +52,19 @@ export default function PropertiesPanel({
     return Number.isNaN(n) ? null : n;
   };
 
-  const handleGestureSelect = (gesture: string) => {
-    setSelectedGesture(gesture);
-    setShowGesturePanel(false);
-
-    if (onElementEdit && selectedElement) {
-      const updatedElement = {
-        ...selectedElement,
-        properties: {
-          ...selectedElement.properties,
-          gesture,
-        },
-      };
-      onElementEdit(updatedElement, false);
-    }
-  };
-
   // Whether this element wants to show a given property
   const showProp = (
     name:
       | "resistance"
       | "voltage"
       | "ratio"
-      | "temperature"
-      | "brightness"
       | "color"
+      | "text"
   ) =>
     !selectedElement?.displayProperties ||
-    selectedElement.displayProperties.includes(name);
+    selectedElement.displayProperties.includes(name) ||
+    (selectedElement?.type === "microbit" && name === "color") ||
+    (selectedElement?.type === "microbitWithBreakout" && name === "color");
 
   useEffect(() => {
     if (!selectedElement) return;
@@ -96,9 +86,30 @@ export default function PropertiesPanel({
     }
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
-    setTemperature(selectedElement.properties?.temperature ?? null);
-    setBrightness(selectedElement.properties?.brightness ?? null);
-    setColor(selectedElement.properties?.color ?? null);
+    const nextColor =
+      selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout"
+        ? selectedElement.properties?.color ?? (selectedElement.type === "microbitWithBreakout" ? "green" : "red")
+        : selectedElement.properties?.color ?? null;
+    setColor(nextColor);
+    // Normalize old "Select to edit" text to empty string
+    const text = selectedElement.properties?.text ?? "";
+    setNoteText(text === "Select to edit" ? "" : text);
+    if (selectedElement.type === "AA_battery") {
+      const bt = (selectedElement.properties as any)?.batteryType as
+        | "AA"
+        | "AAA"
+        | undefined;
+      setBatteryType(bt ?? "AA");
+      const bc = (selectedElement.properties as any)?.batteryCount as number | undefined;
+      setBatteryCount(bc ?? 1);
+    }
+    if (selectedElement.type === "rgbled") {
+      const rlt = selectedElement.properties?.rgbLedType as
+        | "common-cathode"
+        | "common-anode"
+        | undefined;
+      setRgbLedType(rlt ?? "common-cathode");
+    }
     lastSelectedIdRef.current = selectedElement.id;
   }, [selectedElement]);
 
@@ -125,10 +136,8 @@ export default function PropertiesPanel({
         resistance: resistance ?? undefined,
         voltage: voltage ?? undefined,
         ratio: ratio ?? undefined,
-        temperature: temperature ?? undefined,
-        brightness: brightness ?? undefined,
         color: color ?? undefined,
-        gesture: selectedGesture || selectedElement.properties?.gesture,
+        text: noteText || undefined,
       };
 
       if (selectedElement.type === "battery") {
@@ -146,47 +155,78 @@ export default function PropertiesPanel({
         properties: nextProps,
       };
 
+      // AA/AAA battery form factor + count (series pack)
+      if (selectedElement.type === "AA_battery") {
+        const totalVoltage = 1.5 * batteryCount; // series addition
+        const resistancePerCell = batteryType === "AAA" ? 0.4 : 0.3;
+        const totalResistance = resistancePerCell * batteryCount; // series resistances add
+
+        updatedElement = {
+          ...updatedElement,
+          properties: {
+            ...updatedElement.properties,
+            voltage: totalVoltage,
+            resistance: totalResistance,
+            batteryType,
+            batteryCount,
+          } as any,
+        };
+
+        // Use centralized node map utility
+        const pos = getBatteryNodePositions(batteryType, batteryCount);
+        updatedElement = {
+          ...updatedElement,
+          nodes: updatedElement.nodes.map((n) => {
+            if (n.id.endsWith("-node-1")) return { ...n, x: pos.x1, y: pos.y1 };
+            if (n.id.endsWith("-node-2")) return { ...n, x: pos.x2, y: pos.y2 };
+            return n;
+          }),
+        };
+      }
+
       // For resistor, update node positions inline  similar to LED mapping
       if (selectedElement.type === "resistor") {
         const r = resistance ?? selectedElement.properties?.resistance ?? 5;
         const eps = 1e-6;
         const key =
           Math.abs(r - 5) < eps ? "5ohm" :
-            Math.abs(r - 10) < eps ? "10ohm" :
-              Math.abs(r - 15) < eps ? "15ohm" :
-                Math.abs(r - 20) < eps ? "20ohm" :
-                  Math.abs(r - 25) < eps ? "25ohm" :
-                    Math.abs(r - 5000) < eps ? "5kohm" :
-                      Math.abs(r - 10000) < eps ? "10kohm" :
-                        Math.abs(r - 15000) < eps ? "15kohm" :
-                          Math.abs(r - 20000) < eps ? "20kohm" :
-                            Math.abs(r - 25000) < eps ? "25kohm" :
-                              "5ohm";
+          Math.abs(r - 10) < eps ? "10ohm" :
+          Math.abs(r - 15) < eps ? "15ohm" :
+          Math.abs(r - 20) < eps ? "20ohm" :
+          Math.abs(r - 25) < eps ? "25ohm" :
+          Math.abs(r - 5000) < eps ? "5kohm" :
+          Math.abs(r - 10000) < eps ? "10kohm" :
+          Math.abs(r - 15000) < eps ? "15kohm" :
+          Math.abs(r - 20000) < eps ? "20kohm" :
+          Math.abs(r - 25000) < eps ? "25kohm" :
+          "5ohm";
 
-        const nodeMap: Record<string, { left: { x: number; y: number }; right: { x: number; y: number } }> = {
+        // Base map (same as createElement) then apply the visual offsets used there
+        const baseMap: Record<string, { left: { x: number; y: number }; right: { x: number; y: number } }> = {
           "5ohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
-          "10ohm": { left: { x: 4, y: 36.5 }, right: { x: 96, y: 36.5 } },
-          "15ohm": { left: { x: 4, y: 37.5 }, right: { x: 96, y: 37.2 } },
-          "20ohm": { left: { x: 5, y: 36 }, right: { x: 96, y: 36.2 } },
-          "25ohm": { left: { x: 4, y: 34.5 }, right: { x: 96, y: 34.5 } },
-          "5kohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
+          "10ohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
+          "15ohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
+          "20ohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
+          "25ohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
+          "5kohm": { left: { x: 5, y: 35.5 }, right: { x: 96, y: 35.5 } },
           "10kohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
-          "15kohm": { left: { x: 4, y: 34.5 }, right: { x: 96, y: 34.5 } },
-          "20kohm": { left: { x: 4, y: 35 }, right: { x: 96, y: 35 } },
+          "15kohm": { left: { x: 4, y: 37.5 }, right: { x: 96, y: 37.5 } },
+          "20kohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
           "25kohm": { left: { x: 4, y: 35.5 }, right: { x: 96, y: 35.5 } },
         };
-        const pos = nodeMap[key];
-        const node1 = selectedElement.nodes.find((n) => n.id.endsWith("-node-1")) || selectedElement.nodes[0];
-        const node2 = selectedElement.nodes.find((n) => n.id.endsWith("-node-2")) || selectedElement.nodes[1];
-        if (node1 && node2) {
-          updatedElement = {
-            ...updatedElement,
-            nodes: [
-              { ...node1, x: pos.left.x, y: pos.left.y },
-              { ...node2, x: pos.right.x, y: pos.right.y },
-            ],
-          };
-        }
+        const base = baseMap[key];
+        const leftFinal = { x: base.left.x + 3.5, y: base.left.y + 13 };
+        const rightFinal = { x: base.right.x - 40, y: base.right.y + 13 };
+
+        updatedElement = {
+          ...updatedElement,
+          properties: { ...updatedElement.properties, resistance: r },
+          nodes: updatedElement.nodes.map((n) => {
+            if (n.id.endsWith("-node-1")) return { ...n, x: leftFinal.x, y: leftFinal.y };
+            if (n.id.endsWith("-node-2")) return { ...n, x: rightFinal.x, y: rightFinal.y };
+            return n;
+          }),
+        };
       }
 
       // For LED, update node positions when color changes so cathode/anode pins align with the artwork per color
@@ -204,6 +244,33 @@ export default function PropertiesPanel({
           };
         }
       }
+
+      // For RGB LED, update node polarities when type changes
+      if (selectedElement.type === "rgbled") {
+        const pos = getRgbLedNodePositions();
+        const polarities = getRgbLedNodePolarities(rgbLedType);
+        const commonPlaceholder = rgbLedType === "common-cathode" ? "Cathode" : "Anode";
+        updatedElement = {
+          ...updatedElement,
+          properties: {
+            ...updatedElement.properties,
+            rgbLedType,
+          },
+          nodes: updatedElement.nodes.map((n) => {
+            if (n.id.endsWith("-node-red")) return { ...n, x: pos.red.x, y: pos.red.y, polarity: polarities.red };
+            if (n.id.endsWith("-node-common")) return { ...n, x: pos.common.x, y: pos.common.y, polarity: polarities.common, fillColor: rgbLedType === "common-cathode" ? "black" : "green", placeholder: commonPlaceholder };
+            if (n.id.endsWith("-node-green")) return { ...n, x: pos.green.x, y: pos.green.y, polarity: polarities.green };
+            if (n.id.endsWith("-node-blue")) return { ...n, x: pos.blue.x, y: pos.blue.y, polarity: polarities.blue };
+            return n;
+          }),
+        };
+      }
+
+      // For microbit/microbitWithBreakout, update node positions when color changes
+      if ((selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && color) {
+        updatedElement = updateMicrobitNodes(updatedElement);
+      }
+
       onElementEdit(updatedElement, false);
     }
 
@@ -222,8 +289,10 @@ export default function PropertiesPanel({
 
   const connectedWires = wires.filter(
     (w) =>
-      w.fromNodeId.startsWith(selectedElement.id) ||
-      w.toNodeId.startsWith(selectedElement.id)
+      !w.deleted && (
+        w.fromNodeId.startsWith(selectedElement.id) ||
+        w.toNodeId.startsWith(selectedElement.id)
+      )
   );
 
   const effResistanceText = useMemo(() => {
@@ -247,17 +316,10 @@ export default function PropertiesPanel({
         </div>
       </div>
 
-      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && (
-        <button
-          className="bg-blue-500 text-white text-xs px-1 py-1 rounded w-full"
-          onClick={() => setOpenCodeEditor(true)}
-        >
-          Open Code Editor
-        </button>
-      )}
+      {/* Removed "Open Code Editor" button for microbit elements */}
 
       {/* Numeric fields — never show for wires */}
-      {selectedElement.type !== "wire" && selectedElement.type !== "battery" && selectedElement.type !== "lightbulb" && showProp("resistance") && (
+      {selectedElement.type !== "wire" && selectedElement.type !== "battery" && selectedElement.type !== "lightbulb" && selectedElement.type !== "led" && showProp("resistance") && (
         <div className="flex flex-col text-xs">
           <label>Resistance:</label>
           <div className="flex items-stretch gap-1">
@@ -316,6 +378,39 @@ export default function PropertiesPanel({
         </div>
       )}
 
+      {/* AA battery type (AA/AAA) and count selector like Tinkercad */}
+      {selectedElement.type === "AA_battery" && (
+        <>
+          <div className="flex flex-col text-xs">
+            <label>Count:</label>
+            <select
+              className="border px-1 py-1 rounded text-xs bg-white"
+              value={batteryCount}
+              onChange={(e) => setBatteryCount(Number(e.target.value))}
+            >
+              <option value={1}>1 battery</option>
+              <option value={2}>2 batteries</option>
+              <option value={3}>3 batteries</option>
+              <option value={4}>4 batteries</option>
+            </select>
+          </div>
+          <div className="flex flex-col text-xs mt-2">
+            <label>Type:</label>
+            <select
+              className="border px-1 py-1 rounded text-xs bg-white"
+              value={batteryType}
+              onChange={(e) => setBatteryType(e.target.value as "AA" | "AAA")}
+            >
+              <option value="AA">AA</option>
+              <option value="AAA">AAA</option>
+            </select>
+          </div>
+          <div className="text-gray-500 mt-1 text-xs">
+            Voltage: {(1.5 * batteryCount).toFixed(1)} V, Resistance: {((batteryType === "AAA" ? 0.4 : 0.3) * batteryCount).toFixed(2)} Ω
+          </div>
+        </>
+      )}
+
       {selectedElement.type !== "wire" && showProp("ratio") && (
         <div className="flex flex-col text-xs">
           <label>Ratio:</label>
@@ -329,6 +424,40 @@ export default function PropertiesPanel({
           <span className="text-gray-500 mt-1">
             Eff. Resistance: {effResistanceText} Ω
           </span>
+        </div>
+      )}
+
+      {/* micro:bit shell color */}
+      {selectedElement.type === "microbit" && showProp("color") && (
+        <div className="flex flex-col text-xs">
+          <label>micro:bit Color:</label>
+          <select
+            value={color ?? "red"}
+            onChange={(e) => setColor(e.target.value)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="red">Red</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+          </select>
+        </div>
+      )}
+
+      {/* micro:bit with breakout shell color */}
+      {selectedElement.type === "microbitWithBreakout" && showProp("color") && (
+        <div className="flex flex-col text-xs">
+          <label>micro:bit Breakout Color:</label>
+          <select
+            value={color ?? "green"}
+            onChange={(e) => setColor(e.target.value)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="red">Red</option>
+            <option value="yellow">Yellow</option>
+            <option value="green">Green</option>
+            <option value="blue">Blue</option>
+          </select>
         </div>
       )}
 
@@ -351,83 +480,40 @@ export default function PropertiesPanel({
         </div>
       )}
 
-      {/* Micro:bit-specific controls */}
-      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("temperature") && (
+      {/* RGB LED type selector */}
+      {selectedElement.type === "rgbled" && (
         <div className="flex flex-col text-xs">
-          <label>Temperature (°C):</label>
-          <input
-            type="range"
-            min="-5"
-            max="50"
-            value={temperature ?? 0}
-            onChange={(e) => setTemperature(parseNumber(e.target.value) ?? 0)}
-            className="w-full"
-          />
-          <div className="text-xs text-gray-500 mt-1">
-            {temperature ?? 0}°C
-          </div>
+          <label>RGB LED Type:</label>
+          <select
+            value={rgbLedType}
+            onChange={(e) => setRgbLedType(e.target.value as "common-cathode" | "common-anode")}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="common-cathode">Common Cathode</option>
+            <option value="common-anode">Common Anode</option>
+          </select>
+          <span className="text-gray-500 mt-1">
+            {rgbLedType === "common-cathode" 
+              ? "Ground shared (2nd pin = GND)" 
+              : "Positive shared (2nd pin = VCC)"}
+          </span>
         </div>
       )}
 
-      {(selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && showProp("brightness") && (
+      {/* Note-specific text */}
+      {selectedElement.type === "note" && (
         <div className="flex flex-col text-xs">
-          <label>Brightness (0–255):</label>
-          <input
-            type="range"
-            min="0"
-            max="255"
-            value={brightness ?? 0}
-            onChange={(e) => setBrightness(parseNumber(e.target.value) ?? 0)}
-            className="w-full"
+          <label>Note Text:</label>
+          <textarea
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            className="border px-2 py-2 rounded text-xs min-h-[100px] resize-y"
+            placeholder="Write your note here"
           />
-          <div className="text-xs text-gray-500 mt-1">
-            {brightness ?? 0}
-          </div>
-
-          {/* Gesture Section */}
-          <div className="mt-2">
-            <label>Gesture:</label>
-            <button
-              className="bg-purple-200 hover:bg-purple-300 text-xs px-2 py-1 rounded mt-1 ms-1"
-              onClick={() => setShowGesturePanel(!showGesturePanel)}
-            >
-              {selectedGesture
-                ? `Selected: ${selectedGesture}`
-                : "Choose Gesture"}
-            </button>
-
-            {showGesturePanel && (
-              <div className="grid grid-cols-2 gap-2 mt-2 bg-purple-50 p-2 rounded">
-                {[
-                  "shake",
-                  "logo up",
-                  "logo down",
-                  "screen up",
-                  "screen down",
-                  "tilt left",
-                  "tilt right",
-                  "free fall",
-                  "3g",
-                  "6g",
-                  "8g",
-                ].map((gesture) => (
-                  <button
-                    key={gesture}
-                    className={`px-2 py-1 rounded text-xs border ${selectedGesture === gesture
-                        ? "bg-purple-400 text-white"
-                        : "bg-white"
-                      }`}
-                    onClick={() => handleGestureSelect(gesture)}
-                  >
-                    {gesture}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
       )}
 
+  
       {/* Wire-specific color */}
       {selectedElement.type === "wire" && (
         <>
@@ -466,7 +552,8 @@ export default function PropertiesPanel({
       )}
 
       <div className="flex justify-between gap-2 text-xs">
-        {selectedElement.type !== "wire" && 
+        { 
+          selectedElement.type !== "wire" &&
           Array.isArray(selectedElement.displayProperties) &&
           selectedElement.displayProperties.length > 0 && (
           <button

@@ -1,4 +1,6 @@
 import { CircuitElement, Wire } from "../types/circuit";
+import { getLedForwardVoltage, getLedSeriesResistance } from "./ledBehavior";
+import { getRgbLedForwardVoltage, getRgbLedSeriesResistance } from "./rgbLedBehavior";
 const DEBUG = false;
 
 // Multimeter modeling constants
@@ -39,9 +41,10 @@ function solveSingleSubcircuit(
   wires: Wire[]
 ): CircuitElement[] {
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
+  const microbitShortMap = detectMicrobitRailShorts(elements, nodeEquivalenceMap);
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
   if (effectiveNodeIds.size === 0) {
-    return zeroOutComputed(elements);
+    return applyMicrobitShortFlags(zeroOutComputed(elements), microbitShortMap);
   }
 
   const { groundId, nonGroundIds, nodeIndex } =
@@ -52,6 +55,7 @@ function solveSingleSubcircuit(
   // Determine which elements act as independent sources for this subcircuit
   // Base set includes batteries, microbits, and multimeters in resistance mode
   const baseSources = getElementsWithCurrent(elements, nodeEquivalenceMap);
+  
   const hasExternalSources = baseSources.some(
     (e) => e.type !== "multimeter" || e.properties?.mode !== "resistance"
   );
@@ -70,6 +74,11 @@ function solveSingleSubcircuit(
     elements.filter((e) => e.type === "led").map((e) => e.id)
   );
   let ledOnMap = new Map<string, boolean>(); // default: all off
+  
+  // RGB LED has 3 channels, so we track each channel's on/off state separately
+  // Key format: "elementId-red", "elementId-green", "elementId-blue"
+  let rgbLedOnMap = new Map<string, boolean>(); // default: all off
+  
   let nodeVoltages: Record<string, number> = {};
   let x: number[] | null = null;
 
@@ -77,10 +86,14 @@ function solveSingleSubcircuit(
   for (let iter = 0; iter < MAX_ITERS; iter++) {
     const { G, B, C, D, I, E } = buildMNAMatrices(
       elements,
+      elementsWithCurrent,
       nodeEquivalenceMap,
       nodeIndex,
       currentSourceIndexMap,
-      ledOnMap
+      ledOnMap,
+      undefined,
+      false,
+      rgbLedOnMap
     );
 
 
@@ -88,16 +101,23 @@ function solveSingleSubcircuit(
 
     x = solveLinearSystem(A, z);
     if (!x) {
-      return zeroOutComputed(elements);
+      return applyMicrobitShortFlags(zeroOutComputed(elements), microbitShortMap);
     }
 
     nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+    
 
     // Re-evaluate LED forward bias and update on/off map
     let changed = false;
     const nextMap = new Map<string, boolean>(ledOnMap);
     for (const el of elements) {
       if (el.type !== "led") continue;
+      const isExploded = (el.runtime as any)?.led?.exploded;
+      if (isExploded) {
+        if ((ledOnMap.get(el.id) ?? false) !== false) changed = true;
+        nextMap.set(el.id, false);
+        continue;
+      }
       const cathodeId = el.nodes?.[0]?.id;
       const anodeId = el.nodes?.[1]?.id;
       const cNode = cathodeId ? nodeEquivalenceMap.get(cathodeId) : undefined;
@@ -113,19 +133,210 @@ function solveSingleSubcircuit(
       }
     }
     ledOnMap = nextMap;
+    
+    // Re-evaluate RGB LED channels
+    const nextRgbMap = new Map<string, boolean>(rgbLedOnMap);
+    for (const el of elements) {
+      if (el.type !== "rgbled") continue;
+      const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
+      const runtime = (el.runtime as any)?.rgbled;
+      
+      // RGB LED nodes: [red, common, green, blue]
+      const redNodeId = el.nodes?.[0]?.id;
+      const commonNodeId = el.nodes?.[1]?.id;
+      const greenNodeId = el.nodes?.[2]?.id;
+      const blueNodeId = el.nodes?.[3]?.id;
+      
+      const redNode = redNodeId ? nodeEquivalenceMap.get(redNodeId) : undefined;
+      const commonNode = commonNodeId ? nodeEquivalenceMap.get(commonNodeId) : undefined;
+      const greenNode = greenNodeId ? nodeEquivalenceMap.get(greenNodeId) : undefined;
+      const blueNode = blueNodeId ? nodeEquivalenceMap.get(blueNodeId) : undefined;
+      
+      const Vred = redNode ? nodeVoltages[redNode] ?? 0 : 0;
+      const Vcommon = commonNode ? nodeVoltages[commonNode] ?? 0 : 0;
+      const Vgreen = greenNode ? nodeVoltages[greenNode] ?? 0 : 0;
+      const Vblue = blueNode ? nodeVoltages[blueNode] ?? 0 : 0;
+      
+      // For common-cathode: common is negative, colors are positive (anodes)
+      // For common-anode: common is positive, colors are negative (cathodes)
+      const channels: Array<{ channel: "red" | "green" | "blue"; colorNode: string | undefined; colorV: number }> = [
+        { channel: "red", colorNode: redNode, colorV: Vred },
+        { channel: "green", colorNode: greenNode, colorV: Vgreen },
+        { channel: "blue", colorNode: blueNode, colorV: Vblue },
+      ];
+      
+      for (const { channel, colorV } of channels) {
+        const channelKey = `${el.id}-${channel}`;
+        const isExploded = runtime?.[channel]?.exploded;
+        
+        if (isExploded) {
+          if ((rgbLedOnMap.get(channelKey) ?? false) !== false) changed = true;
+          nextRgbMap.set(channelKey, false);
+          continue;
+        }
+        
+        const Vf = getRgbLedForwardVoltage(channel);
+        let forward: number;
+        
+        if (rgbLedType === "common-cathode") {
+          // Color is anode, common is cathode
+          forward = colorV - Vcommon;
+        } else {
+          // Color is cathode, common is anode
+          forward = Vcommon - colorV;
+        }
+        
+        const isOn = forward >= Vf;
+        if ((rgbLedOnMap.get(channelKey) ?? false) !== isOn) {
+          nextRgbMap.set(channelKey, isOn);
+          changed = true;
+        }
+      }
+    }
+    rgbLedOnMap = nextRgbMap;
+    
     if (!changed) break; // converged
+  }
+
+  // If there are exploded LEDs, also compute a "what-if" solution treating them
+  // as electrically intact so the UI can match Tinkercad-like readouts.
+  const hasExplodedLed = elements.some(
+    (e) => e.type === "led" && !!(e.runtime as any)?.led?.exploded
+  );
+  let intactLedCurrentById: Map<string, number> | undefined;
+  if (hasExplodedLed) {
+    const intact = solveSubcircuitWithExplodedLedsIntact(
+      elements,
+      elementsWithCurrent,
+      nodeEquivalenceMap,
+      nodeIndex,
+      currentSourceIndexMap,
+      nonGroundIds,
+      groundId
+    );
+    intactLedCurrentById = intact;
+  }
+
+  // --- Bench Power Supply VC/CC adaptation pass ---
+  // After initial solve treating all ON supplies as voltage sources at vSet, detect any that exceed iLimit.
+  const supplyDefs = elements.filter(
+    (e) => e.type === "powersupply" && (e.properties as any)?.isOn !== false
+  );
+  const limitedIds = new Set<string>();
+  for (const s of supplyDefs) {
+    const idx = currentSourceIndexMap.get(s.id);
+    if (idx === undefined) continue;
+    const iLimit = (s.properties as any)?.iLimit ?? 1;
+    const currentVal = Math.abs(x![n + idx] ?? 0);
+    if (currentVal > iLimit + 1e-9) limitedIds.add(s.id);
+  }
+
+  let finalNodeVoltages = nodeVoltages;
+  let finalX = x!;
+  let finalCurrentSourceIndexMap = currentSourceIndexMap;
+
+  if (limitedIds.size > 0) {
+    // Rebuild matrices with limited supplies modeled as current sources instead of voltage sources.
+    const { results: reSolved } = reSolveWithCurrentLimitedSupplies(
+      elements,
+      nodeEquivalenceMap,
+      nodeIndex,
+      limitedIds
+    );
+    finalNodeVoltages = reSolved.nodeVoltages;
+    finalX = reSolved.x;
+    finalCurrentSourceIndexMap = reSolved.currentMap;
   }
 
   const results = computeElementResults(
     elements,
-    nodeVoltages,
-    x!,
+    finalNodeVoltages,
+    finalX,
     nodeEquivalenceMap,
-    currentSourceIndexMap,
-    n
+    finalCurrentSourceIndexMap,
+    n,
+    limitedIds,
+    false,
+    intactLedCurrentById,
+    microbitShortMap
   );
 
-  return results;
+  return applyMicrobitShortFlags(results, microbitShortMap);
+}
+
+function solveSubcircuitWithExplodedLedsIntact(
+  elements: CircuitElement[],
+  elementsWithCurrent: CircuitElement[],
+  nodeEquivalenceMap: Map<string, string>,
+  nodeIndex: Map<string, number>,
+  currentSourceIndexMap: Map<string, number>,
+  nonGroundIds: string[],
+  groundId: string
+): Map<string, number> {
+  let ledOnMap = new Map<string, boolean>();
+  let x: number[] | null = null;
+
+  const MAX_ITERS = 8;
+  for (let iter = 0; iter < MAX_ITERS; iter++) {
+    const { G, B, C, D, I, E } = buildMNAMatrices(
+      elements,
+      elementsWithCurrent,
+      nodeEquivalenceMap,
+      nodeIndex,
+      currentSourceIndexMap,
+      ledOnMap,
+      undefined,
+      true
+    );
+
+    const { A, z } = buildFullSystem(G, B, C, D, I, E);
+    x = solveLinearSystem(A, z);
+    if (!x) return new Map();
+
+    const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+
+    // Determine LED ON/OFF for this hypothetical solve (ignore exploded state)
+    let changed = false;
+    const nextMap = new Map<string, boolean>(ledOnMap);
+    for (const el of elements) {
+      if (el.type !== "led") continue;
+      const cathodeId = el.nodes?.[0]?.id;
+      const anodeId = el.nodes?.[1]?.id;
+      const cNode = cathodeId ? nodeEquivalenceMap.get(cathodeId) : undefined;
+      const aNode = anodeId ? nodeEquivalenceMap.get(anodeId) : undefined;
+      const Vc = cNode ? nodeVoltages[cNode] ?? 0 : 0;
+      const Va = aNode ? nodeVoltages[aNode] ?? 0 : 0;
+      const Vf = getLedForwardVoltage(el.properties?.color);
+      const forward = Va - Vc;
+      const isOn = forward >= Vf;
+      if ((ledOnMap.get(el.id) ?? false) !== isOn) {
+        nextMap.set(el.id, isOn);
+        changed = true;
+      }
+    }
+    ledOnMap = nextMap;
+    if (!changed) break;
+  }
+
+  if (!x) return new Map();
+  const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+  const n = nonGroundIds.length;
+  const hypoResults = computeElementResults(
+    elements,
+    nodeVoltages,
+    x,
+    nodeEquivalenceMap,
+    currentSourceIndexMap,
+    n,
+    undefined,
+    true
+  );
+
+  const map = new Map<string, number>();
+  for (const el of hypoResults) {
+    if (el.type === "led") map.set(el.id, el.computed?.current ?? 0);
+  }
+  return map;
 }
 
 /* ------------------------- Graph / equivalence helpers ------------------------- */
@@ -207,7 +418,10 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
   const parent = new Map<string, string>();
   const allNodeIds = new Set<string>();
 
-  wires.forEach((w) => {
+  // Filter out deleted wires, but keep hidden wires (node-to-node connections are hidden but electrically active)
+  const activeWires = wires.filter((w) => !w.deleted);
+
+  activeWires.forEach((w) => {
     if (!w.fromNodeId || !w.toNodeId) return;
     parent.set(w.fromNodeId, w.fromNodeId);
     parent.set(w.toNodeId, w.toNodeId);
@@ -252,6 +466,18 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
         parent.set(n.id, n.id);
         allNodeIds.add(n.id);
       });
+
+      // For 4-pin pushbutton: 1a is always tied to 1b, and 2a is always tied to 2b.
+      // This mirrors real hardware so wiring any top/bottom pin of a side shares the same net.
+      if (e.type === "pushbutton") {
+        const n1a = e.nodes.find((n) => n.placeholder === "Terminal 1a");
+        const n1b = e.nodes.find((n) => n.placeholder === "Terminal 1b");
+        const n2a = e.nodes.find((n) => n.placeholder === "Terminal 2a");
+        const n2b = e.nodes.find((n) => n.placeholder === "Terminal 2b");
+
+        if (n1a && n1b) union(n1a.id, n1b.id);
+        if (n2a && n2b) union(n2a.id, n2b.id);
+      }
     }
   });
 
@@ -271,7 +497,7 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
     if (rootI !== rootJ) parent.set(rootI, rootJ);
   }
 
-  for (const wire of wires) {
+  for (const wire of activeWires) {
     if (wire.fromNodeId && wire.toNodeId) union(wire.fromNodeId, wire.toNodeId);
   }
 
@@ -287,8 +513,51 @@ function getEffectiveNodeIds(map: Map<string, string>) {
 function zeroOutComputed(elements: CircuitElement[]) {
   return elements.map((el) => ({
     ...el,
-    computed: { current: 0, voltage: 0, power: 0, measurement: 0 },
+    computed: { current: 0, voltage: 0, power: 0, measurement: 0, forwardVoltage: 0, reverseVoltage: 0 },
   }));
+}
+
+function detectMicrobitRailShorts(
+  elements: CircuitElement[],
+  nodeMap: Map<string, string>
+): Map<string, boolean> {
+  const result = new Map<string, boolean>();
+  for (const el of elements) {
+    if (el.type !== "microbit" && el.type !== "microbitWithBreakout") continue;
+
+    const posRoots = el.nodes
+      ?.filter((n) => n.placeholder === "3.3V")
+      .map((n) => nodeMap.get(n.id))
+      .filter((id): id is string => !!id);
+
+    const negRoots = el.nodes
+      ?.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND"))
+      .map((n) => nodeMap.get(n.id))
+      .filter((id): id is string => !!id);
+
+    const shorted = (posRoots ?? []).some((root) => (negRoots ?? []).includes(root));
+    result.set(el.id, shorted);
+  }
+
+  return result;
+}
+
+function applyMicrobitShortFlags(
+  elements: CircuitElement[],
+  shortMap: Map<string, boolean>
+): CircuitElement[] {
+  if (!shortMap || shortMap.size === 0) return elements;
+
+  return elements.map((el) => {
+    if (el.type === "microbit" || el.type === "microbitWithBreakout") {
+      const shorted = shortMap.get(el.id) ?? false;
+      return {
+        ...el,
+        computed: { ...(el.computed ?? {}), shorted },
+      } as CircuitElement;
+    }
+    return el;
+  });
 }
 
 function getNodeMappings(effectiveNodeIds: Set<string>) {
@@ -309,17 +578,30 @@ function getElementsWithCurrent(
 ) {
   const result: CircuitElement[] = [];
 
-  for (const e of elements) {
-    if (!e || !e.type) continue;
-    if (
-      ((e.type === "battery" || e.type === "powersupply") &&
-        Array.isArray(e.nodes) &&
-        e.nodes.length === 2) ||
-      e.type === "microbit" ||
-      e.type === "microbitWithBreakout" ||
-      (e.type === "multimeter" && e.properties?.mode === "resistance")
-    ) {
+    for (const e of elements) {
+      if (!e || !e.type) continue;
+      if (
+        (((e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply")) &&
+          Array.isArray(e.nodes) &&
+          e.nodes.length === 2) ||
+        (e.type === "multimeter" && e.properties?.mode === "resistance")
+      ) {
+      // If it's a power supply explicitly switched OFF, do not treat as source.
+      if (e.type === "powersupply" && (e.properties as any)?.isOn === false) {
+        continue;
+      }
       result.push(e);
+    } else if ((e.type === "microbit" || e.type === "microbitWithBreakout") && nodeMap) {
+      // Only add the main microbit source if both 3.3V and GND are connected
+      const posIds = e.nodes?.filter((n) => n.placeholder === "3.3V").map((n) => n.id) ?? [];
+      const negIds = e.nodes?.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND")).map((n) => n.id) ?? [];
+      
+      const hasConnectedPos = posIds.some(id => nodeMap.has(id));
+      const hasConnectedNeg = negIds.some(id => nodeMap.has(id));
+      
+      if (hasConnectedPos && hasConnectedNeg) {
+        result.push(e);
+      }
     }
   }
 
@@ -327,6 +609,7 @@ function getElementsWithCurrent(
     if (e.type === "microbit" || e.type === "microbitWithBreakout") {
       const pins =
         (e.controller?.pins as Record<string, { digital?: number }>) ?? {};
+      
       for (const node of e.nodes ?? []) {
         const pinName = node.placeholder;
         if (pinName && pinName.startsWith("P")) {
@@ -355,10 +638,14 @@ function mapCurrentSourceIndices(elements: CircuitElement[]) {
 
 function buildMNAMatrices(
   elements: CircuitElement[],
+  elementsWithCurrent: CircuitElement[],
   nodeMap: Map<string, string>,
   nodeIndex: Map<string, number>,
   currentMap: Map<string, number>,
-  ledOnMap?: Map<string, boolean>
+  ledOnMap?: Map<string, boolean>,
+  currentLimitedIds?: Set<string>,
+  ignoreExplodedLeds?: boolean,
+  rgbLedOnMap?: Map<string, boolean>
 ) {
   const n = nodeIndex.size; // number of non-ground nodes
   const m = currentMap.size; // number of current sources / voltage sources
@@ -395,7 +682,8 @@ function buildMNAMatrices(
 
     if (
       el.type === "resistor" ||
-      el.type === "lightbulb"
+      el.type === "lightbulb" ||
+      el.type === "pushbutton"
     ) {
       const R = el.type === "lightbulb" ? 48 : (el.properties?.resistance ?? 1);
       const g = 1 / R;
@@ -407,18 +695,100 @@ function buildMNAMatrices(
       }
     } else if (el.type === "led") {
       // LED is directional: only conduct when forward-biased beyond threshold.
+      // Model as a voltage source (forward voltage) in series with a resistor
+      const exploded = (el.runtime as any)?.led?.exploded;
+      if (exploded && !ignoreExplodedLeds) {
+        continue; // blown LED becomes an open circuit
+      }
       const isOn = ledOnMap?.get(el.id) ?? false;
       if (isOn) {
-        const R = el.properties?.resistance ?? 100; // on-state series resistance approximation
+        const R = getLedSeriesResistance(el.properties?.color);
+        const Vf = getLedForwardVoltage(el.properties?.color);
         const g = 1 / R;
+        
+        // Stamp resistive part
         if (ai !== undefined) G[ai][ai] += g;
         if (bi !== undefined) G[bi][bi] += g;
         if (ai !== undefined && bi !== undefined) {
           G[ai][bi] -= g;
           G[bi][ai] -= g;
         }
+        
+        // Stamp the forward drop using a Norton equivalent.
+        // Branch equation: i = (Va - Vc - Vf) / R = g*(Va - Vc) - g*Vf
+        // Equivalent to a resistor between (anode,cathode) plus a current source of Is = g*Vf from cathode -> anode.
+        // In the nodal RHS (current injections into node): anode gets +Is, cathode gets -Is.
+        const Is = Vf * g;
+        if (bi !== undefined) I[bi] += Is; // anode
+        if (ai !== undefined) I[ai] -= Is; // cathode
       } else {
         // Off: open circuit (no stamp)
+      }
+    } else if (el.type === "rgbled") {
+      // RGB LED has 3 independent LED channels: Red, Green, Blue
+      // Nodes: [red, common, green, blue]
+      // For common-cathode: common is cathode (negative), colors are anodes (positive)
+      // For common-anode: common is anode (positive), colors are cathodes (negative)
+      const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
+      const runtime = (el.runtime as any)?.rgbled;
+      
+      const redNodeId = el.nodes?.[0]?.id;
+      const commonNodeId = el.nodes?.[1]?.id;
+      const greenNodeId = el.nodes?.[2]?.id;
+      const blueNodeId = el.nodes?.[3]?.id;
+      
+      const redIdx = safeNodeIndex(redNodeId);
+      const commonIdx = safeNodeIndex(commonNodeId);
+      const greenIdx = safeNodeIndex(greenNodeId);
+      const blueIdx = safeNodeIndex(blueNodeId);
+      
+      const channels: Array<{ channel: "red" | "green" | "blue"; colorIdx: number | undefined }> = [
+        { channel: "red", colorIdx: redIdx },
+        { channel: "green", colorIdx: greenIdx },
+        { channel: "blue", colorIdx: blueIdx },
+      ];
+      
+      for (const { channel, colorIdx } of channels) {
+        const channelKey = `${el.id}-${channel}`;
+        const isExploded = runtime?.[channel]?.exploded;
+        
+        if (isExploded && !ignoreExplodedLeds) {
+          continue; // blown channel becomes an open circuit
+        }
+        
+        const isOn = rgbLedOnMap?.get(channelKey) ?? false;
+        if (!isOn) continue; // Off: open circuit
+        
+        const R = getRgbLedSeriesResistance(channel);
+        const Vf = getRgbLedForwardVoltage(channel);
+        const g = 1 / R;
+        
+        // Determine which node is anode and which is cathode based on LED type
+        let anodeIdx: number | undefined;
+        let cathodeIdx: number | undefined;
+        
+        if (rgbLedType === "common-cathode") {
+          // Color is anode, common is cathode
+          anodeIdx = colorIdx;
+          cathodeIdx = commonIdx;
+        } else {
+          // Color is cathode, common is anode
+          anodeIdx = commonIdx;
+          cathodeIdx = colorIdx;
+        }
+        
+        // Stamp resistive part between anode and cathode
+        if (anodeIdx !== undefined) G[anodeIdx][anodeIdx] += g;
+        if (cathodeIdx !== undefined) G[cathodeIdx][cathodeIdx] += g;
+        if (anodeIdx !== undefined && cathodeIdx !== undefined) {
+          G[anodeIdx][cathodeIdx] -= g;
+          G[cathodeIdx][anodeIdx] -= g;
+        }
+        
+        // Stamp the forward drop using Norton equivalent
+        const Is = Vf * g;
+        if (anodeIdx !== undefined) I[anodeIdx] += Is;
+        if (cathodeIdx !== undefined) I[cathodeIdx] -= Is;
       }
     } else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
@@ -449,7 +819,7 @@ function buildMNAMatrices(
         G[bi2][wi] -= gb;
         G[wi][bi2] -= gb;
       }
-    } else if (el.type === "battery" || el.type === "powersupply") {
+    } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
       // find pos/neg mapped nodes
       const pos =
         el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1]?.id;
@@ -460,74 +830,53 @@ function buildMNAMatrices(
       const idx = safeCurrentIndex(el.id);
       if (idx === undefined) continue; // don't stamp if no mapping for source
 
+      // Treat an explicitly switched-off power supply as inactive (no source stamped)
+      const psIsOn = (el.properties as any)?.isOn;
+      if (el.type === "powersupply" && psIsOn === false) {
+        continue;
+      }
+
       if (pIdx !== undefined) B[pIdx][idx] -= 1;
       if (nIdx !== undefined) B[nIdx][idx] += 1;
       if (pIdx !== undefined) C[idx][pIdx] += 1;
       if (nIdx !== undefined) C[idx][nIdx] -= 1;
       // Battery has fixed params; powersupply is configurable
-      if (el.type === "battery") {
-        D[idx][idx] += 1.45; // Ω
-        E[idx] = 9; // V
+      // If this supply is current limited (CC mode), model as current source instead of voltage source.
+      if (el.type === "powersupply" && currentLimitedIds?.has(el.id)) {
+        // Undo voltage source stamping we just made (remove B/C contributions and D/E entry) then inject current.
+        if (pIdx !== undefined) B[pIdx][idx] += 1; // reverse earlier subtraction
+        if (nIdx !== undefined) B[nIdx][idx] -= 1;
+        if (pIdx !== undefined) C[idx][pIdx] -= 1;
+        if (nIdx !== undefined) C[idx][nIdx] += 1;
+        // zero row/col for this source index so it becomes inert
+        for (let k = 0; k < D.length; k++) {
+          D[k][idx] = 0;
+          D[idx][k] = 0;
+        }
+        D[idx][idx] = 0;
+        E[idx] = 0;
+        // Inject current source: +I at positive node, -I at negative node.
+        const iLimit = (el.properties as any)?.iLimit ?? 1;
+        if (pIdx !== undefined) I[pIdx] += iLimit;
+        if (nIdx !== undefined) I[nIdx] -= iLimit;
       } else {
-        D[idx][idx] += el.properties?.resistance ?? 0.2;
-        E[idx] = el.properties?.voltage ?? 5;
-      }
-    } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
-      // Collect all 3.3V and GND node ids in this element
-      const posIds = el.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
-      const negIds = el.nodes.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND")).map((n) => n.id);
-
-      // Need at least one pos and one neg to model the internal source
-      if (posIds.length === 0 || negIds.length === 0) continue;
-
-      // Prefer a pin that is actually present in the node map (i.e., connected), else fall back
-      const firstConnected = (ids: string[]) => ids.find((id) => nodeMap.has(id)) ?? ids[0];
-      const pos = firstConnected(posIds);
-      const neg = firstConnected(negIds);
-
-      const pIdx = safeNodeIndex(pos);
-      const nIdx = safeNodeIndex(neg);
-      const idx = safeCurrentIndex(el.id);
-      if (idx === undefined) continue;
-
-      if (pIdx !== undefined) B[pIdx][idx] -= 1;
-      if (nIdx !== undefined) B[nIdx][idx] += 1;
-      if (pIdx !== undefined) C[idx][pIdx] += 1;
-      if (nIdx !== undefined) C[idx][nIdx] -= 1;
-      D[idx][idx] += el.properties?.resistance ?? 0;
-      E[idx] = el.properties?.voltage ?? 3.3;
-
-      // Per-pin stamping: if a pin is driven HIGH, stamp a source between the pin and the microbit 3.3V.
-      // We use pin placeholder names like "P0", "P1", etc., which you already set in createElement.
-      const pins =
-        (el.controller?.pins as Record<string, { digital?: number }>) ?? {};
-      for (const node of el.nodes) {
-        const pinName = node.placeholder;
-        if (pinName && pinName.startsWith("P")) {
-          const pinState = pins[pinName];
-          if (pinState?.digital === 1 && nodeMap.has(node.id)) {
-            const pinIdx = safeNodeIndex(node.id);
-            const pin33VIdx = safeNodeIndex(pos);
-            const pinCurrentIdx = safeCurrentIndex(`${el.id}-${pinName}`);
-
-            if (
-              pinIdx !== undefined &&
-              pin33VIdx !== undefined &&
-              pinCurrentIdx !== undefined
-            ) {
-              // stamp a voltage-source-like constraint between pin and representative 3.3V node
-              B[pinIdx][pinCurrentIdx] -= 1;
-              B[pin33VIdx][pinCurrentIdx] += 1;
-              C[pinCurrentIdx][pinIdx] += 1;
-              C[pinCurrentIdx][pin33VIdx] -= 1;
-              D[pinCurrentIdx][pinCurrentIdx] += el.properties?.resistance ?? 0;
-              // Historically E was set to 0 (0-difference to 3.3V). If you prefer pin driven to 3.3V,
-              // set E[pinCurrentIdx] = el.properties?.voltage ?? 3.3 . Keep as 0 for backward compat.
-              E[pinCurrentIdx] = 0;
-            }
-          }
+        // Normal voltage source stamping
+        if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery") {
+          const defaultV = el.type === "battery" ? 9 : (el.type === "cell3v" ? 3 : (el.type === "AA_battery" ? 1.5 : 1.5));
+          const defaultR = el.type === "battery" ? 1.45 : (el.type === "cell3v" ? 0.8 : (el.type === "AA_battery" ? 0.3 : 0.4));
+          D[idx][idx] += el.properties?.resistance ?? defaultR; // internal resistance
+          E[idx] = el.properties?.voltage ?? defaultV; // source voltage
+        } else {
+          D[idx][idx] += el.properties?.resistance ?? 0.2;
+          // Use setpoint if present for bench supply
+          const vSet = (el.properties as any)?.vSet;
+          E[idx] = vSet !== undefined ? vSet : el.properties?.voltage ?? 5;
         }
       }
+    } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
+      // Skip microbit stamping in the main elements loop
+      // They will be stamped in the elementsWithCurrent loop below
+      continue;
     } else if (el.type === "multimeter") {
       const mode = el.properties?.mode;
       if (mode === "voltage") {
@@ -561,6 +910,129 @@ function buildMNAMatrices(
         D[idx][idx] += 0; // ideal source
         E[idx] = OHMMETER_VTEST;
       }
+    }
+  }
+
+  // Stamp current sources (batteries, power supplies, microbits, and active pins)
+  for (const el of elementsWithCurrent) {
+    if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
+      // Battery/power supply stamping (same as before, but now in separate loop)
+      const pos =
+        el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1]?.id;
+      const neg =
+        el.nodes.find((n) => n.polarity === "negative")?.id ?? el.nodes[0]?.id;
+      const pIdx = safeNodeIndex(pos);
+      const nIdx = safeNodeIndex(neg);
+      const idx = safeCurrentIndex(el.id);
+      if (idx === undefined) continue;
+
+      const psIsOn = (el.properties as any)?.isOn;
+      if (el.type === "powersupply" && psIsOn === false) {
+        continue;
+      }
+
+      if (pIdx !== undefined) B[pIdx][idx] -= 1;
+      if (nIdx !== undefined) B[nIdx][idx] += 1;
+      if (pIdx !== undefined) C[idx][pIdx] += 1;
+      if (nIdx !== undefined) C[idx][nIdx] -= 1;
+      
+      if (el.type === "powersupply" && currentLimitedIds?.has(el.id)) {
+        // Current-limited mode
+        if (pIdx !== undefined) B[pIdx][idx] += 1;
+        if (nIdx !== undefined) B[nIdx][idx] -= 1;
+        if (pIdx !== undefined) C[idx][pIdx] -= 1;
+        if (nIdx !== undefined) C[idx][nIdx] += 1;
+        for (let k = 0; k < D.length; k++) {
+          D[k][idx] = 0;
+          D[idx][k] = 0;
+        }
+        D[idx][idx] = 0;
+        E[idx] = 0;
+        const iLimit = (el.properties as any)?.iLimit ?? 1;
+        if (pIdx !== undefined) I[pIdx] += iLimit;
+        if (nIdx !== undefined) I[nIdx] -= iLimit;
+      } else {
+        // Voltage source mode
+        D[idx][idx] += el.properties?.resistance ?? 0;
+        E[idx] = el.properties?.voltage ?? (el.type === "cell3v" ? 3 : el.type === "AA_battery" || el.type === "AAA_battery" ? 1.5 : 1.5);
+      }
+    } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
+      // Check if this is a per-pin source entry (id format: "microbit-X-PY")
+      const isPinSource = el.id.includes("-P");
+      
+      
+      if (isPinSource) {
+        // This is a pin source entry created by getElementsWithCurrent
+        const pinName = el.id.split("-").pop(); // Extract pin name like "P2"
+        if (!pinName || !pinName.startsWith("P")) continue;
+        
+        // Find the GND node from the original microbit element
+        const negIds = el.nodes.filter((n) => 
+          n.placeholder && n.placeholder.toUpperCase().startsWith("GND")
+        ).map((n) => n.id);
+        
+        const neg = negIds.find((id) => nodeMap.has(id)) ?? negIds[0];
+        const gndIdx = safeNodeIndex(neg);
+        
+        // Find the pin node
+        const pinNode = el.nodes.find((n) => n.placeholder === pinName);
+        if (!pinNode || !nodeMap.has(pinNode.id)) {
+          // if (DEBUG) console.log(`Pin node ${pinName} not found or not connected`);
+          continue;
+        }
+        
+        const pinIdx = safeNodeIndex(pinNode.id);
+        const pinCurrentIdx = safeCurrentIndex(el.id);
+        
+        if (pinIdx !== undefined && pinCurrentIdx !== undefined) {
+          // Stamp a voltage source between pin and GND to provide 3.3V
+          // GND is the reference (ground) node, so it may not have an index
+          B[pinIdx][pinCurrentIdx] -= 1;
+          if (gndIdx !== undefined) B[gndIdx][pinCurrentIdx] += 1;
+          C[pinCurrentIdx][pinIdx] += 1;
+          if (gndIdx !== undefined) C[pinCurrentIdx][gndIdx] -= 1;
+          D[pinCurrentIdx][pinCurrentIdx] += el.properties?.resistance ?? 0;
+          E[pinCurrentIdx] = el.properties?.voltage ?? 3.3;
+        }
+      } else {
+        // This is the main microbit source entry
+        const posIds = el.nodes.filter((n) => n.placeholder === "3.3V").map((n) => n.id);
+        const negIds = el.nodes.filter((n) => 
+          n.placeholder && n.placeholder.toUpperCase().startsWith("GND")
+        ).map((n) => n.id);
+
+        if (posIds.length === 0 || negIds.length === 0) continue;
+
+        const firstConnected = (ids: string[]) => ids.find((id) => nodeMap.has(id)) ?? ids[0];
+        const pos = firstConnected(posIds);
+        const neg = firstConnected(negIds);
+
+        const pIdx = safeNodeIndex(pos);
+        const nIdx = safeNodeIndex(neg);
+        const idx = safeCurrentIndex(el.id);
+        if (idx === undefined) continue;
+
+        if (pIdx !== undefined) B[pIdx][idx] -= 1;
+        if (nIdx !== undefined) B[nIdx][idx] += 1;
+        if (pIdx !== undefined) C[idx][pIdx] += 1;
+        if (nIdx !== undefined) C[idx][nIdx] -= 1;
+        D[idx][idx] += el.properties?.resistance ?? 0;
+        E[idx] = el.properties?.voltage ?? 3.3;
+      }
+    } else if (el.type === "multimeter" && el.properties?.mode === "resistance") {
+      // Ohmmeter mode
+      const node0 = el.nodes[0]?.id;
+      const node1 = el.nodes[1]?.id;
+      const ai = safeNodeIndex(node0);
+      const bi = safeNodeIndex(node1);
+      const idx = safeCurrentIndex(el.id);
+      if (idx === undefined) continue;
+      if (ai !== undefined) B[ai][idx] -= 1;
+      if (bi !== undefined) B[bi][idx] += 1;
+      if (ai !== undefined) C[idx][ai] += 1;
+      if (bi !== undefined) C[idx][bi] -= 1;
+      D[idx][idx] += 0;
+      E[idx] = OHMMETER_VTEST;
     }
   }
 
@@ -602,39 +1074,26 @@ function getNodeVoltages(x: number[], ids: string[], groundId: string) {
   return result;
 }
 
-// Estimated forward voltage per LED color (V). Used as a simple threshold.
-function getLedForwardVoltage(color?: string) {
-  const c = (color || 'red').toLowerCase();
-  switch (c) {
-    case 'red':
-    case 'orange':
-      return 1.8;
-    case 'yellow':
-      return 2.0;
-    case 'green':
-      return 2.1;
-    case 'blue':
-    case 'white':
-      return 2.8;
-    default:
-      return 2.0;
-  }
-}
-
 function computeElementResults(
   elements: CircuitElement[],
   nodeVoltages: Record<string, number>,
   x: number[],
   nodeMap: Map<string, string>,
   currentMap: Map<string, number>,
-  n: number
+  n: number,
+  currentLimitedIds?: Set<string>,
+  ignoreExplodedLedsForResults?: boolean,
+  intactLedCurrentById?: Map<string, number>,
+  microbitShortMap?: Map<string, boolean>
 ): CircuitElement[] {
   // Detect if subcircuit is externally powered (battery or microbit present)
   const externallyPowered = elements.some(
-    (e) => e.type === "battery" || e.type === "powersupply" || e.type === "microbit" || e.type === "microbitWithBreakout"
+    (e) => e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply" || e.type === "microbit" || e.type === "microbitWithBreakout"
   );
 
   return elements.map((el) => {
+    const isMicrobit = el.type === "microbit" || el.type === "microbitWithBreakout";
+    const shorted = isMicrobit ? microbitShortMap?.get(el.id) ?? false : false;
     const a = nodeMap.get(el.nodes?.[0]?.id ?? "");
     const b = nodeMap.get(el.nodes?.[1]?.id ?? "");
     const Va = a ? nodeVoltages[a] ?? 0 : 0;
@@ -643,29 +1102,101 @@ function computeElementResults(
     let current = 0,
       power = 0,
       measurement = 0;
+    let forwardVoltage: number | undefined;
+    let reverseVoltage: number | undefined;
 
-    if (["resistor", "lightbulb"].includes(el.type)) {
+    if (["resistor", "lightbulb", "pushbutton"].includes(el.type)) {
       const R = el.properties?.resistance ?? 1;
       current = voltage / R;
       power = voltage * current;
     } else if (el.type === "led") {
       // Respect polarity: forward conduction only (anode is node[1], cathode is node[0] per createElement)
-      const a = nodeMap.get(el.nodes?.[1]?.id ?? "");
-      const c = nodeMap.get(el.nodes?.[0]?.id ?? "");
-      const Va = a ? nodeVoltages[a] ?? 0 : 0;
-      const Vc = c ? nodeVoltages[c] ?? 0 : 0;
-      const forward = Va - Vc;
+      const anodeId = nodeMap.get(el.nodes?.[1]?.id ?? "");
+      const cathodeId = nodeMap.get(el.nodes?.[0]?.id ?? "");
+      const VaNode = anodeId ? nodeVoltages[anodeId] ?? 0 : 0;
+      const VcNode = cathodeId ? nodeVoltages[cathodeId] ?? 0 : 0;
+      const forward = VaNode - VcNode;
+      forwardVoltage = forward;
+      reverseVoltage = forward < 0 ? -forward : 0;
+      voltage = forward; // expose forward drop for UI and runtime models
+
+      const exploded = (el.runtime as any)?.led?.exploded;
       const Vf = getLedForwardVoltage(el.properties?.color);
-      if (forward >= Vf) {
-        const R = el.properties?.resistance ?? 100;
-        current = forward / R;
-        voltage = forward; // drop across LED path we model
+      if ((!exploded || ignoreExplodedLedsForResults) && forward >= Vf) {
+        // Use the same model as stamping: i = (Vfwd - Vf) / R
+        // Do NOT use properties.resistance here; that is a UI knob today and defaults to 1Ω.
+        const R = getLedSeriesResistance(el.properties?.color);
+        current = Math.max(0, (forward - Vf) / (R || 1e-12));
         power = voltage * current;
       } else {
         current = 0;
         power = 0;
-        // keep voltage as Va-Vb for probes, but LED behaves open
       }
+    } else if (el.type === "rgbled") {
+      // RGB LED has 3 channels, compute results for each channel
+      // Nodes: [red, common, green, blue]
+      const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
+      const runtime = (el.runtime as any)?.rgbled;
+      
+      const redNodeId = nodeMap.get(el.nodes?.[0]?.id ?? "");
+      const commonNodeId = nodeMap.get(el.nodes?.[1]?.id ?? "");
+      const greenNodeId = nodeMap.get(el.nodes?.[2]?.id ?? "");
+      const blueNodeId = nodeMap.get(el.nodes?.[3]?.id ?? "");
+      
+      const Vred = redNodeId ? nodeVoltages[redNodeId] ?? 0 : 0;
+      const Vcommon = commonNodeId ? nodeVoltages[commonNodeId] ?? 0 : 0;
+      const Vgreen = greenNodeId ? nodeVoltages[greenNodeId] ?? 0 : 0;
+      const Vblue = blueNodeId ? nodeVoltages[blueNodeId] ?? 0 : 0;
+      
+      const computeChannel = (channel: "red" | "green" | "blue", colorVoltage: number) => {
+        const isExploded = runtime?.[channel]?.exploded;
+        const Vf = getRgbLedForwardVoltage(channel);
+        const R = getRgbLedSeriesResistance(channel);
+        
+        let forward: number;
+        if (rgbLedType === "common-cathode") {
+          forward = colorVoltage - Vcommon;
+        } else {
+          forward = Vcommon - colorVoltage;
+        }
+        
+        const channelForwardVoltage = forward;
+        const channelReverseVoltage = forward < 0 ? -forward : 0;
+        
+        let channelCurrent = 0;
+        let channelPower = 0;
+        
+        if ((!isExploded || ignoreExplodedLedsForResults) && forward >= Vf) {
+          channelCurrent = Math.max(0, (forward - Vf) / (R || 1e-12));
+          channelPower = forward * channelCurrent;
+        }
+        
+        return {
+          forwardVoltage: channelForwardVoltage,
+          reverseVoltage: channelReverseVoltage,
+          current: channelCurrent,
+          power: channelPower,
+        };
+      };
+      
+      const redResult = computeChannel("red", Vred);
+      const greenResult = computeChannel("green", Vgreen);
+      const blueResult = computeChannel("blue", Vblue);
+      
+      // Store computed values for each channel
+      (el as any).computed = {
+        voltage: 0,
+        current: 0,
+        power: 0,
+        red: redResult,
+        green: greenResult,
+        blue: blueResult,
+      };
+      
+      // Use overall values for compatibility
+      voltage = Math.max(redResult.forwardVoltage, greenResult.forwardVoltage, blueResult.forwardVoltage);
+      current = redResult.current + greenResult.current + blueResult.current;
+      power = redResult.power + greenResult.power + blueResult.power;
     } else if (el.type === "potentiometer") {
       const [nodeA, nodeW, nodeB] = el.nodes;
       const Va2 = nodeVoltages[nodeMap.get(nodeA.id) ?? ""] ?? 0;
@@ -685,10 +1216,24 @@ function computeElementResults(
       current = totalCurrent;
       voltage = totalVoltage;
       power = totalPower;
-    } else if (el.type === "battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
-      const idx = currentMap.get(el.id);
-      if (idx !== undefined) current = x[n + idx] ?? 0;
-      power = voltage * current;
+    } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
+      const isPsOff = el.type === "powersupply" && (el.properties as any)?.isOn === false;
+      if (isPsOff) {
+        // Hard zero when supply is OFF regardless of passive node potentials
+        voltage = 0;
+        current = 0;
+        power = 0;
+      } else {
+        const limited = el.type === "powersupply" && currentLimitedIds?.has(el.id);
+        if (limited) {
+          current = (el.properties as any)?.iLimit ?? 1;
+          power = voltage * current;
+        } else {
+          const idx = currentMap.get(el.id);
+            if (idx !== undefined) current = x[n + idx] ?? 0;
+          power = voltage * current;
+        }
+      }
     } else if (el.type === "multimeter") {
       const mode = el.properties?.mode;
       if (mode === "voltage") {
@@ -718,15 +1263,35 @@ function computeElementResults(
       }
     }
 
+    const supplyMode = el.type === "powersupply"
+      ? ((el.type === "powersupply" && (el.properties as any)?.isOn === false)
+          ? "OFF"
+          : currentLimitedIds?.has(el.id) ? "CC" : "VC")
+      : undefined;
+
+    const computedResult: any = {
+      voltage,
+      current,
+      power,
+      measurement,
+      supplyMode,
+      ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
+        ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }
+        : {}),
+    };
+
+    if (isMicrobit) {
+      computedResult.shorted = shorted;
+    }
+
     return {
       ...el,
-      computed: { voltage, current, power, measurement },
-    };
+      computed: computedResult,
+    } as any;
   });
 }
 
 /* ------------------------- Improved linear solver ------------------------- */
-
 /**
  * Solve linear system using Gaussian elimination with scaled partial pivoting.
  * Returns solution vector x or null if no unique solution.
@@ -795,6 +1360,38 @@ function solveLinearSystem(A: number[][], z: number[]): number[] | null {
   }
 
   return x;
+}
+
+// Helper: rebuild & solve with identified current-limited supplies
+function reSolveWithCurrentLimitedSupplies(
+  elements: CircuitElement[],
+  nodeMap: Map<string, string>,
+  nodeIndex: Map<string, number>,
+  limitedIds: Set<string>
+) {
+  // Re-identify sources excluding limited supplies (they won't be voltage sources now)
+  const baseSources = getElementsWithCurrent(elements, nodeMap);
+  const filteredSources = baseSources.filter(
+    (e) => !(e.type === "powersupply" && limitedIds.has(e.id))
+  );
+  const currentMap = mapCurrentSourceIndices(filteredSources);
+  const { G, B, C, D, I, E } = buildMNAMatrices(
+    elements,
+    filteredSources,
+    nodeMap,
+    nodeIndex,
+    currentMap,
+    undefined,
+    limitedIds
+  );
+  const { A, z } = buildFullSystem(G, B, C, D, I, E);
+  const x = solveLinearSystem(A, z) || [];
+  // Node voltages reconstruction
+  const nonGroundIds: string[] = [];
+  nodeIndex.forEach((_v, k) => nonGroundIds.push(k));
+  const groundId = Array.from(new Set(nodeMap.values())).find((id) => id.includes("GND")) || nonGroundIds[0];
+  const nodeVoltages = getNodeVoltages(x, nonGroundIds, groundId);
+  return { results: { nodeVoltages, x, currentMap } };
 }
 
 /* ------------------------- Utilities for debug / small tests ------------------------- */

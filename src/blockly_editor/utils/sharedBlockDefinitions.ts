@@ -2,117 +2,104 @@ import * as Blockly from "blockly";
 import { Order } from "blockly/python";
 import "./fields/PianoField";
 import "./fields/MusicRecorderField";
-import { PythonToBlocklyConverter } from "./pythonToBlocklyConverter";
+import "./fields/SliderField";
+import { registerIconField } from "./fields/IconField";
+import { registerLedMatrixField } from "./fields/LedMatrixField";
+import { initializeDuplicateOnDrag, installDuplicateOnDragListener } from "../plugins/duplicateOnDrag";
 
-/**
- * Shared interface for block definitions that enables bidirectional conversion
- *
- * This interface ensures that each block type has all the necessary components for:
- * 1. Defining the block's appearance and behavior in Blockly (blockDefinition)
- * 2. Parsing Python code to create blocks (pythonPattern + pythonExtractor + blockCreator)
- * 3. Generating Python code from blocks (pythonGenerator)
- *
- * By using this shared approach, we eliminate code duplication and ensure consistency
- * between Python-to-Blockly and Blockly-to-Python conversions.
- */
 export interface SharedBlockDefinition {
-  /** Unique identifier for this block type */
   type: string;
-
   category?: CategoryName;
-
-  /** Blockly JSON definition describing the block's appearance and connections */
   blockDefinition: any;
-
-  /** Regular expression pattern that matches Python code for this block type */
   pythonPattern: RegExp;
-
-  /** Function that generates Python code from a Blockly block instance */
   pythonGenerator: (block: any, generator?: any) => string | [string, number];
-
-  /** Function that extracts values from matched Python code */
   pythonExtractor: (match: RegExpMatchArray) => Record<string, any>;
-
-  /** Function that creates a Blockly block from extracted values */
   blockCreator: (
     workspace: Blockly.Workspace,
     values: Record<string, any>
   ) => Blockly.Block;
 }
-
-// categories with name and color
 export interface BlockCategory {
   name: string;
-  color: string | number; // color can be a string (hex) or number (hue)
+  color: string | number;
 }
 
 type CategoryName = (typeof BLOCK_CATEGORIES)[number]["name"];
 
 export const BLOCK_CATEGORIES: BlockCategory[] = [
-  { name: "Basic", color: 220 },
-  { name: "Input", color: 290 },
-  { name: "Led", color: 300 },
-  { name: "Logic", color: 180.72 },
-  // Place Variables directly after Logic (to match MakeCode ordering)
-  { name: "Variables", color: "#A64D79" }, // Purple color matching MakeCode
-  { name: "Text", color: "#F06292" }, // Pink color matching MakeCode
-  { name: "Maths", color: "#9C27B0" }, // Purple color for Maths
-  { name: "Music", color: "#D32F2F" }, //  Music category
-  { name: "Uncategorized", color: "#999999" }, // Gray for uncategorized
+  { name: "Basic", color: "#0078D7" },
+  { name: "Input", color: "#C724B1" },
+  { name: "Loops", color: "#00aa00" }, 
+  { name: "Led", color: "#6A1B9A" },
+  { name: "Logic", color: "#00BCD4" },
+  { name: "Variables", color: "#DC3545" },
+  { name: "Text", color: "#F06292" },
+  { name: "Maths", color: "#7B2D8F" },
+  { name: "Music", color: "#EB4437" },
+  { name: "Pins", color: "#b45309" },
 ];
 
-// Category icons mapping for toolbox UI enhancement
+export const CATEGORY_COLORS: Record<string, string> = Object.fromEntries(
+  BLOCK_CATEGORIES.map(({ name, color }) => [name, color.toString()])
+);
+
+export function getCategoryMeta(categoryName: string): { color: string; icon: string } {
+  return {
+    color: CATEGORY_COLORS[categoryName] || "#cccccc",
+    icon: CATEGORY_ICONS[categoryName] || "📦",
+  };
+}
+
 export const CATEGORY_ICONS: Record<string, string> = {
-  "Basic": "⚡", // Lightning bolt for basic functions
-  "Input": "🎮", // Game controller for input
-  "Led": "💡", // Light bulb for LED
-  "Logic": "🔀", // Flow for logic
-  "Variables": "📦", // Box for variables
-  "Text": "🔢", // Numbers for math
-  "Maths": "🔢", // Numbers for maths
-  "Music": "🎵", // Play Music
-  "Uncategorized": "📋", // Clipboard for uncategorized
+  Basic: "🧩",
+  Input: "🎮",
+  Loops: "🔁",
+  Led: "💡",
+  Logic: "🔀",
+  Variables: "🗃️",
+  Text: "🔤",
+  Maths: "➗",
+  Music: "🎵",
+  Pins: "🔌",
 };
 
-/**
- * Indent a container body by one level if it isn't indented already.
- * - Preserves existing indentation if present.
- * - Ensures a trailing newline.
- * - Returns an IND + 'pass' line when code is empty.
- */
+const IF_ELSE_ADD_ICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="4" ry="4" fill="%2300bcd4"/><path d="M11 5h2v14h-2z" fill="white"/><path d="M5 11h14v2H5z" fill="white"/></svg>';
+
+const IF_ELSE_REMOVE_ICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><rect x="1" y="1" width="22" height="22" rx="4" ry="4" fill="%23f44336"/><path d="M5 11h14v2H5z" fill="white"/></svg>';
+import { LOGIC_BLOCKS } from "./sharedBlockDefinitions/logic";
+import { MUSIC_BLOCKS } from "./sharedBlockDefinitions/music";
+import { MATHS_BLOCKS } from "./sharedBlockDefinitions/maths";
+import { BASIC_BLOCKS } from "./sharedBlockDefinitions/basic";
+import { LED_BLOCKS } from "./sharedBlockDefinitions/led";
+import { INPUT_BLOCKS } from "./sharedBlockDefinitions/input";
+import {LOOPS_BLOCKS } from "./sharedBlockDefinitions/loops";
+import { PINS_BLOCKS } from "./sharedBlockDefinitions/pins";
+
 function indentBodyIfNeeded(code: string, IND: string): string {
   if (!code || code.trim().length === 0) return `${IND}pass\n`;
   const normalized = code.replace(/\r/g, "");
   const lines = normalized.split("\n");
   const firstContent = lines.find((l) => l.trim().length > 0) ?? "";
   const startsIndented = /^\s+/.test(firstContent);
-  const processed = startsIndented
-    ? lines
-    : lines.map((l) => (l.trim().length === 0 ? l : IND + l));
+  const processed = startsIndented ? lines : lines.map((l) => (l.trim().length === 0 ? l : IND + l));
   let out = processed.join("\n");
   if (!out.endsWith("\n")) out += "\n";
   return out;
 }
 
-/**
- * Helper function to safely create and initialize a block
- * Handles both headless and rendered workspaces properly
- */
 function createAndInitializeBlock(
   workspace: Blockly.Workspace,
   blockType: string,
   fieldUpdates?: Record<string, any>
 ): Blockly.Block {
   const block = workspace.newBlock(blockType);
-
-  // Apply field updates first
   if (fieldUpdates) {
     for (const [fieldName, value] of Object.entries(fieldUpdates)) {
       block.setFieldValue(value, fieldName);
     }
   }
-
-  // Only initialize SVG if workspace supports rendering (not headless)
   if (workspace.rendered && (block as any).initSvg) {
     try {
       (block as any).initSvg();
@@ -121,1329 +108,408 @@ function createAndInitializeBlock(
       console.warn("Could not initialize SVG for block:", error);
     }
   }
-
   return block;
 }
 
-/**
- * Shared block definitions for micro:bit blocks
- * This ensures consistency between Python generation and parsing
- */
-export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
-  {
-    // basic blocks
-    type: "show_string",
-    category: "Basic",
-    blockDefinition: {
-      type: "show_string",
-      message0: "show string %1",
-      args0: [
-        {
-          type: "input_value",
-          name: "TEXT",
-          check: "String",
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Show a string on the display",
+function attachNumberShadow(
+  workspace: Blockly.Workspace,
+  hostBlock: Blockly.Block,
+  inputName: string,
+  defaultValue: number
+): void {
+  try {
+    const num = workspace.newBlock("math_number");
+    (num as any).setShadow(true);
+    (num as any).setFieldValue(String(Number.isFinite(defaultValue) ? defaultValue : 0), "NUM");
+    if ((num as any).initSvg) (num as any).initSvg();
+    if ((num as any).render) (num as any).render();
+    const input = hostBlock.getInput(inputName);
+    input?.connection?.connect((num as any).outputConnection);
+  } catch (_) {}
+}
+
+function attachBooleanShadow(
+  workspace: Blockly.Workspace,
+  hostBlock: Blockly.Block,
+  inputName: string,
+  defaultValue: boolean
+): void {
+  try {
+    const bool = workspace.newBlock("logic_boolean");
+    (bool as any).setShadow(true);
+    (bool as any).setFieldValue(defaultValue ? "TRUE" : "FALSE", "BOOL");
+    if ((bool as any).initSvg) (bool as any).initSvg();
+    if ((bool as any).render) (bool as any).render();
+    const input = hostBlock.getInput(inputName);
+    input?.connection?.connect((bool as any).outputConnection);
+  } catch (_) {}
+}
+
+function registerInlineIfElseBlock(): void {
+  const logicColor = CATEGORY_COLORS["Logic"] || "#00BCD4";
+
+  const IF_ELSE_MIXIN = {
+    elseifCount_: 0,
+    elseCount_: 0,
+    valueConnections_: [] as (Blockly.Connection | null)[],
+    statementConnections_: [] as (Blockly.Connection | null)[],
+    elseStatementConnection_: null as Blockly.Connection | null,
+    mutationToDom(this: any) {
+      if (!this.elseifCount_ && !this.elseCount_) return null;
+      const container = Blockly.utils.xml.createElement("mutation");
+      if (this.elseifCount_) container.setAttribute("elseif", String(this.elseifCount_));
+      if (this.elseCount_) container.setAttribute("else", "1");
+      return container;
     },
-  pythonPattern: /(?:^|\s)(?:await\s+)?basic\.show_string\(\s*(['"])(.*?)\1(?:\s*,\s*[^)]*)?\s*\)/g,
-    pythonGenerator: (block, generator) => {
-      const text = generator.valueToCode(block, "TEXT", (generator as any).ORDER_NONE) || '""';
-      return `basic.show_string(${text})\n`;
+    domToMutation(this: any, xmlElement: Element) {
+      if (!xmlElement) return;
+      this.elseifCount_ = parseInt(xmlElement.getAttribute("elseif") || "0", 10) || 0;
+      this.elseCount_ = parseInt(xmlElement.getAttribute("else") || "0", 10) || 0;
+      this.rebuildShape_();
     },
-    pythonExtractor: (match) => ({
-      TEXT: match[2],
-    }),
-    blockCreator: (workspace, values) => {
-      // Create the show_string block
-      const block = workspace.newBlock("show_string");
-      if (workspace.rendered && (block as any).initSvg) {
-        (block as any).initSvg();
+    storeConnections_(this: any, skipIndex?: number) {
+      this.valueConnections_ = [null];
+      this.statementConnections_ = [null];
+      this.elseStatementConnection_ = null;
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        if (skipIndex && skipIndex === i) continue;
+        this.valueConnections_.push(this.getInput("IF" + i)?.connection?.targetConnection || null);
+        this.statementConnections_.push(this.getInput("DO" + i)?.connection?.targetConnection || null);
       }
-      
-      // Create a text block with the parsed value
-      const textBlock = workspace.newBlock("text");
-      (textBlock as any).setShadow(true);
-  (textBlock as any).setFieldValue(values.TEXT ?? "Hello!", "TEXT");
-      if (workspace.rendered && (textBlock as any).initSvg) {
-        (textBlock as any).initSvg();
+      if (this.getInput("ELSE")) {
+        this.elseStatementConnection_ = this.getInput("ELSE")?.connection?.targetConnection || null;
       }
-      
-      // Connect the text block to the show_string block's TEXT input
-      const input = block.getInput("TEXT");
-      if (input && input.connection && (textBlock as any).outputConnection) {
-        input.connection.connect((textBlock as any).outputConnection);
+    },
+    restoreConnections_(this: any) {
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        this.reconnectValueConnection_(i, this.valueConnections_);
+        this.statementConnections_[i]?.reconnect(this, "DO" + i);
       }
-      
-      // Render both blocks after connection to ensure proper layout
-      if (workspace.rendered) {
-        if ((textBlock as any).render) (textBlock as any).render();
-        if ((block as any).render) (block as any).render();
-        // Force a second render to ensure connection notches are properly aligned
+      if (this.getInput("ELSE")) {
+        this.elseStatementConnection_?.reconnect(this, "ELSE");
+      }
+    },
+    addElse_(this: any) {
+      this.update_(() => {
+        this.elseCount_ = 1;
+      });
+    },
+    removeElse_(this: any) {
+      this.update_(() => {
+        this.elseCount_ = 0;
+      });
+    },
+    addElseIf_(this: any) {
+      this.update_(() => {
+        this.elseifCount_++;
+      });
+    },
+    removeElseIf_(this: any, index: number) {
+      this.update_(() => {
+        this.elseifCount_ = Math.max(0, this.elseifCount_ - 1);
+      }, index);
+    },
+    update_(this: any, updater: () => void, skipIndex?: number) {
+      Blockly.Events.setGroup(true);
+      this.storeConnections_(skipIndex);
+      const block = this as Blockly.Block;
+      const oldMutationDom = block.mutationToDom?.();
+      const oldMutation = oldMutationDom ? Blockly.Xml.domToText(oldMutationDom) : "";
+      updater?.();
+      this.updateShape_();
+      if ((block as any).initSvg) (block as any).initSvg();
+      if ((block as any).render) (block as any).render();
+      const newMutationDom = block.mutationToDom?.();
+      const newMutation = newMutationDom ? Blockly.Xml.domToText(newMutationDom) : "";
+      if (oldMutation !== newMutation) {
+        const changeEvent = new Blockly.Events.BlockChange(block, "mutation", null, oldMutation, newMutation);
+        Blockly.Events.fire(changeEvent);
+        const group = Blockly.Events.getGroup();
         setTimeout(() => {
-          if ((block as any).render) (block as any).render();
-        }, 0);
+          Blockly.Events.setGroup(group);
+          (block as any).bumpNeighbours?.();
+          Blockly.Events.setGroup(false);
+        }, (Blockly as any).config?.bumpDelay ?? 0);
       }
-      
-      return block;
+      this.restoreConnections_();
+      Blockly.Events.setGroup(false);
     },
-  },
-  {
-    type: "show_number",
-    category: "Basic",
-    blockDefinition: {
-      type: "show_number",
-      message0: "show number %1",
-      args0: [
-        {
-          // Switch to an input so users can plug variables/expressions like MakeCode
-          type: "input_value",
-          name: "NUM",
-          check: "Number",
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Show a number on the display",
-    },
-    // Keep a simple numeric pattern; general expressions are handled via blocks
-    pythonPattern: /(?:^|\s)(?:await\s+)?basic\.show_number\((-?\d+(?:\.\d+)?)\)/g,
-    pythonGenerator: (block, generator?: any) => {
-      const gen = generator || ({} as any);
-      const numCode = gen.valueToCode
-        ? gen.valueToCode(block, "NUM", gen.ORDER_NONE) || "0"
-        : "0";
-      return `basic.show_number(${numCode})\n`;
-    },
-    pythonExtractor: (match) => ({
-      NUM: parseFloat(match[1]),
-    }),
-    blockCreator: (workspace, values) => {
-      // Create block and plug a number value into the NUM input
-      const block = workspace.newBlock("show_number");
-      if (workspace.rendered && (block as any).initSvg) (block as any).initSvg();
-      // Create shadow number with the parsed value (or 0)
-      const num = workspace.newBlock("math_number");
-      (num as any).setShadow(true);
-      (num as any).setFieldValue(String(Number.isFinite(values.NUM) ? values.NUM : 0), "NUM");
-      if ((num as any).initSvg) (num as any).initSvg();
-      if ((num as any).render) (num as any).render();
-      const input = block.getInput("NUM");
-      input?.connection?.connect((num as any).outputConnection);
-      if ((block as any).render) (block as any).render();
-      return block;
-    },
-  },
-  {
-    // Basic: show leds with a 5x5 clickable matrix (MakeCode-style)
-    type: "basic_show_leds",
-    category: "Basic",
-    blockDefinition: {
-      type: "basic_show_leds",
-      message0: "show leds %1",
-      args0: [
-        {
-          type: "field_led_matrix",
-          name: "MATRIX",
-          value: ".....\n.....\n.....\n.....\n.....",
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Draw a 5×5 image and show it on the LED screen",
-    },
-    // Matches: basic.show_leds("""\n# . . . .\n. . . . .\n...\n""")
-    // Note: Our converter is line-based; this pattern is primarily for documentation and future use.
-    pythonPattern: /(?:^|\s)(?:await\s+)?basic\.show_leds\(\s*(["']){3}([\s\S]*?)\1{3}\s*\)/g,
-    pythonGenerator: (block) => {
-      // Retrieve matrix value as 5 lines of '#' and '.'
-      const raw = (block.getFieldValue("MATRIX") || "") as string;
-      // Normalize to 5 lines x 5 cols and format with spaces as MakeCode shows
-      const rows = raw
-        .toString()
-        .replace(/\r/g, "")
-        .split("\n")
-        .slice(0, 5)
-        .map((line: string) => {
-          const markers = (line.match(/[#.]/g) || []).slice(0, 5);
-          while (markers.length < 5) markers.push(".");
-          return markers.join(" ");
-        });
-      while (rows.length < 5) rows.push(". . . . .");
-      const body = rows.join("\n");
-      return `basic.show_leds("""\n${body}\n""")\n`;
-    },
-    pythonExtractor: (match) => {
-      // Extract inner triple-quoted content and normalize to 5 lines of '#'/'.'
-      const inner = match[2] || "";
-      const onlyMarkers = inner
-        .replace(/\r/g, "")
-        .split("\n");
-      const rows: string[] = [];
-      for (let y = 0; y < 5; y++) {
-        const line = onlyMarkers[y] ?? "";
-        const markers = (line.match(/[#.]/g) || []).slice(0, 5);
-        while (markers.length < 5) markers.push(".");
-        rows.push(markers.join(""));
+    updateShape_(this: any) {
+      const _b = Blockly as any;
+      const _inputsKey = "inp" + "uts";
+      const _alignKey = "Al" + "ign";
+      const _horizKey = "Horiz" + "ontal" + "Alignment";
+      const _rightKey = "RIGH" + "T";
+      const rightAlign = _b[_inputsKey]?.[_alignKey]?.[_rightKey] ?? _b[_alignKey]?.[_rightKey] ?? _b[_horizKey]?.[_rightKey] ?? 0;
+      if (this.getInput("ELSE")) {
+        this.removeInput("ELSEBUTTONS");
+        this.removeInput("ELSETITLE");
+        this.removeInput("ELSE");
       }
-      return { MATRIX: rows.join("\n") };
-    },
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("basic_show_leds");
-      block.setFieldValue(values.MATRIX || ".....\n.....\n.....\n.....\n.....", "MATRIX");
-      return block;
-    },
-  },
-  {
-    type: "pause",
-    category: "Basic",
-    blockDefinition: {
-      type: "pause",
-      message0: "pause %1 ms",
-      args0: [
-        {
-          type: "field_number",
-          name: "TIME",
-          value: 1000,
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Pause execution",
-    },
-    pythonPattern: /(?:^|\s)(?:await\s+)?basic\.pause\((\d+)\)/g,
-    pythonGenerator: (block) => {
-      const time = block.getFieldValue("TIME");
-      return `basic.pause(${time})\n`;
-    },
-    pythonExtractor: (match) => ({
-      TIME: parseInt(match[1]),
-    }),
-    blockCreator: (workspace, values) => {
-      return createAndInitializeBlock(workspace, "pause", {
-        TIME: values.TIME,
-      });
-    },
-  },
-
-  // led blocks
-  {
-    type: "plot_led",
-    category: "Led",
-    blockDefinition: {
-      type: "plot_led",
-      message0: "plot x: %1 y: %2",
-      args0: [
-        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
-        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Turn on LED at (x, y)",
-    },
-    pythonPattern: /led\.plot\((\d+),\s*(\d+)\)/g,
-    pythonGenerator: (block) => {
-      const x = block.getFieldValue("X");
-      const y = block.getFieldValue("Y");
-      return `led.plot(${x}, ${y})\n`;
-    },
-    pythonExtractor: (match) => ({
-      X: parseInt(match[1]),
-      Y: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("plot_led");
-      block.setFieldValue(values.X, "X");
-      block.setFieldValue(values.Y, "Y");
-      return block;
-    },
-  },
-  {
-    type: "unplot_led",
-    category: "Led",
-    blockDefinition: {
-      type: "unplot_led",
-      message0: "unplot x: %1 y: %2",
-      args0: [
-        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
-        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Turn off LED at (x, y)",
-    },
-    pythonPattern: /led\.unplot\((\d+),\s*(\d+)\)/g,
-    pythonGenerator: (block) => {
-      const x = block.getFieldValue("X");
-      const y = block.getFieldValue("Y");
-      return `led.unplot(${x}, ${y})\n`;
-    },
-    pythonExtractor: (match) => ({
-      X: parseInt(match[1]),
-      Y: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("unplot_led");
-      block.setFieldValue(values.X, "X");
-      block.setFieldValue(values.Y, "Y");
-      return block;
-    },
-  },
-  {
-    type: "show_leds",
-    category: "Led",
-    blockDefinition: {
-      type: "show_leds",
-      message0: "show leds %1",
-      args0: [
-        {
-          type: "field_multilinetext",
-          name: "PATTERN",
-          text: "00000\n00000\n00000\n00000\n00000",
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Display pattern on LEDs",
-    },
-    pythonPattern: /(?:^|\s)(?:await\s+)?basic\.show_leds\(\s*(["']){3}([\s\S]*?)\1{3}\s*\)/g,
-    pythonGenerator: (block) => {
-      const raw = (block.getFieldValue("PATTERN") || "") as string;
-      const rows = raw
-        .toString()
-        .replace(/\r/g, "")
-        .split("\n")
-        .slice(0, 5)
-        .map((line: string) => {
-          const bits = (line.match(/[01]/g) || []).slice(0, 5);
-          while (bits.length < 5) bits.push("0");
-          const markers = bits.map((c) => (c === "1" ? "#" : "."));
-          return markers.join(" ");
-        });
-      while (rows.length < 5) rows.push(". . . . .");
-      const body = rows.join("\n");
-      return `basic.show_leds("""\n${body}\n""")\n`;
-    },
-    pythonExtractor: (match) => {
-      const inner = match[2] || "";
-      const lines = inner.replace(/\r/g, "").split("\n");
-      const out: string[] = [];
-      for (let y = 0; y < 5; y++) {
-        const line = lines[y] ?? "";
-        const markers = (line.match(/[#.]/g) || []).slice(0, 5);
-        while (markers.length < 5) markers.push(".");
-        out.push(markers.map((m) => (m === "#" ? "1" : "0")).join(""));
+      let i = 1;
+      while (this.getInput("IF" + i)) {
+        this.removeInput("IF" + i);
+        this.removeInput("IFTITLE" + i);
+        this.removeInput("IFBUTTONS" + i);
+        this.removeInput("DO" + i);
+        i++;
       }
-      return { PATTERN: out.join("\n") };
-    },
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("show_leds");
-      block.setFieldValue(values.PATTERN, "PATTERN");
-      return block;
-    },
-  },
-  {
-    // Basic: show icon (predefined 5x5 patterns)
-    // We generate led.unplot for all pixels, then led.plot for the icon pixels
-    type: "show_icon",
-    category: "Basic",
-    blockDefinition: {
-      type: "show_icon",
-      message0: "show icon %1",
-      args0: [
-        {
-          type: "field_icon",
-          name: "ICON",
-          value: "HEART",
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Show a predefined icon on the LED matrix",
-    },
-    // Support parsing the MicroPython-like form: display.show(Image.ICON)
-    pythonPattern: /display\.show\(Image\.([A-Z_]+)\)/g,
-    pythonGenerator: (block) => {
-      const icon = (block.getFieldValue("ICON") || "HEART") as string;
-      const patterns: Record<string, string[]> = {
-        HEART: ["01010", "11111", "11111", "01110", "00100"],
-        SMALL_HEART: ["00000", "01010", "01110", "00100", "00000"],
-        HAPPY: ["00000", "01010", "00000", "10001", "01110"],
-        SAD: ["00000", "01010", "01110", "10001", "00000"],
-        YES: ["00001", "00010", "00100", "01000", "10000"],
-        NO: ["10001", "01010", "00100", "01010", "10001"],
+      for (let idx = 1; idx <= this.elseifCount_; idx++) {
+        const removeElseIf = () => this.removeElseIf_(idx);
+        this.appendValueInput("IF" + idx)
+          .setCheck("Boolean")
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_ELSEIF || "else if");
+        this.appendDummyInput("IFTITLE" + idx)
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_THEN || "then");
+        this.appendDummyInput("IFBUTTONS" + idx)
+          .setAlign(rightAlign)
+          .appendField(new Blockly.FieldImage(IF_ELSE_REMOVE_ICON, 18, 18, "-", removeElseIf, false));
+        this.appendStatementInput("DO" + idx);
+        
+        // Attach default false boolean to else-if conditions if no connection exists
+        if (this.workspace && !this.getInput("IF" + idx)?.connection?.targetConnection) {
+          attachBooleanShadow(this.workspace, this, "IF" + idx, false);
+        }
+      }
+      if (this.elseCount_) {
+        this.appendDummyInput("ELSETITLE")
+          .appendField(Blockly.Msg.CONTROLS_IF_MSG_ELSE || "else");
+        this.appendDummyInput("ELSEBUTTONS")
+          .setAlign(rightAlign)
+          .appendField(new Blockly.FieldImage(IF_ELSE_REMOVE_ICON, 18, 18, "-", this.removeElse_.bind(this), false));
+        this.appendStatementInput("ELSE");
+      }
+      if (this.getInput("ADDBUTTON")) this.removeInput("ADDBUTTON");
+      const addElseOrElseIf = () => {
+        if (!this.elseCount_) {
+          this.addElse_();
+        } else {
+          this.addElseIf_();
+        }
       };
-
-      const rows = patterns[icon] || patterns.HEART;
-      // Generate Python: clear entire 5x5 then plot icon pixels
-      const lines: string[] = [];
-      for (let y = 0; y < 5; y++) {
-        for (let x = 0; x < 5; x++) {
-          lines.push(`led.unplot(${x}, ${y})`);
+      this.appendDummyInput("ADDBUTTON")
+        .setAlign(rightAlign)
+        .appendField(new Blockly.FieldImage(IF_ELSE_ADD_ICON, 18, 18, "+", addElseOrElseIf, false));
+    },
+    rebuildShape_(this: any) {
+      const valueConnections: (Blockly.Connection | null)[] = [null];
+      const statementConnections: (Blockly.Connection | null)[] = [null];
+      let elseConnection: Blockly.Connection | null = null;
+      if (this.getInput("ELSE")) {
+        elseConnection = this.getInput("ELSE")?.connection?.targetConnection || null;
+      }
+      let idx = 1;
+      while (this.getInput("IF" + idx)) {
+        valueConnections[idx] = this.getInput("IF" + idx)?.connection?.targetConnection || null;
+        statementConnections[idx] = this.getInput("DO" + idx)?.connection?.targetConnection || null;
+        idx++;
+      }
+      this.updateShape_();
+      this.reconnectChildBlocks_(valueConnections, statementConnections, elseConnection);
+    },
+    reconnectChildBlocks_(
+      this: any,
+      valueConnections: (Blockly.Connection | null)[],
+      statementConnections: (Blockly.Connection | null)[],
+      elseConnection: Blockly.Connection | null
+    ) {
+      for (let i = 1; i <= this.elseifCount_; i++) {
+        this.reconnectValueConnection_(i, valueConnections);
+        statementConnections[i]?.reconnect(this, "DO" + i);
+      }
+      elseConnection?.reconnect(this, "ELSE");
+    },
+    reconnectValueConnection_(this: any, index: number, valueConnections: (Blockly.Connection | null)[]) {
+      const shadow = this.getInput("IF" + index)?.connection?.targetBlock();
+      if (valueConnections[index]) {
+        valueConnections[index]?.reconnect(this, "IF" + index);
+        if (shadow && typeof (shadow as any).getParent === "function" && !(shadow as any).getParent()) {
+          shadow.dispose();
         }
       }
-      for (let y = 0; y < 5; y++) {
-        const row = rows[y];
-        for (let x = 0; x < 5; x++) {
-          if (row.charAt(x) === "1") {
-            lines.push(`led.plot(${x}, ${y})`);
-          }
-        }
-      }
-      return lines.join("\n") + "\n";
     },
-    pythonExtractor: (match) => ({
-      ICON: match[1]?.toUpperCase(),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("show_icon");
-      const valid = new Set([
-        "HEART",
-        "SMALL_HEART",
-        "HAPPY",
-        "SAD",
-        "YES",
-        "NO",
-      ]);
-      const picked = valid.has(values.ICON) ? values.ICON : "HEART";
-      block.setFieldValue(picked, "ICON");
-      return block;
-    },
-  },
-  {
-    // Led: plot with brightness (0..255)
-    type: "plot_led_brightness",
-    category: "Led",
-    blockDefinition: {
-      type: "plot_led_brightness",
-      message0: "plot x %1 y %2 brightness %3",
-      args0: [
-        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
-        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
-        { type: "field_slider", name: "BRIGHTNESS", value: 255, min: 0, max: 255, precision: 1 },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Plot an LED at (x,y) with brightness 0-255",
-    },
-    // Custom Python mapping for our editor
-    pythonPattern: /led\.plot_brightness\((\d+),\s*(\d+),\s*(\d+)\)/g,
-    pythonGenerator: (block) => {
-      const x = block.getFieldValue("X");
-      const y = block.getFieldValue("Y");
-      const b = block.getFieldValue("BRIGHTNESS");
-      return `led.plot_brightness(${x}, ${y}, ${b})\n`;
-    },
-    pythonExtractor: (match) => ({
-      X: parseInt(match[1]),
-      Y: parseInt(match[2]),
-      BRIGHTNESS: parseInt(match[3]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("plot_led_brightness");
-      block.setFieldValue(values.X, "X");
-      block.setFieldValue(values.Y, "Y");
-      block.setFieldValue(values.BRIGHTNESS, "BRIGHTNESS");
-      return block;
-    },
-  },
-  {
-    type: "toggle_led",
-    category: "Led",
-    blockDefinition: {
-      type: "toggle_led",
-      message0: "toggle x: %1 y: %2",
-      args0: [
-        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
-        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Toggle LED at (x, y)",
-    },
-    pythonPattern: /led\.toggle\((\d+),\s*(\d+)\)/g,
-    pythonGenerator: (block) => {
-      const x = block.getFieldValue("X");
-      const y = block.getFieldValue("Y");
-      return `led.toggle(${x}, ${y})\n`;
-    },
-    pythonExtractor: (match) => ({
-      X: parseInt(match[1]),
-      Y: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("toggle_led");
-      block.setFieldValue(values.X, "X");
-      block.setFieldValue(values.Y, "Y");
-      return block;
-    },
-  },
-  {
-    type: "point_led",
-    category: "Led",
-    blockDefinition: {
-      type: "point_led",
-      message0: "point x: %1 y: %2",
-      args0: [
-        { type: "field_number", name: "X", value: 0, min: 0, max: 4 },
-        { type: "field_number", name: "Y", value: 0, min: 0, max: 4 },
-      ],
-      output: "Boolean",
-      tooltip: "Check if LED at (x, y) is on",
-    },
-    pythonPattern: /led\.point\((\d+),\s*(\d+)\)/g,
-    pythonGenerator: (block) => {
-      const x = block.getFieldValue("X");
-      const y = block.getFieldValue("Y");
-      return [`led.point(${x}, ${y})`, 0];
-    },
-    pythonExtractor: (match) => ({
-      X: parseInt(match[1]),
-      Y: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("point_led");
-      block.setFieldValue(values.X, "X");
-      block.setFieldValue(values.Y, "Y");
-      return block;
-    },
-  },
+  };
 
-  // logic blocks
-
-  // --- LOGIC CATEGORY (updated to match image) ---
-  // Conditionals: if, if-else
-  {
-    type: "controls_if",
-    category: "Logic",
-    blockDefinition: {
-      type: "controls_if",
-      message0: "if %1 then %2",
-      args0: [
-        { type: "input_value", name: "IF0", check: "Boolean" },
-        { type: "input_statement", name: "DO0" },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "If / else if / else",
-      mutator: "controls_if_mutator",
-    },
-    pythonPattern: /\bif\b[\s\S]*?:/g,
-    pythonGenerator: (block, generator) => {
-      let n = 0;
-      let code = "";
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
-      const ensureBody = (s: string) => {
-        if (s && s.trim().length > 0) return s;
-        return IND + "# your code here\n";
-      };
-      const condition0 = generator.valueToCode(block, "IF0", (generator as any).ORDER_NONE) || "True";
-      const branch0 = generator.statementToCode(block, "DO0");
-      code += `if ${condition0}:\n${ensureBody(branch0)}`;
-      for (n = 1; block.getInput("IF" + n); n++) {
-        const cond = generator.valueToCode(block, "IF" + n, (generator as any).ORDER_NONE) || "False";
-        const branch = generator.statementToCode(block, "DO" + n);
-        code += `elif ${cond}:\n${ensureBody(branch)}`;
-      }
-      if (block.getInput("ELSE")) {
-        const elseBranch = generator.statementToCode(block, "ELSE");
-        code += `else:\n${ensureBody(elseBranch)}`;
-      }
-      if (!code.endsWith("\n")) code += "\n";
-      return code;
-    },
-    pythonExtractor: () => ({}),
-    blockCreator: (workspace) => {
-      return createAndInitializeBlock(workspace, "controls_if");
-    },
-  },
-  // Comparison: =, ≠, <, ≤, >, ≥
-  {
-    type: "logic_compare",
-    category: "Logic",
-    blockDefinition: {
-      type: "logic_compare",
-      message0: "%1 %2 %3",
-      args0: [
-        { type: "input_value", name: "A" },
-        { type: "field_dropdown", name: "OP", options: [["=", "EQ"], ["≠", "NEQ"], ["<", "LT"], ["≤", "LTE"], [">", "GT"], ["≥", "GTE"]] },
-        { type: "input_value", name: "B" },
-      ],
-      output: "Boolean",
-      tooltip: "Comparison",
-    },
-    pythonPattern: /(.+)\s*(==|!=|<|<=|>|>=)\s*(.+)/g,
-    pythonGenerator: (block, generator) => {
-      const a = generator.valueToCode(block, "A", (generator as any).ORDER_RELATIONAL || 0) || "0";
-      const b = generator.valueToCode(block, "B", (generator as any).ORDER_RELATIONAL || 0) || "0";
-      const op = block.getFieldValue("OP");
-      const ops = { EQ: "==", NEQ: "!=", LT: "<", LTE: "<=", GT: ">", GTE: ">=" };
-      const code = `${a} ${(ops as Record<string, string>)[op] || "=="} ${b}`;
-      return [code, (generator as any).ORDER_RELATIONAL || 0];
-    },
-    pythonExtractor: () => ({}),
-    blockCreator: (workspace) => workspace.newBlock("logic_compare"),
-  },
-  // Boolean: and, or
-  {
-    type: "logic_operation",
-    category: "Logic",
-    blockDefinition: {
-      type: "logic_operation",
-      message0: "%1 %2 %3",
-      args0: [
-        { type: "input_value", name: "A", check: "Boolean" },
-        { type: "field_dropdown", name: "OP", options: [["and", "AND"], ["or", "OR"]] },
-        { type: "input_value", name: "B", check: "Boolean" },
-      ],
-      output: "Boolean",
-      tooltip: "Boolean operation",
-    },
-    pythonPattern: /(.+)\s*(and|or)\s*(.+)/g,
-    pythonGenerator: (block, generator) => {
-      const op = block.getFieldValue("OP");
-      const order = op === "AND" ? (generator as any).ORDER_LOGICAL_AND : (generator as any).ORDER_LOGICAL_OR;
-      const a = generator.valueToCode(block, "A", order) || "False";
-      const b = generator.valueToCode(block, "B", order) || "False";
-      const code = `${a} ${op.toLowerCase()} ${b}`;
-      return [code, order];
-    },
-    pythonExtractor: () => ({}),
-    blockCreator: (workspace) => workspace.newBlock("logic_operation"),
-  },
-  // Boolean: not
-  {
-    type: "logic_negate",
-    category: "Logic",
-    blockDefinition: {
-      type: "logic_negate",
-      message0: "not %1",
-      args0: [
-        { type: "input_value", name: "BOOL", check: "Boolean" },
-      ],
-      output: "Boolean",
-      tooltip: "Negate a boolean value",
-    },
-    pythonPattern: /not\s+(.+)/g,
-    pythonGenerator: (block, generator) => {
-      const bool = generator.valueToCode(block, "BOOL", (generator as any).ORDER_LOGICAL_NOT || 0) || "False";
-      const code = `not ${bool}`;
-      return [code, (generator as any).ORDER_LOGICAL_NOT || 0];
-    },
-    pythonExtractor: () => ({}),
-    blockCreator: (workspace) => workspace.newBlock("logic_negate"),
-  },
-  // Boolean: true, false
-  {
-    type: "logic_boolean",
-    category: "Logic",
-    blockDefinition: {
-      type: "logic_boolean",
-      message0: "%1",
-      args0: [
-        { type: "field_dropdown", name: "BOOL", options: [["true", "TRUE"], ["false", "FALSE"]] },
-      ],
-      output: "Boolean",
-      tooltip: "Boolean value",
-    },
-    pythonPattern: /(True|False)/g,
-    pythonGenerator: (block, generator) => {
-      const bool = block.getFieldValue("BOOL");
-      const code = bool === "TRUE" ? "True" : "False";
-      return [code, (generator as any).ORDER_ATOMIC || 0];
-    },
-    pythonExtractor: () => ({}),
-    blockCreator: (workspace) => workspace.newBlock("logic_boolean"),
-  },
-
-  // input blocks
-
-  // --- NEW: on_button_pressed event block (A, B, A+B) ---
-  {
-    type: "on_button_pressed",
-    category: "Input",
-    blockDefinition: {
-      type: "on_button_pressed",
-      message0: "on button %1 pressed %2",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "BUTTON",
-          options: [
-            ["A", "A"],
-            ["B", "B"],
-            ["A+B", "AB"],
-          ],
-        },
-        { type: "input_statement", name: "DO" },
-      ],
-      tooltip: "Run when a button is pressed",
-      nextStatement: null,
-    },
-    // Matches a typical generated handler pattern like:
-    // def on_button_pressed_a():
-    //     ...
-    // input.on_button_pressed(Button.A, on_button_pressed_a)
-    pythonPattern: /(?:async\s+)?def\s+on_button_pressed_(a|b|ab)\s*\(\s*\)\s*:([\s\S]*?)\n\s*input\.on_button_pressed\(\s*Button\.(A|B|AB)\s*,\s*([A-Za-z_]\w*)\s*\)/gi,
-    pythonGenerator: (block, generator) => {
-      const btn = block.getFieldValue("BUTTON");
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
-      const statements = generator.statementToCode(block, "DO");
-      const funcName = `on_button_pressed_${btn.toLowerCase()}`;
-      // Collect variables used in this handler
-      const used = new Set<string>();
-      const assigned = new Set<string>();
-      try {
-        const getName = (ws: any, id: string) => {
-          try {
-            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
-            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
-          } catch { return "x"; }
-        };
-        const doInput = block.getInputTargetBlock("DO");
-        if (doInput) {
-          const desc = doInput.getDescendants(false);
-          for (const d of desc) {
-            if (!d || !d.type) continue;
-            if (d.type === "variables_get") {
-              const id = d.getFieldValue("VAR");
-              used.add(getName(block.workspace, id));
-            } else if (d.type === "variables_set") {
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-              assigned.add(name);
-            } else if (d.type === "math_change") {
-              // change requires a prior value -> treat as usage, not a defining assignment
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-            }
-          }
-        }
-      } catch (_) {}
-      const globals = Array.from(used);
-      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
-      // Ensure body is indented one level when needed
-      const body = indentBodyIfNeeded(statements, IND);
-      return `def ${funcName}():\n${globalLine}${body}\ninput.on_button_pressed(Button.${btn}, ${funcName})\n`;
-    },
-    pythonExtractor: (match) => ({
-      BUTTON: (match[3] || match[1]).toUpperCase(),
-      STATEMENTS: (match[2] || "").trim(),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("on_button_pressed");
-      // default to A if value missing
-      block.setFieldValue(values.BUTTON || "A", "BUTTON");
-      return block;
-    },
-  },
-  {
-    type: "button_is_pressed",
-    category: "Input",
-    blockDefinition: {
-      type: "button_is_pressed",
-      message0: "button %1 is pressed",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "BUTTON",
-          options: [
-            ["A", "A"],
-            ["B", "B"],
-            ["A+B", "AB"],
-          ],
-        },
-      ],
-      output: "Boolean",
-      tooltip: "Check whether a button is currently pressed",
-    },
-    // Matches calls like: input.button_is_pressed(Button.A)
-    pythonPattern: /input\.button_is_pressed\(\s*Button\.(A|B|AB)\s*\)/g,
-    pythonGenerator: (block) => {
-      const btn = block.getFieldValue("BUTTON") || "A";
-      return [`input.button_is_pressed(Button.${btn})`, (Order as any)?.NONE || 0];
-    },
-    pythonExtractor: (match) => ({
-      BUTTON: match[1].toUpperCase(),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("button_is_pressed");
-      block.setFieldValue(values.BUTTON || "A", "BUTTON");
-      return block;
-    },
-  },
-
-  {
-    type: "forever",
-    category: "Basic",
-    blockDefinition: {
-      type: "forever",
-      message0: "forever %1 %2",
-      args0: [{ type: "input_dummy" }, { type: "input_statement", name: "DO" }],
-      tooltip: "Runs code forever",
-    },
-    // Support recognizing either the classic while True: form or
-    // the handler registration style we generate below
-    // - def on_forever():\n    ...\n    basic.forever(on_forever)
-    pythonPattern: /((?:async\s+)?def\s+on_forever\(\s*\)\s*:|basic\.forever\(\s*on_forever\s*\)|while\s+True\s*:)/g,
-    pythonGenerator: (block, generator) => {
-      // Skip disabled forever blocks (e.g., duplicate forever loops)
-      const isDisabled = typeof (block as any).getInheritedDisabled === "function"
-        ? (block as any).getInheritedDisabled()
-        : (typeof (block as any).isEnabled === "function" ? !(block as any).isEnabled() : false);
-      if (isDisabled) return "";
-      
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
-      const statements = generator.statementToCode(block, "DO");
-      // Collect variables used in this container
-      const used = new Set<string>();
-      const assigned = new Set<string>();
-      try {
-        const getName = (ws: any, id: string) => {
-          try {
-            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
-            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
-          } catch { return "x"; }
-        };
-        const doInput = block.getInputTargetBlock("DO");
-        if (doInput) {
-          const desc = doInput.getDescendants(false);
-          for (const d of desc) {
-            if (!d || !d.type) continue;
-            if (d.type === "variables_get") {
-              const id = d.getFieldValue("VAR");
-              used.add(getName(block.workspace, id));
-            } else if (d.type === "variables_set") {
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-              assigned.add(name);
-            } else if (d.type === "math_change") {
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-            }
-          }
-        }
-      } catch (_) {}
-      const globals = Array.from(used);
-      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
-
-      // Ensure body is indented one level when needed
-      const body = indentBodyIfNeeded(statements, IND);
-      return `def on_forever():\n${globalLine}${body}basic.forever(on_forever)\n`;
-    },
-    pythonExtractor: (_match) => ({
-      STATEMENTS: "",
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("forever");
-      // Note: Nested statements need to be handled separately
-      return block;
-    },
-  },
-  {
-    type: "on_start",
-    category: "Basic",
-    blockDefinition: {
-      type: "on_start",
-      message0: "on start %1 %2",
-      args0: [{ type: "input_dummy" }, { type: "input_statement", name: "DO" }],
-      tooltip: "Runs once at the start",
-    },
-    pythonPattern: /(?:async\s+)?def\s+on_start\(\s*\)\s*:([\s\S]*?)(?=\n(?:\S|$))/g,
-    pythonGenerator: (block, generator) => {
-      // Skip disabled on_start blocks (e.g., duplicate on_start blocks)
-      const isDisabled = typeof (block as any).getInheritedDisabled === "function"
-        ? (block as any).getInheritedDisabled()
-        : (typeof (block as any).isEnabled === "function" ? !(block as any).isEnabled() : false);
-      if (isDisabled) return "";
-      
-      const IND = ((generator as any)?.INDENT ?? "    ") as string;
-      const statements = generator.statementToCode(block, "DO");
-      // Collect variables used in on_start
-      const used = new Set<string>();
-      const assigned = new Set<string>();
-      try {
-        const getName = (ws: any, id: string) => {
-          try {
-            const m = typeof ws?.getVariableById === "function" ? ws.getVariableById(id) : null;
-            return (m && m.name) || (id && !/^[a-f0-9-]{8,}$/i.test(id) ? id : "x");
-          } catch { return "x"; }
-        };
-        const doInput = block.getInputTargetBlock("DO");
-        if (doInput) {
-          const desc = doInput.getDescendants(false);
-          for (const d of desc) {
-            if (!d || !d.type) continue;
-            if (d.type === "variables_get") {
-              const id = d.getFieldValue("VAR");
-              used.add(getName(block.workspace, id));
-            } else if (d.type === "variables_set") {
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-              assigned.add(name);
-            } else if (d.type === "math_change") {
-              const id = d.getFieldValue("VAR");
-              const name = getName(block.workspace, id);
-              used.add(name);
-            }
-          }
-        }
-      } catch (_) {}
-      const globals = Array.from(new Set<string>([...used]));
-      const globalLine = globals.length ? `${IND}global ${globals.join(", ")}\n` : "";
-      // Ensure body is indented one level when needed
-      const bodyIndented = indentBodyIfNeeded(statements, IND);
-      return `def on_start():\n${globalLine}${bodyIndented}\non_start()\n`;
-    },
-    pythonExtractor: (match) => ({
-      STATEMENTS: match[1].trim(),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("on_start");
-      // Note: Nested statements need to be handled separately
-      return block;
-    },
-  },
-  {
-    type: "microbit_accelerometer",
-    blockDefinition: {
-      type: "microbit_accelerometer",
-      message0: "accelerometer %1",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "AXIS",
-          options: [
-            ["x", "x"],
-            ["y", "y"],
-            ["z", "z"],
-          ],
-        },
-      ],
-      output: "Number",
-      tooltip: "Get accelerometer reading",
-    },
-    pythonPattern: /accelerometer\.get_([xyz])\(\)/g,
-    pythonGenerator: (block, generator) => {
-      const axis = block.getFieldValue("AXIS");
-      return [
-        `accelerometer.get_${axis}()`,
-        (generator as any).ORDER_NONE || 0,
-      ];
-    },
-    pythonExtractor: (match) => ({
-      AXIS: match[1],
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("microbit_accelerometer");
-      block.setFieldValue(values.AXIS, "AXIS");
-      return block;
-    },
-  },
-  {
-    type: "microbit_pin_read",
-    blockDefinition: {
-      type: "microbit_pin_read",
-      message0: "read analog pin %1",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "PIN",
-          options: [
-            ["0", "0"],
-            ["1", "1"],
-            ["2", "2"],
-          ],
-        },
-      ],
-      output: "Number",
-      tooltip: "Read analog value from pin",
-    },
-    pythonPattern: /pin(\d+)\.read_analog\(\)/g,
-    pythonGenerator: (block, generator) => {
-      const pin = block.getFieldValue("PIN");
-      return [`pin${pin}.read_analog()`, (generator as any).ORDER_NONE || 0];
-    },
-    pythonExtractor: (match) => ({
-      PIN: match[1],
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("microbit_pin_read");
-      block.setFieldValue(values.PIN, "PIN");
-      return block;
-    },
-  },
-  {
-    type: "microbit_pin_write",
-    blockDefinition: {
-      type: "microbit_pin_write",
-      message0: "write analog pin %1 value %2",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "PIN",
-          options: [
-            ["0", "0"],
-            ["1", "1"],
-            ["2", "2"],
-          ],
-        },
-        {
-          type: "field_number",
-          name: "VALUE",
-          value: 512,
-          min: 0,
-          max: 1023,
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Write analog value to pin",
-    },
-    pythonPattern: /pin(\d+)\.write_analog\((\d+)\)/g,
-    pythonGenerator: (block) => {
-      const pin = block.getFieldValue("PIN");
-      const value = block.getFieldValue("VALUE");
-      return `pin${pin}.write_analog(${value})\n`;
-    },
-    pythonExtractor: (match) => ({
-      PIN: match[1],
-      VALUE: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("microbit_pin_write");
-      block.setFieldValue(values.PIN, "PIN");
-      block.setFieldValue(values.VALUE, "VALUE");
-      return block;
-    },
-  },
-
-  // --- MUSIC BLOCKS ---
-  {
-    type: "music_play_tone",
-    category: "Music",
-    blockDefinition: {
-      type: "music_play_tone",
-      message0: "play tone %1 for %2 beat %3",
-      args0: [
-        {
-          type: "field_piano",
-          name: "NOTE",
-          value: "262",
-        },
-        {
-          type: "field_dropdown",
-          name: "DURATION",
-          options: [
-            ["1", "1"],
-            ["1/2", "0.5"],
-            ["1/4", "0.25"],
-            ["1/8", "0.125"],
-            ["2", "2"],
-            ["4", "4"],
-          ],
-        },
-        {
-          type: "field_dropdown",
-          name: "MODE",
-          options: [
-            ["until done", "until_done"],
-            ["in background", "background"],
-            ["looping in background", "loop"],
-          ],
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Play a tone of specific frequency and duration",
-    },
-    pythonPattern: /(?:^|\s)(?:await\s+)?music\.play_tone\((\d+),\s*(\d+(?:\.\d+)?)\)/g,
-    pythonGenerator: (block, generator) => {
-      const freq = block.getFieldValue("NOTE");
-      const duration = block.getFieldValue("DURATION");
-      const mode = block.getFieldValue("MODE") || "until_done";
-
-      // Looping in background: sustain the tone continuously without blocking
-      if (mode === "loop") {
-        return `music.ring_tone(${freq})\n`;
-      }
-
-      // Until done (blocking) and background (single-shot fallback) both emit a single play call
-      return `music.play_tone(${freq}, ${duration})\n`;
-    },
-    pythonExtractor: (match) => ({
-      NOTE: match[1],
-      DURATION: match[2],
-      MODE: "until_done",
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("music_play_tone");
-      block.setFieldValue(values.NOTE || "262", "NOTE");
-      block.setFieldValue(values.DURATION || "1", "DURATION");
-      block.setFieldValue(values.MODE || "until_done", "MODE");
-      return block;
-    },
-  },
-  {
-    type: "music_ring_tone",
-    category: "Music",
-    blockDefinition: {
-      type: "music_ring_tone",
-      message0: "ring tone (Hz) %1",
-      args0: [
-        {
-          type: "field_number",
-          name: "FREQ",
-          value: 262,
-          min: 100,
-          max: 10000,
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Continuously play a tone at the given frequency",
-    },
-    pythonPattern: /music\.ring_tone\((\d+)\)/g,
-    pythonGenerator: (block) => {
-      const freq = block.getFieldValue("FREQ");
-      return `music.ring_tone(${freq})\n`;
-    },
-    pythonExtractor: (match) => ({
-      FREQ: parseInt(match[1]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("music_ring_tone");
-      block.setFieldValue(values.FREQ || 262, "FREQ");
-      return block;
-    },
-  },
-  {
-    type: "music_rest",
-    category: "Music",
-    blockDefinition: {
-      type: "music_rest",
-      message0: "rest for %1 beat",
-      args0: [
-        {
-          type: "field_dropdown",
-          name: "DURATION",
-          options: [
-            ["1", "1"],
-            ["1/2", "0.5"],
-            ["1/4", "0.25"],
-            ["1/8", "0.125"],
-            ["2", "2"],
-            ["4", "4"],
-          ],
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Pause playback for a number of beats",
-    },
-    pythonPattern: /(?:^|\s)(?:await\s+)?music\.rest\((\d+(?:\.\d+)?)\)/g,
-    pythonGenerator: (block) => {
-      const duration = block.getFieldValue("DURATION");
-      return `music.rest(${duration})\n`;
-    },
-    pythonExtractor: (match) => ({
-      DURATION: match[1],
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("music_rest");
-      block.setFieldValue(values.DURATION || "1", "DURATION");
-      return block;
-    },
-  },
-  {
-    type: "music_record_and_play",
-    category: "Music",
-    blockDefinition: {
-      type: "music_record_and_play",
-      message0: "record and play %1",
-      args0: [
-        {
-          type: "field_music_recorder", // ✅ uses your new custom field
-          name: "RECORDER",
-          value: "[]", // stores recorded tones as JSON
-        },
-      ],
-      previousStatement: null,
-      nextStatement: null,
-      tooltip: "Record a sequence of notes and play them back",
-    },
-
-    // ✅ Regex allows both with and without 'await'
-    pythonPattern: /(?:^|\s)(?:await\s+)?music\.record_and_play\((.*?)\)/g,
-
-    // ✅ Generator emits async call with recorded data
-    pythonGenerator: (block) => {
-      const recorded = block.getFieldValue("RECORDER") || "[]";
-      if (recorded === "[]" || recorded.trim() === "")
-        return "# no recorded notes\n";
-      return `await music.record_and_play(${recorded})\n`;
-    },
-
-    // ✅ For code → blocks extraction
-    pythonExtractor: (match) => ({
-      RECORDER: match[1] || "[]",
-    }),
-
-    // ✅ Block creation logic
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("music_record_and_play");
-      block.setFieldValue(values.RECORDER || "[]", "RECORDER");
-      return block;
-    },
-  },
-
-
-  // --- END MUSIC BLOCKS ---
-
-  // --- MATHS BLOCKS ---
-  {
-    type: "math_random_int",
-    category: "Maths",
-    blockDefinition: {
-      type: "math_random_int",
-      message0: "pick random %1 to %2",
-      args0: [
-        {
-          type: "input_value",
-          name: "FROM",
-          check: "Number",
-        },
-        {
-          type: "input_value",
-          name: "TO",
-          check: "Number",
-        },
-      ],
-      output: "Number",
-      tooltip: "Return a random integer between the two specified values (inclusive)",
-    },
-    pythonPattern: /random\.randint\((-?\d+),\s*(-?\d+)\)/g,
-    pythonGenerator: (block, generator) => {
-      const from = generator.valueToCode(block, "FROM", (generator as any).ORDER_NONE) || "0";
-      const to = generator.valueToCode(block, "TO", (generator as any).ORDER_NONE) || "10";
-      return [`random.randint(${from}, ${to})`, (generator as any).ORDER_FUNCTION_CALL || 0];
-    },
-    pythonExtractor: (match) => ({
-      FROM: parseInt(match[1]),
-      TO: parseInt(match[2]),
-    }),
-    blockCreator: (workspace, values) => {
-      const block = workspace.newBlock("math_random_int");
-      if (workspace.rendered && (block as any).initSvg) (block as any).initSvg();
-      
-      // Create shadow number for FROM input
-      const fromBlock = workspace.newBlock("math_number");
-      (fromBlock as any).setShadow(true);
-      (fromBlock as any).setFieldValue(String(Number.isFinite(values.FROM) ? values.FROM : 0), "NUM");
-      if ((fromBlock as any).initSvg) (fromBlock as any).initSvg();
-      if ((fromBlock as any).render) (fromBlock as any).render();
-      const fromInput = block.getInput("FROM");
-      fromInput?.connection?.connect((fromBlock as any).outputConnection);
-      
-      // Create shadow number for TO input
-      const toBlock = workspace.newBlock("math_number");
-      (toBlock as any).setShadow(true);
-      (toBlock as any).setFieldValue(String(Number.isFinite(values.TO) ? values.TO : 10), "NUM");
-      if ((toBlock as any).initSvg) (toBlock as any).initSvg();
-      if ((toBlock as any).render) (toBlock as any).render();
-      const toInput = block.getInput("TO");
-      toInput?.connection?.connect((toBlock as any).outputConnection);
-      
-      if ((block as any).render) (block as any).render();
-      return block;
-    },
-  },
-  // --- END MATHS BLOCKS ---
-
-  {
-    type: "text",
-    category: "Text",
-    blockDefinition: {
-      type: "text",
-      message0: "%1",
-      args0: [
-        {
-          type: "field_input",
-          name: "TEXT",
-          text: '"Hello World"',
-        },
-      ],
-      output: "String",
-      tooltip: "A text value",
-      helpUrl: "",
-    },
-    pythonPattern: /(['"])(.+?)\1/g,
-    pythonGenerator: (block, generator) => {
-      const text = block.getFieldValue("TEXT");
-      const code = JSON.stringify(text);
-      return [code, (generator as any).ORDER_ATOMIC || 0];
-    },
-    pythonExtractor: (match) => ({
-      TEXT: match[2],
-    }),
-    blockCreator: (workspace, values) => {
-      return createAndInitializeBlock(workspace, "text", {
-        TEXT: values.TEXT || '"Hello World"',
+  Blockly.Blocks["controls_if"] = {
+    ...IF_ELSE_MIXIN,
+    init(this: any) {
+      this.elseifCount_ = 0;
+      this.elseCount_ = 0;
+      this.setHelpUrl(Blockly.Msg.CONTROLS_IF_HELPURL);
+      this.appendValueInput("IF0")
+        .setCheck("Boolean")
+        .appendField(Blockly.Msg.CONTROLS_IF_MSG_IF || "if");
+      this.appendDummyInput("THEN0")
+        .appendField(Blockly.Msg.CONTROLS_IF_MSG_THEN || "then");
+      this.appendStatementInput("DO0");
+      this.setInputsInline(true);
+      this.setPreviousStatement(true);
+      this.setNextStatement(true);
+      this.setColour(logicColor);
+      this.updateShape_();
+      this.setTooltip(() => {
+        if (!this.elseifCount_ && !this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_1 || "If true, do something.";
+        if (!this.elseifCount_ && this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_2 || "If true, do first block; else do second block.";
+        if (this.elseifCount_ && !this.elseCount_) return Blockly.Msg.CONTROLS_IF_TOOLTIP_3 || "If first condition false, test the next.";
+        return Blockly.Msg.CONTROLS_IF_TOOLTIP_4 || "Multiple conditions and an else block.";
       });
+      
+      // Attach default true boolean to the first IF condition
+      if (this.workspace) {
+        attachBooleanShadow(this.workspace, this, "IF0", true);
+      }
     },
-  },
-
-  
-
-
+  } as any;
+}
+export const SHARED_MICROBIT_BLOCKS: SharedBlockDefinition[] = [
+  ...BASIC_BLOCKS,
+  ...LED_BLOCKS,
+  ...LOOPS_BLOCKS,
+  ...LOGIC_BLOCKS,
+  ...INPUT_BLOCKS,
+  ...MUSIC_BLOCKS,
+  ...PINS_BLOCKS,
+  ...MATHS_BLOCKS,
 ];
 
-
-
-/**
- * Utility functions for working with shared block definitions
- *
- * This registry manages all block definitions and provides methods for:
- * - Registering blocks with Blockly
- * - Setting up Python code generators
- * - Finding blocks that match Python patterns
- * - Creating blocks from Python code
- */
+// Utility functions for working with shared block definitions
 export class SharedBlockRegistry {
-  /**
-   * Register all shared block definitions with Blockly
-   * This makes the blocks available in the Blockly editor toolbox and workspace
-   */
+  // Register all shared block definitions with Blockly
   static registerBlocks(): void {
-    // Set block color to match category color before registering
+    // Ensure custom fields are available before defining blocks
+    try { registerIconField(); } catch (_) {}
+    try { registerLedMatrixField(); } catch (_) {}
 
+    // Set block color to match category color before registering
     Blockly.utils.colour.setHsvSaturation(1);
     Blockly.utils.colour.setHsvValue(0.8314);
     SHARED_MICROBIT_BLOCKS.forEach((block) => {
-      const category = block.category ?? "Uncategorized";
+      const category = block.category ?? "Basic";
       const categoryObj = BLOCK_CATEGORIES.find((c) => c.name === category);
       if (categoryObj) {
         block.blockDefinition.colour = categoryObj.color;
       }
     });
-    const blockDefinitions = SHARED_MICROBIT_BLOCKS.map(
-      (block) => block.blockDefinition
-    );
+    const blockDefinitions = SHARED_MICROBIT_BLOCKS
+      .filter((block) => block.type !== "controls_if")
+      .map((block) => block.blockDefinition);
     Blockly.defineBlocksWithJsonArray(blockDefinitions);
+    registerInlineIfElseBlock();
+
+    // Disable copying and duplication for forever and on_start blocks
+    const disableCopyForBlock = (blockType: string) => {
+      if (Blockly.Blocks[blockType]) {
+        // Store original customContextMenu if it exists
+        const originalCustomContextMenu = Blockly.Blocks[blockType].customContextMenu;
+        // Override customContextMenu to filter out copy/duplicate options
+        Blockly.Blocks[blockType].customContextMenu = function(this: Blockly.Block, options: any[]) {
+          if (originalCustomContextMenu) {
+            originalCustomContextMenu.call(this, options);
+          }
+          const filteredOptions = options.filter(option => {
+            if (!option || !option.text) return true;
+            const text = option.text.toLowerCase();
+            return !text.includes('duplicate') && !text.includes('copy');
+          });
+          options.length = 0;
+          filteredOptions.forEach(opt => options.push(opt));
+        };
+        Blockly.Blocks[blockType].isDuplicatable = function(this: Blockly.Block) {
+          return false;
+        };
+      }
+    };
+    disableCopyForBlock('forever');
+    disableCopyForBlock('on_start');
+
+    // Add custom duplicate for all other blocks
+    Object.keys(Blockly.Blocks).forEach((blockType) => {
+      if (blockType === 'forever' || blockType === 'on_start') return;
+      if (blockType.startsWith('variables_') || blockType.startsWith('procedures_')) return;
+      
+      const blockDef = Blockly.Blocks[blockType];
+      if (!blockDef) return;
+      
+      if (blockDef.customContextMenu) return;
+      
+      const originalCustomContextMenu = blockDef.customContextMenu;
+      blockDef.customContextMenu = function(this: Blockly.Block, options: any[]) {
+        if (originalCustomContextMenu) {
+          originalCustomContextMenu.call(this, options);
+        }
+        // Remove default duplicate option if present
+        const filteredOptions = options.filter(option => {
+          if (!option || !option.text) return true;
+          const text = option.text.toLowerCase();
+          return !text.includes('duplicate');
+        });
+        options.length = 0;
+        filteredOptions.forEach(opt => options.push(opt));
+        // Add our custom duplicate option
+        options.push({
+          text: 'Duplicate',
+          enabled: true,
+          callback: () => {
+            const workspace = this.workspace;
+            if (!workspace) return;
+            // Serialize this block and all its children to XML
+            const xml = Blockly.Xml.blockToDomWithXY(this, true);
+            // Only proceed if xml is an Element (not DocumentFragment)
+            if (xml && (xml as Element).setAttribute) {
+              const el = xml as Element;
+              // Center the new block in the workspace
+              // Get workspace metrics after rendering to ensure correct centering
+              setTimeout(() => {
+                const newBlock = Blockly.Xml.domToBlock(el, workspace);
+                // Center the pasted block stack
+                if (newBlock) {
+                  // Get workspace metrics
+                  // getMetrics is only available on WorkspaceSvg
+                  const wsSvg = workspace as Blockly.WorkspaceSvg;
+                  const metrics = wsSvg.getMetrics ? wsSvg.getMetrics() : undefined;
+                  const centerX = metrics ? metrics.viewLeft + metrics.viewWidth / 2 : 50;
+                  const centerY = metrics ? metrics.viewTop + metrics.viewHeight / 2 : 50;
+                  // Get current position of the top block
+                  const curXY = newBlock.getRelativeToSurfaceXY();
+                  // Move the top block so its position is centered
+                  newBlock.moveBy(centerX - curXY.x, centerY - curXY.y);
+                  // Add a CSS class to make the copied block and its children darker but readable
+                  function darkenBlockAndChildren(block: Blockly.Block) {
+                    try {
+                      const svgRoot = (block as any).getSvgRoot?.();
+                      if (svgRoot) {
+                        svgRoot.classList.add('blocklyCopied');
+                      }
+                      if ((block as any).getChildren) {
+                        ((block as any).getChildren() as Blockly.Block[]).forEach(darkenBlockAndChildren);
+                      }
+                    } catch (e) {}
+                  }
+                  darkenBlockAndChildren(newBlock);
+                  // Optionally select the new block for user feedback
+                  (newBlock as any).select?.();
+                  (workspace as any).resize?.();
+                }
+              }, 0);
+            }
+          }
+        });
+      };
+    });
+
+    // Initialize duplicate-on-drag functionality for loop blocks
+    initializeDuplicateOnDrag();
   }
 
   /**
-   * Register Python code generators for all block types
-   * This enables blocks-to-Python conversion
-   * @param pythonGenerator The Blockly Python generator instance
+   * Setup duplicate-on-drag listener on workspace
+   * Call this after workspace is created
    */
+  static setupDuplicateOnDragListener(workspace: Blockly.WorkspaceSvg): void {
+    installDuplicateOnDragListener(workspace);
+  }
+
+  // Register Python code generators for all block types
   static registerPythonGenerators(pythonGenerator: any): void {
     const GATED_BLOCKS = new Set<string>([
       // LED
@@ -1452,12 +518,15 @@ export class SharedBlockRegistry {
       "toggle_led",
       "plot_led_brightness",
       "show_leds",
+      "clear_screen",
       // BASIC
       "show_string",
       "show_number",
       "basic_show_leds",
       "pause",
       "show_icon",
+      // MATH
+      "math_random_int",
       // MUSIC 🎵
       "music_play_tone",
       "music_ring_tone",
@@ -1470,6 +539,10 @@ export class SharedBlockRegistry {
       "forever",
       "on_start",
       "on_button_pressed",
+      "on_gesture",
+      "on_logo_pressed",
+      "on_logo_released",
+      "loops_every_interval",
     ]);
 
     SHARED_MICROBIT_BLOCKS.forEach((block) => {
@@ -1498,7 +571,7 @@ export class SharedBlockRegistry {
       };
     });
 
-    // --- Built-in Variables blocks (not part of SHARED_MICROBIT_BLOCKS) ---
+    // Built-in Variables blocks (not part of SHARED_MICROBIT_BLOCKS)
     const resolveVarName = (workspace: any, varIdOrName: string): string => {
       try {
         const model = typeof workspace?.getVariableById === "function"
@@ -1535,29 +608,17 @@ export class SharedBlockRegistry {
     };
   }
 
-  /**
-   * Find a block definition by its type name
-   * @param type The block type to find
-   * @returns The block definition, or undefined if not found
-   */
+  // Find a block definition by its type name
   static getBlockDefinition(type: string): SharedBlockDefinition | undefined {
     return SHARED_MICROBIT_BLOCKS.find((block) => block.type === type);
   }
 
-  /**
-   * Get all registered block type names
-   * @returns Array of block type strings
-   */
+  // Get all registered block type names
   static getBlockTypes(): string[] {
     return SHARED_MICROBIT_BLOCKS.map((block) => block.type);
   }
 
-  /**
-   * Find all block definitions that match the given Python code
-   * Tests the code against each block's Python pattern
-   * @param code The Python code to test
-   * @returns Array of matching block definitions
-   */
+  // Find all block definitions that match the given Python code
   static matchesPythonPattern(code: string): SharedBlockDefinition[] {
     const matches: SharedBlockDefinition[] = [];
 
@@ -1572,13 +633,7 @@ export class SharedBlockRegistry {
     return matches;
   }
 
-  /**
-   * Create a block from Python code using the appropriate block definition
-   * @param workspace The Blockly workspace to create the block in
-   * @param pythonCode The Python code line to parse
-   * @param blockType The type of block to create
-   * @returns The created block, or null if creation failed
-   */
+  // Create a block from Python code using the appropriate block definition
   static createBlockFromPython(
     workspace: Blockly.Workspace,
     pythonCode: string,
@@ -1602,12 +657,7 @@ export class SharedBlockRegistry {
   }
 }
 
-/**
- * Enhanced converter that uses shared block definitions for consistent bidirectional conversion
- *
- * This converter processes Python code line by line, matching each line against known patterns
- * and creating corresponding Blockly blocks. It handles block connections automatically.
- */
+// Enhanced converter that uses shared block definitions for consistent bidirectional conversion
 export class EnhancedPythonToBlocklyConverter {
   private workspace: Blockly.Workspace;
 
@@ -1615,44 +665,49 @@ export class EnhancedPythonToBlocklyConverter {
     this.workspace = workspace;
   }
 
-  /**
-   * Convert Python code to Blockly blocks using proper lexer/parser/converter
-   * 
-   * This follows MakeCode's architecture:
-   * 1. Lexer: Tokenize Python code
-   * 2. Parser: Build AST
-   * 3. Converter: Transform AST to Blockly blocks
-   *
-   * @param pythonCode The complete Python code to convert
-   * @returns Array of created Blockly blocks
-   */
+  // Convert Python code to Blockly blocks using shared definitions
   convertPythonToBlocks(pythonCode: string): Blockly.Block[] {
-    const converter = new PythonToBlocklyConverter(this.workspace);
-    const blocks = converter.convert(pythonCode);
-    
-    // Initialize SVG for all blocks
-    blocks.forEach((block) => {
-      if (this.workspace.rendered && (block as any).initSvg) {
-        (block as any).initSvg();
+    const blocks: Blockly.Block[] = [];
+    const lines = pythonCode.split("\n");
+    let currentLine = 0;
+
+    // Process each line of Python code
+    while (currentLine < lines.length) {
+      const line = lines[currentLine].trim();
+
+      // Skip empty lines and comments
+      if (!line || line.startsWith("#")) {
+        currentLine++;
+        continue;
       }
-      if (this.workspace.rendered && (block as any).render) {
-        (block as any).render();
+
+      // Find block patterns that match this line
+      const matchingBlocks = SharedBlockRegistry.matchesPythonPattern(line);
+
+      if (matchingBlocks.length > 0) {
+        // Use the first matching block type (most specific match)
+        const blockDef = matchingBlocks[0];
+        const block = SharedBlockRegistry.createBlockFromPython(
+          this.workspace,
+          line,
+          blockDef.type
+        );
+
+        if (block) {
+          blocks.push(block);
+        }
       }
-    });
-    
+
+      currentLine++;
+    }
+
+    // Connect blocks that should be in sequence (e.g., statements in a program)
+    this.connectSequentialBlocks(blocks);
+
     return blocks;
   }
 
-  /**
-   * Connect blocks that should be in sequence (statements that execute one after another)
-   *
-   * This method links blocks together using Blockly's connection system.
-   * Only connects blocks that have the appropriate connection points:
-   * - Current block must have a 'nextConnection'
-   * - Next block must have a 'previousConnection'
-   *
-   * @param blocks Array of blocks to connect in order
-   */
+  // Connect blocks that should be in sequence (statements that execute one after another)
   private connectSequentialBlocks(blocks: Blockly.Block[]): void {
     for (let i = 0; i < blocks.length - 1; i++) {
       const currentBlock = blocks[i];
@@ -1670,12 +725,7 @@ export class EnhancedPythonToBlocklyConverter {
     }
   }
 
-  /**
-   * Convert Python code to a specific block type (for targeted conversion)
-   * @param pythonCode The Python code to convert
-   * @param blockType The specific block type to create
-   * @returns The created block, or null if conversion failed
-   */
+  // Convert Python code to a specific block type (for targeted conversion)
   convertToSpecificBlock(
     pythonCode: string,
     blockType: string
@@ -1688,9 +738,7 @@ export class EnhancedPythonToBlocklyConverter {
   }
 }
 
-/**
- * Utility function to update existing BlocklyEditor to use shared definitions
- */
+// Utility function to update existing BlocklyEditor to use shared definitions
 export function createUpdatedBlocklyEditor() {
   return {
     initializeSharedBlocks: () => {
@@ -1709,13 +757,13 @@ export function createUpdatedBlocklyEditor() {
 
 export function createToolboxXmlFromBlocks(): string {
   // Default category name and color if not specified
-  const DEFAULT_CATEGORY = "Uncategorized";
+  const DEFAULT_CATEGORY = "Basic";
   const DEFAULT_COLOR = "#999999ff";
 
   // Helper: map category name -> color
   const categoryColorMap: Record<string, string> = {};
   BLOCK_CATEGORIES.forEach(({ name, color }) => {
-    categoryColorMap[name] = color.toString(); // Convert to string if number
+    categoryColorMap[name] = color.toString();
   });
 
   // Group blocks by category name
@@ -1728,15 +776,13 @@ export function createToolboxXmlFromBlocks(): string {
     blocksByCategory[category].push(block);
   }
 
-  // Helper: generate block XML string with default field values from blockDefinition
+  // Helper: generate block XML string with default field values
   function generateBlockXml(block: SharedBlockDefinition): string {
-    // Look for fields with default values in blockDefinition.args0
     const args = block.blockDefinition.args0 || [];
     let fieldsXml = "";
     let valuesXml = "";
     for (const arg of args) {
       if ("name" in arg) {
-        // Only generate fields for these arg types: field_input, field_number, field_dropdown, field_multilinetext
         if (
           arg.type === "field_input" ||
           arg.type === "field_number" ||
@@ -1751,23 +797,37 @@ export function createToolboxXmlFromBlocks(): string {
             Array.isArray(arg.options) &&
             arg.options.length > 0
           ) {
-            // For dropdown, use first option's value as default
             defaultValue = arg.options[0][1];
           }
           fieldsXml += `\n      <field name="${arg.name}">${defaultValue}</field>`;
         } else if (arg.type === "input_value") {
-          // Provide sensible default shadows in the toolbox for numeric and string inputs
           const wantsNumberShadow =
             (block.type === "show_number" && arg.name === "NUM") ||
             (arg.check && (Array.isArray(arg.check) ? arg.check.includes("Number") : arg.check === "Number"));
           const wantsTextShadow =
             (block.type === "show_string" && arg.name === "TEXT") ||
             (arg.check && (Array.isArray(arg.check) ? arg.check.includes("String") : arg.check === "String"));
+          const wantsVariableShadow =
+            arg.check && (Array.isArray(arg.check) ? arg.check.includes("Variable") : arg.check === "Variable");
           
           if (wantsNumberShadow) {
-            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">0</field>\n        </shadow>\n      </value>`;
+            const defaultNumberValue =
+              block.type === "pins_analog_write_pin" && arg.name === "VALUE" ? 1023 : 0;
+            valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="math_number">\n          <field name="NUM">${defaultNumberValue}</field>\n        </shadow>\n      </value>`;
           } else if (wantsTextShadow) {
             valuesXml += `\n      <value name="${arg.name}">\n        <shadow type="text">\n          <field name="TEXT">Hello!</field>\n        </shadow>\n      </value>`;
+          } else if (wantsVariableShadow) {
+            // Determine default variable name based on block type and input name
+            let varName = "item";
+            if (block.type === "loops_for_range" && arg.name === "VAR") {
+              varName = "index";
+            } else if (block.type === "loops_for_of" && arg.name === "VAR") {
+              varName = "value";
+            } else if (block.type === "loops_for_of" && arg.name === "LIST") {
+              varName = "list";
+            }
+            // Use regular block instead of shadow for draggability
+            valuesXml += `\n      <value name="${arg.name}">\n        <block type="variables_get">\n          <field name="VAR">${varName}</field>\n        </block>\n      </value>`;
           }
         }
       }
@@ -1775,22 +835,24 @@ export function createToolboxXmlFromBlocks(): string {
     return `<block type="${block.type}">${fieldsXml}${valuesXml}\n    </block>`;
   }
 
-  // Helper: get category icon
+  // Get category icon
   function getCategoryIcon(categoryName: string): string {
     return CATEGORY_ICONS[categoryName] || "📋";
   }
 
-  // Compose category XML blocks following BLOCK_CATEGORIES order
+  // Create category-based toolbox with modern styling
   let xml = `<xml xmlns="https://developers.google.com/blockly/xml" id="toolbox-categories" style="display: none">\n`;
 
   const emitted: Set<string> = new Set();
   const categoriesToEmit = BLOCK_CATEGORIES.filter(({ name }) => name !== "Text");
+
   categoriesToEmit.forEach(({ name: categoryName }, idx) => {
     const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
     const icon = getCategoryIcon(categoryName);
 
     if (categoryName === "Variables") {
-      xml += `  <category name="${icon} ${categoryName}" colour="${color}" custom="VARIABLE_CUSTOM"></category>\n`;
+      // Match expected custom callback key registered in workspace initialization
+      xml += `  <category name="${icon} ${categoryName}" colour="${color}" custom="VARIABLE_CUSTOM">\n  </category>\n`;
       emitted.add(categoryName);
       emitted.add("Text");
     } else {
@@ -1819,28 +881,158 @@ export function createToolboxXmlFromBlocks(): string {
         emitted.add(categoryName);
       }
     }
-    // Add a separator after each category except the last
     if (idx < categoriesToEmit.length - 1) {
-      xml += `  <sep gap="16"/>\n`;
+      xml += `  <sep gap="8"/>\n`;
     }
   });
 
-  // Emit any remaining categories (including Uncategorized) that weren't listed explicitly
-  for (const categoryName of Object.keys(blocksByCategory)) {
-    if (emitted.has(categoryName)) continue;
-    const color = categoryColorMap[categoryName] ?? DEFAULT_COLOR;
-    const icon = getCategoryIcon(categoryName);
-    const blocks = blocksByCategory[categoryName];
-    if (!blocks || blocks.length === 0) continue;
-    xml += `  <category name="${icon} ${categoryName}" colour="${color}">\n`;
-    for (const block of blocks) {
-      xml += `    ${generateBlockXml(block)}\n`;
-    }
-    xml += `  </category>\n`;
-    xml += `  <sep gap="10"/>\n`;
-  }
-
   xml += `</xml>`;
   return xml;
+}
+
+/**
+ * Enforce uniqueness for event handler blocks (e.g., on_button_pressed).
+ * Only one handler per button (A, B, AB) can be enabled; others are auto-disabled.
+ * Call this function and add the returned listener to your workspace.
+ */
+export function enforceButtonHandlerUniqueness(workspace: Blockly.Workspace) {
+  const checkDuplicates = () => {
+    try {
+      if (!workspace || (workspace as any).isFlyout) return;
+      const all = (workspace.getAllBlocks ? workspace.getAllBlocks(false) : []) as Blockly.Block[];
+      const groups: Record<string, Blockly.Block[]> = { A: [], B: [], AB: [] };
+      
+      for (const b of all) {
+        if (!b || b.type !== "on_button_pressed") continue;
+        if (typeof (b as any).isInFlyout === 'function' && (b as any).isInFlyout()) continue;
+        const key = (b.getFieldValue && b.getFieldValue("BUTTON")) || "A";
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(b);
+      }
+
+      // For each button, keep the top-most block enabled and disable others
+      Object.keys(groups).forEach((k) => {
+        const list = groups[k];
+        if (!list || list.length <= 1) {
+          // Re-enable single blocks that might have been disabled
+          if (list && list.length === 1) {
+            const block = list[0];
+            const isDisabled = !!(block as any).disabled;
+            if (isDisabled) {
+              (block as any).disabled = false;
+              
+              if ((block as any)._originalTooltip) {
+                block.setTooltip((block as any)._originalTooltip);
+                delete (block as any)._originalTooltip;
+              }
+              
+              const svgGroup = (block as any).svgGroup_ || (block as any).getSvgRoot?.();
+              
+              if (svgGroup && svgGroup.classList) {
+                svgGroup.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+              }
+              
+              if (typeof (block as any).updateDisabled === 'function') {
+                (block as any).updateDisabled();
+              }
+              if (typeof (block as any).render === 'function') {
+                (block as any).render();
+              }
+            }
+          }
+          return;
+        }
+        
+        list.sort((b1, b2) => {
+          const y1 = (b1.getRelativeToSurfaceXY && b1.getRelativeToSurfaceXY().y) || 0;
+          const y2 = (b2.getRelativeToSurfaceXY && b2.getRelativeToSurfaceXY().y) || 0;
+          return y1 - y2; // top-most first
+        });
+        
+        list.forEach((b, idx) => {
+          const shouldEnable = idx === 0;
+          
+          // Blockly uses 'disabled' property, not isEnabled()
+          const isDisabled = !!(b as any).disabled;
+          const currentlyEnabled = !isDisabled;
+          
+          if (shouldEnable && !currentlyEnabled) {
+            // Enable the block
+            (b as any).disabled = false;
+            
+            if ((b as any)._originalTooltip) {
+              b.setTooltip((b as any)._originalTooltip);
+              delete (b as any)._originalTooltip;
+            }
+            
+            const svgGroup = (b as any).svgGroup_ || (b as any).getSvgRoot?.();
+            
+            if (svgGroup && svgGroup.classList) {
+              svgGroup.classList.remove('blocklyDisabled', 'blocklyDisabledPattern');
+            }
+            
+            if (typeof (b as any).updateDisabled === 'function') {
+              (b as any).updateDisabled();
+            }
+            if (typeof (b as any).render === 'function') {
+              (b as any).render();
+            }
+          } else if (!shouldEnable && currentlyEnabled) {
+            // Disable the block
+            (b as any).disabled = true;
+            
+            const currentTooltip = b.tooltip || "Run when a button is pressed";
+            if (!(b as any)._originalTooltip) {
+              (b as any)._originalTooltip = currentTooltip;
+            }
+            b.setTooltip("This block is disabled because another 'on button pressed' block with the same button already exists. Change the button or remove the duplicate to enable this block.");
+            
+            const svgGroup = (b as any).svgGroup_ || (b as any).getSvgRoot?.();
+            
+            if (svgGroup && svgGroup.classList) {
+              svgGroup.classList.add('blocklyDisabled', 'blocklyDisabledPattern');
+            }
+            
+            if (typeof (b as any).updateDisabled === 'function') {
+              (b as any).updateDisabled();
+            }
+            if (typeof (b as any).render === 'function') {
+              (b as any).render();
+            }
+          }
+        });
+      });
+    } catch (e) {
+      console.warn("Error checking button handler duplicates:", e);
+    }
+  };
+
+  const listener = (event: any) => {
+    if (!event) return;
+    const relevantTypes = [
+      Blockly.Events.BLOCK_CREATE,
+      Blockly.Events.BLOCK_DELETE,
+      Blockly.Events.BLOCK_CHANGE,
+      Blockly.Events.BLOCK_MOVE,
+    ];
+    
+    // Also check if it's a field change on an on_button_pressed block
+    const isButtonFieldChange = 
+      event.type === Blockly.Events.BLOCK_CHANGE &&
+      event.name === 'BUTTON' &&
+      event.blockId;
+    
+    if (relevantTypes.includes(event.type) || isButtonFieldChange) {
+      // Use requestAnimationFrame to batch multiple rapid changes
+      requestAnimationFrame(checkDuplicates);
+    }
+  };
+
+  workspace.addChangeListener(listener);
+  
+  // Initial check
+  setTimeout(checkDuplicates, 100);
+  
+  return listener;
 }
 

@@ -153,9 +153,27 @@ export function convertMakeCodeToMicroPython(makeCodePython: string): string {
   // Convert basic.show_icon() → display.show()
   code = code.replace(/basic\.show_icon\s*\(/g, 'display.show(');
   
-  // Convert basic.show_leds() - this is more complex
-  // basic.show_leds(`# . . . #\n. # . # .\n. . # . .\n. # . # .\n# . . . #`) 
+  // Convert basic.show_leds() - handles both single-line and triple-quoted multiline strings
+  // Format 1 (single line): basic.show_leds(`# . . . #\n. # . # .\n. . # . .\n. # . # .\n# . . . #`)
+  // Format 2 (multiline): basic.show_leds("""
+  //   . . . . .
+  //   . . . . #
+  //   . . . # .
+  //   # . # . .
+  //   . # . . .
+  //   """)
   // → display.show(Image('90009:09090:00900:09090:90009'))
+  
+  // Handle triple-quoted strings first (""" or ''')
+  code = code.replace(
+    /basic\.show_leds\s*\(\s*("""|''')([\s\S]*?)\1\s*\)/g,
+    (match, quote, ledPattern) => {
+      const micropythonPattern = convertLedPatternToMicroPython(ledPattern);
+      return `display.show(Image('${micropythonPattern}'))`;
+    }
+  );
+  
+  // Handle single-quoted/backtick strings (single line)
   code = code.replace(
     /basic\.show_leds\s*\(\s*[`"']([^`"']+)[`"']\s*\)/g,
     (match, ledPattern) => {
@@ -168,17 +186,100 @@ export function convertMakeCodeToMicroPython(makeCodePython: string): string {
   code = code.replace(/input\.button_is_pressed\s*\(\s*Button\.A\s*\)/g, 'button_a.is_pressed()');
   code = code.replace(/input\.button_is_pressed\s*\(\s*Button\.B\s*\)/g, 'button_b.is_pressed()');
   
+  // Convert input sensor functions
+  code = code.replace(/input\.temperature\s*\(\s*\)/g, 'temperature()');
+  code = code.replace(/input\.light_level\s*\(\s*\)/g, 'display.read_light_level()');
+  
+  // Convert logo touch functions (V2 only)
+  code = code.replace(/input\.logo_is_pressed\s*\(\s*\)/g, 'pin_logo.is_touched()');
+  // Note: on_logo_pressed/released need to be converted to polling like buttons
+  code = code.replace(/input\.on_logo_pressed\s*\(\s*(\w+)\s*\)/g, '# Logo pressed handler: $1 (use pin_logo.is_touched() in main loop)');
+  code = code.replace(/input\.on_logo_released\s*\(\s*(\w+)\s*\)/g, '# Logo released handler: $1 (use pin_logo.is_touched() in main loop)');
+  
+  // Convert gesture functions
+  // Gesture mappings for MicroPython accelerometer
+  const gestureMappings: Record<string, string> = {
+    'Gesture.SHAKE': '"shake"',
+    'Gesture.LOGO_UP': '"up"',
+    'Gesture.LOGO_DOWN': '"down"',
+    'Gesture.SCREEN_UP': '"face up"',
+    'Gesture.SCREEN_DOWN': '"face down"',
+    'Gesture.TILT_LEFT': '"left"',
+    'Gesture.TILT_RIGHT': '"right"',
+    'Gesture.FREE_FALL': '"freefall"',
+    'Gesture.THREE_G': '"3g"',
+    'Gesture.SIX_G': '"6g"',
+    'Gesture.EIGHT_G': '"8g"',
+  };
+  
+  for (const [makecode, micropython] of Object.entries(gestureMappings)) {
+    code = code.replace(new RegExp(makecode.replace('.', '\\.'), 'g'), micropython);
+  }
+  
+  code = code.replace(/input\.is_gesture\s*\(\s*([^)]+)\s*\)/g, 'accelerometer.is_gesture($1)');
+  code = code.replace(/input\.on_gesture\s*\(\s*([^,]+)\s*,\s*(\w+)\s*\)/g, '# Gesture handler: $2 for $1 (use accelerometer.is_gesture() in main loop)');
+  
   // Convert led functions
-  code = code.replace(/led\.plot\s*\(/g, 'display.set_pixel(');
-  code = code.replace(/led\.unplot\s*\(/g, 'display.set_pixel('); // Note: need to add , 0) at end
-  code = code.replace(/led\.toggle\s*\(/g, '# toggle pixel at (');
+  code = code.replace(/led\.plot\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/g, 'display.set_pixel($1, $2, 9)');
+  code = code.replace(/led\.unplot\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/g, 'display.set_pixel($1, $2, 0)');
+  code = code.replace(/led\.toggle\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/g, 'display.set_pixel($1, $2, 0 if display.get_pixel($1, $2) else 9)');
+  code = code.replace(/led\.point\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)/g, 'display.get_pixel($1, $2) > 0');
+  code = code.replace(/led\.plot_brightness\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/g, (match, x, y, brightness) => {
+    // MakeCode brightness is 0-255, MicroPython is 0-9
+    return `display.set_pixel(${x}, ${y}, int(${brightness} / 28))`;
+  });
+  
+  // Convert pins functions
+  // Pin mappings
+  const pinMappings: Record<string, string> = {
+    'DigitalPin.P0': 'pin0',
+    'DigitalPin.P1': 'pin1',
+    'DigitalPin.P2': 'pin2',
+    'DigitalPin.P3': 'pin3',
+    'DigitalPin.P4': 'pin4',
+    'DigitalPin.P5': 'pin5',
+    'DigitalPin.P6': 'pin6',
+    'DigitalPin.P7': 'pin7',
+    'DigitalPin.P8': 'pin8',
+    'DigitalPin.P9': 'pin9',
+    'DigitalPin.P10': 'pin10',
+    'DigitalPin.P11': 'pin11',
+    'DigitalPin.P12': 'pin12',
+    'DigitalPin.P13': 'pin13',
+    'DigitalPin.P14': 'pin14',
+    'DigitalPin.P15': 'pin15',
+    'DigitalPin.P16': 'pin16',
+    'AnalogPin.P0': 'pin0',
+    'AnalogPin.P1': 'pin1',
+    'AnalogPin.P2': 'pin2',
+  };
+  
+  for (const [makecode, micropython] of Object.entries(pinMappings)) {
+    code = code.replace(new RegExp(makecode.replace('.', '\\.'), 'g'), micropython);
+  }
+  
+  // Handle pins with expressions/variables as values (not just numbers)
+  code = code.replace(/pins\.digital_write_pin\s*\(\s*(\w+)\s*,\s*([^)]+)\s*\)/g, '$1.write_digital($2)');
+  code = code.replace(/pins\.digital_read_pin\s*\(\s*(\w+)\s*\)/g, '$1.read_digital()');
+  code = code.replace(/pins\.analog_write_pin\s*\(\s*(\w+)\s*,\s*([^)]+)\s*\)/g, '$1.write_analog($2)');
+  code = code.replace(/pins\.read_analog_pin\s*\(\s*(\w+)\s*\)/g, '$1.read_analog()');
   
   // Convert music functions
   if (code.includes('music.')) {
     needsImports.add('music');
   }
   code = code.replace(/music\.play_tone\s*\(/g, 'music.pitch(');
+  code = code.replace(/music\.ring_tone\s*\(\s*(\d+)\s*\)/g, 'music.pitch($1)');
   code = code.replace(/music\.rest\s*\(/g, 'sleep(');
+  code = code.replace(/music\.stop\s*\(\s*\)/g, 'music.stop()');
+  
+  // Convert random functions
+  if (code.includes('random.') || code.includes('randint')) {
+    needsImports.add('random');
+  }
+  
+  // Convert basic.sleep() to sleep() (already done for pause, but just in case)
+  code = code.replace(/basic\.sleep\s*\(/g, 'sleep(');
   
   // Remove on_start function wrapper if present, keep the content
   code = code.replace(/def on_start\s*\(\s*\)\s*:\s*\n([\s\S]*?)(?=\ndef|\non_start\(\)|\n[^\s]|$)/g, (match, content) => {
@@ -193,6 +294,9 @@ export function convertMakeCodeToMicroPython(makeCodePython: string): string {
   let imports = '# Imports go at the top\nfrom microbit import *\n';
   if (needsImports.has('music')) {
     imports += 'import music\n';
+  }
+  if (needsImports.has('random')) {
+    imports += 'import random\n';
   }
   
   // Remove any existing imports that might conflict
@@ -275,11 +379,31 @@ export function isMakeCodeStyle(code: string): boolean {
     /basic\./,
     /input\.button_is_pressed/,
     /input\.on_button_pressed/,
+    /input\.temperature\(\)/,
+    /input\.light_level\(\)/,
+    /input\.logo_is_pressed/,
+    /input\.is_gesture/,
+    /input\.on_gesture/,
     /IconNames\./,
     /Button\.A/,
     /Button\.B/,
     /on_start\s*\(\)/,
     /basic\.forever/,
+    /led\.plot/,
+    /led\.unplot/,
+    /led\.toggle/,
+    /led\.point/,
+    /led\.plot_brightness/,
+    /pins\.digital_write_pin/,
+    /pins\.digital_read_pin/,
+    /pins\.analog_write_pin/,
+    /pins\.read_analog_pin/,
+    /DigitalPin\./,
+    /AnalogPin\./,
+    /Gesture\./,
+    /music\.play_tone/,
+    /music\.ring_tone/,
+    /music\.rest/,
   ];
   
   return makeCodePatterns.some(pattern => pattern.test(code));

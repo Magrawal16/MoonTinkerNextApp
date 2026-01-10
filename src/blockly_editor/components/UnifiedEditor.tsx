@@ -21,6 +21,7 @@ import BlockSearchPalette from "./BlockSearchPalette";
 import { getCategoryMeta } from "@/blockly_editor/utils/sharedBlockDefinitions";
 import { maskEditingTextFields } from "./UnifiedEditor/workspaceStyles";
 import { useToolboxSearch } from "./UnifiedEditor/hooks/useToolboxSearch";
+import { MicrobitFlasher, FlashProgress, ConnectionStatusType } from "@/python_code_editor/utils/microbitFlasher";
 
 type EditorMode = "block" | "text";
 
@@ -96,6 +97,31 @@ export default function UnifiedEditor({
   const [showCodePalette, setShowCodePalette] = useState(false);
   const [showBlockSearch, setShowBlockSearch] = useState(false);
   const [toolboxSearch, setToolboxSearch] = useLocalState("");
+
+  // Flash/Upload state for micro:bit
+  const [isFlashing, setIsFlashing] = useState(false);
+  const [flashProgress, setFlashProgress] = useState<FlashProgress | null>(null);
+  const [showFlashModal, setShowFlashModal] = useState(false);
+  const [flashStatus, setFlashStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [microbitConnectionStatus, setMicrobitConnectionStatus] = useState<ConnectionStatusType>('disconnected');
+  const microbitFlasherRef = useRef(new MicrobitFlasher());
+  const isWebUSBSupported = typeof window !== 'undefined' && MicrobitFlasher.isWebUSBSupported();
+  
+  // Initialize microbit flasher and listen for connection status changes
+  useEffect(() => {
+    const flasher = microbitFlasherRef.current;
+    
+    // Set up status change listener
+    flasher.onStatusChange((status) => {
+      setMicrobitConnectionStatus(status);
+      console.log('micro:bit connection status:', status);
+    });
+    
+    // Initialize the flasher
+    flasher.initialize().catch((err) => {
+      console.warn('Failed to initialize microbit flasher:', err);
+    });
+  }, []);
 
   const isDraggingRef = useRef(false);
   const { editorSize, resizeRef, handleResizeStart } = useEditorResizing(editorMode);
@@ -682,6 +708,93 @@ export default function UnifiedEditor({
     handleCodeChange(newCode);
   };
 
+  // Flash progress callback
+  const handleFlashProgress = useCallback((progress: FlashProgress) => {
+    setFlashProgress(progress);
+    if (progress.stage === 'complete') {
+      setFlashStatus('success');
+      setTimeout(() => {
+        setShowFlashModal(false);
+        setFlashStatus('idle');
+        setFlashProgress(null);
+      }, 2000);
+    } else if (progress.stage === 'error') {
+      // Check if user cancelled - close modal silently
+      if (progress.message?.toLowerCase().includes('cancelled') || 
+          progress.message?.toLowerCase().includes('canceled')) {
+        setTimeout(() => {
+          setShowFlashModal(false);
+          setFlashStatus('idle');
+          setFlashProgress(null);
+        }, 500);
+      } else {
+        setFlashStatus('error');
+      }
+    }
+  }, []);
+
+  // Get the current code to flash (from localCode which is synced with controllerCodeMap)
+  const getCurrentCodeForFlash = useCallback(() => {
+    // Use localCode which holds the current state
+    return localCode || '';
+  }, [localCode]);
+
+  // Handle download HEX file
+  const handleDownloadHex = useCallback(async () => {
+    const code = getCurrentCodeForFlash();
+    if (!code.trim()) {
+      alert('No code to download. Please add some code first.');
+      return;
+    }
+    try {
+      await microbitFlasherRef.current.downloadHex(code);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      alert(`Failed to download HEX file: ${errorMessage}`);
+    }
+  }, [getCurrentCodeForFlash]);
+
+  // Handle flash to micro:bit using WebUSB
+  const handleFlashToMicrobit = useCallback(async () => {
+    if (isFlashing) return;
+    
+    const code = getCurrentCodeForFlash();
+    if (!code.trim()) {
+      alert('No code to flash. Please add some code first.');
+      return;
+    }
+    
+    setIsFlashing(true);
+    setFlashStatus('idle');
+    setShowFlashModal(true);
+    setFlashProgress({ stage: 'connecting', progress: 0, message: 'Connecting to micro:bit...' });
+    
+    try {
+      const success = await microbitFlasherRef.current.flash(code, handleFlashProgress);
+      if (!success && flashProgress?.stage !== 'error') {
+        setFlashStatus('error');
+      }
+    } catch (error) {
+      setFlashStatus('error');
+      setFlashProgress({
+        stage: 'error',
+        progress: 0,
+        message: error instanceof Error ? error.message : 'Unknown error occurred'
+      });
+    } finally {
+      setIsFlashing(false);
+    }
+  }, [isFlashing, getCurrentCodeForFlash, handleFlashProgress, flashProgress]);
+
+  // Close flash modal
+  const handleCloseFlashModal = useCallback(() => {
+    if (!isFlashing) {
+      setShowFlashModal(false);
+      setFlashProgress(null);
+      setFlashStatus('idle');
+    }
+  }, [isFlashing]);
+
   return (
     <div
       ref={resizeRef}
@@ -722,6 +835,11 @@ export default function UnifiedEditor({
         onSelectController={(id) => {
           if (onSelectController) onSelectController(id);
         }}
+        onDownloadHex={handleDownloadHex}
+        onFlashToMicrobit={handleFlashToMicrobit}
+        isFlashing={isFlashing}
+        isWebUSBSupported={isWebUSBSupported}
+        microbitConnectionStatus={microbitConnectionStatus}
       />
 
       {!activeControllerId && controllers.length === 0 ? (
@@ -774,6 +892,113 @@ export default function UnifiedEditor({
             )}
           </div>
         </>
+      )}
+
+      {/* Flash Modal */}
+      {showFlashModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+          <div className="bg-[#252526] border border-[#3c3c3c] rounded-lg shadow-2xl p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-white font-semibold text-lg flex items-center gap-2">
+                <svg className="w-5 h-5 text-[#007acc]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Flashing micro:bit
+              </h3>
+              {!isFlashing && (
+                <button 
+                  onClick={handleCloseFlashModal}
+                  className="text-[#858585] hover:text-white transition"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            
+            {flashProgress && (
+              <div className="space-y-4">
+                {/* Progress Bar */}
+                <div className="relative">
+                  <div className="h-2 bg-[#3c3c3c] rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        flashProgress.stage === 'error' 
+                          ? 'bg-[#F48771]' 
+                          : flashProgress.stage === 'complete' 
+                            ? 'bg-[#4EC9B0]' 
+                            : 'bg-[#007acc]'
+                      }`}
+                      style={{ width: `${flashProgress.progress}%` }}
+                    />
+                  </div>
+                </div>
+                
+                {/* Stage indicator */}
+                <div className="flex items-center gap-3">
+                  {flashProgress.stage === 'error' ? (
+                    <div className="w-8 h-8 rounded-full bg-[#F48771]/20 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#F48771]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </div>
+                  ) : flashProgress.stage === 'complete' ? (
+                    <div className="w-8 h-8 rounded-full bg-[#4EC9B0]/20 flex items-center justify-center">
+                      <svg className="w-5 h-5 text-[#4EC9B0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-[#007acc]/20 flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-[#007acc] border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <p className="text-white text-sm font-medium capitalize">{flashProgress.stage}</p>
+                    <p className="text-[#858585] text-xs">{flashProgress.message}</p>
+                  </div>
+                  <span className="text-[#858585] text-sm font-mono">{flashProgress.progress}%</span>
+                </div>
+                
+                {/* Error retry button */}
+                {flashProgress.stage === 'error' && (
+                  <div className="space-y-3 mt-4">
+                    <p className="text-[#cccccc] text-xs">
+                      Flashing failed. You can try again or download the HEX file to drag and drop onto your MICROBIT drive.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleFlashToMicrobit}
+                        className="flex-1 px-4 py-2 bg-[#007acc] hover:bg-[#1177bb] text-white rounded text-sm font-medium transition"
+                      >
+                        Try Again
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleDownloadHex();
+                          handleCloseFlashModal();
+                        }}
+                        className="flex-1 px-4 py-2 bg-[#4d9f4d] hover:bg-[#5cb85c] text-white rounded text-sm font-medium transition"
+                      >
+                        Download HEX
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* Preparing stage info */}
+            {flashProgress?.stage === 'preparing' && (
+              <div className="mt-4 p-3 bg-[#1e1e1e] rounded border border-[#3c3c3c]">
+                <p className="text-[#cccccc] text-xs leading-relaxed">
+                  Fetching MicroPython runtime and embedding your Python code...
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

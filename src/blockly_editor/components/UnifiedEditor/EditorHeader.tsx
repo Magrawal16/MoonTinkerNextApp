@@ -2,6 +2,7 @@ import React from "react";
 import { FaArrowRight, FaCubes, FaCode } from "react-icons/fa6";
 
 type EditorMode = "block" | "text";
+type MicrobitConnectionStatus = "connected" | "disconnected" | "not-supported";
 
 interface EditorHeaderProps {
   editorMode: EditorMode;
@@ -17,6 +18,12 @@ interface EditorHeaderProps {
   activeControllerId?: string | null;
   blockModeLockout?: boolean;
   onSelectController?: (id: string) => void;
+  // Flash/Upload functionality
+  onDownloadHex?: () => void;
+  onFlashToMicrobit?: () => void;
+  isFlashing?: boolean;
+  isWebUSBSupported?: boolean;
+  microbitConnectionStatus?: MicrobitConnectionStatus;
 }
 
 export function EditorHeader({
@@ -33,6 +40,11 @@ export function EditorHeader({
   activeControllerId = null,
   blockModeLockout = false,
   onSelectController,
+  onDownloadHex,
+  onFlashToMicrobit,
+  isFlashing = false,
+  isWebUSBSupported = false,
+  microbitConnectionStatus = "disconnected",
 }: EditorHeaderProps) {
   return (
     <div
@@ -159,15 +171,106 @@ export function EditorHeader({
             <span className="text-xs text-gray-600 font-medium">None</span>
           </div>
         )}
+
+        {/* Upload to micro:bit buttons - visible in both block and text mode */}
+        {activeControllerId && (
+          <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">
+            {/* micro:bit Connection Status Indicator */}
+            {isWebUSBSupported && (
+              <div 
+                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border transition-all duration-300 ${
+                  microbitConnectionStatus === 'connected'
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                    : microbitConnectionStatus === 'not-supported'
+                    ? 'bg-gray-50 border-gray-300 text-gray-500'
+                    : 'bg-orange-50 border-orange-300 text-orange-600'
+                }`}
+                title={
+                  microbitConnectionStatus === 'connected'
+                    ? 'micro:bit is connected via USB'
+                    : microbitConnectionStatus === 'not-supported'
+                    ? 'WebUSB is not supported in this browser'
+                    : 'No micro:bit connected - click Flash to connect'
+                }
+              >
+                {/* Status dot with animation */}
+                <span className={`relative flex h-2 w-2 ${microbitConnectionStatus === 'connected' ? '' : ''}`}>
+                  {microbitConnectionStatus === 'connected' && (
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  )}
+                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                    microbitConnectionStatus === 'connected'
+                      ? 'bg-emerald-500'
+                      : microbitConnectionStatus === 'not-supported'
+                      ? 'bg-gray-400'
+                      : 'bg-orange-400'
+                  }`}></span>
+                </span>
+                <span className="hidden sm:inline">
+                  {microbitConnectionStatus === 'connected' 
+                    ? 'USB Connected' 
+                    : microbitConnectionStatus === 'not-supported'
+                    ? 'N/A'
+                    : 'Disconnected'}
+                </span>
+              </div>
+            )}
+            
+            {/* Download HEX button */}
+            <button
+              onClick={onDownloadHex}
+              disabled={isFlashing}
+              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border ${
+                isFlashing
+                  ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                  : 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 shadow-sm'
+              }`}
+              title="Download HEX file - drag to MICROBIT drive to flash"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>HEX</span>
+            </button>
+
+            {/* Flash to micro:bit button (WebUSB) */}
+            {isWebUSBSupported && (
+              <button
+                onClick={onFlashToMicrobit}
+                disabled={isFlashing}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border ${
+                  isFlashing
+                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-green-500 border-green-500 text-white hover:bg-green-600 shadow-sm'
+                }`}
+                title="Flash directly to micro:bit via USB"
+              >
+                {isFlashing ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>Flash</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {onClose && (
         <button
-          className="group flex m-2 mb-3 items-center justify-center w-10 h-10 rounded-xl text-gray-400 hover:text-white hover:bg-red-500 transition-all duration-300 shadow-sm hover:shadow-lg transform hover:scale-110 active:scale-95"
+          className="group flex-shrink-0 flex ml-2 items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-white hover:bg-red-500 transition-all duration-200 shadow-sm hover:shadow-md"
           onClick={onClose}
           title="Close Editor"
         >
           <svg
-            className="w-5 h-5 transition-transform duration-300 group-hover:rotate-90"
+            className="w-4 h-4 transition-transform duration-200 group-hover:rotate-90"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

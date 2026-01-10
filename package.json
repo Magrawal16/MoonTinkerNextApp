@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@microbit/microbit-connection": "^0.1.0",
     "@microbit/microbit-fs": "^0.10.0",
     "@monaco-editor/react": "4.7.0-rc.0",
     "blockly": "^12.2.0",

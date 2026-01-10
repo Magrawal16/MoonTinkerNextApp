@@ -34,15 +34,35 @@ export default function solveCircuit(
   return allResults;
 }
 
-/* ------------------------- Helper & improved solver code ------------------------- */
 
 function solveSingleSubcircuit(
   elements: CircuitElement[],
   wires: Wire[]
 ): CircuitElement[] {
   const nodeEquivalenceMap = findEquivalenceClasses(elements, wires);
+  
+  const subcircuits = getConnectedSubcircuitsAfterMerge(elements, wires, nodeEquivalenceMap);
+  
+  if (subcircuits.length > 1) {
+    const allResults: CircuitElement[] = [];
+    for (const sub of subcircuits) {
+      const subResults = solveSingleSubcircuitAfterMerge(sub.elements, sub.wires, nodeEquivalenceMap);
+      allResults.push(...subResults);
+    }
+    return allResults;
+  }
+  
+  return solveSingleSubcircuitAfterMerge(elements, wires, nodeEquivalenceMap);
+}
+
+function solveSingleSubcircuitAfterMerge(
+  elements: CircuitElement[],
+  wires: Wire[],
+  nodeEquivalenceMap: Map<string, string>
+): CircuitElement[] {
   const microbitShortMap = detectMicrobitRailShorts(elements, nodeEquivalenceMap);
   const effectiveNodeIds = getEffectiveNodeIds(nodeEquivalenceMap);
+  
   if (effectiveNodeIds.size === 0) {
     return applyMicrobitShortFlags(zeroOutComputed(elements), microbitShortMap);
   }
@@ -414,6 +434,87 @@ function getConnectedSubcircuits(
   });
 }
 
+function getConnectedSubcircuitsAfterMerge(
+  elements: CircuitElement[],
+  wires: Wire[],
+  nodeEquivalenceMap: Map<string, string>
+): { elements: CircuitElement[]; wires: Wire[] }[] {
+  const graph = new Map<string, Set<string>>();
+  const addEdge = (a: string, b: string) => {
+    if (!graph.has(a)) graph.set(a, new Set());
+    if (!graph.has(b)) graph.set(b, new Set());
+    graph.get(a)!.add(b);
+    graph.get(b)!.add(a);
+  };
+
+  for (const wire of wires) {
+    if (wire.deleted || !wire.fromNodeId || !wire.toNodeId) continue;
+    const from = nodeEquivalenceMap.get(wire.fromNodeId) ?? wire.fromNodeId;
+    const to = nodeEquivalenceMap.get(wire.toNodeId) ?? wire.toNodeId;
+    if (from && to) addEdge(from, to);
+  }
+
+  for (const el of elements) {
+    if (!Array.isArray(el.nodes) || el.nodes.length < 2) continue;
+    
+    if (el.type === "slideswitch" || el.type === "pushbutton") continue;
+    
+    const mergedNodes = el.nodes
+      .map(n => nodeEquivalenceMap.get(n.id) ?? n.id)
+      .filter(Boolean);
+    
+    for (let i = 0; i < mergedNodes.length; i++) {
+      for (let j = i + 1; j < mergedNodes.length; j++) {
+        if (mergedNodes[i] && mergedNodes[j]) {
+          addEdge(mergedNodes[i], mergedNodes[j]);
+        }
+      }
+    }
+  }
+
+  const visited = new Set<string>();
+  const nodeGroups: string[][] = [];
+
+  for (const nodeId of graph.keys()) {
+    if (visited.has(nodeId)) continue;
+
+    const queue = [nodeId];
+    visited.add(nodeId);
+    const group: string[] = [];
+
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      group.push(current);
+      for (const neighbor of graph.get(current) ?? []) {
+        if (!visited.has(neighbor)) {
+          visited.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    nodeGroups.push(group);
+  }
+
+  return nodeGroups.map((group) => {
+    const groupSet = new Set(group);
+    const subElements = elements.filter((el) => {
+      if (!Array.isArray(el.nodes)) return false;
+      return el.nodes.some(n => {
+        const merged = nodeEquivalenceMap.get(n.id) ?? n.id;
+        return groupSet.has(merged);
+      });
+    });
+    const subWires = wires.filter((w) => {
+      if (!w.fromNodeId || !w.toNodeId) return false;
+      const fromMerged = nodeEquivalenceMap.get(w.fromNodeId) ?? w.fromNodeId;
+      const toMerged = nodeEquivalenceMap.get(w.toNodeId) ?? w.toNodeId;
+      return groupSet.has(fromMerged) && groupSet.has(toMerged);
+    });
+    return { elements: subElements, wires: subWires };
+  });
+}
+
 function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
   const parent = new Map<string, string>();
   const allNodeIds = new Set<string>();
@@ -428,6 +529,7 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
     allNodeIds.add(w.fromNodeId);
     allNodeIds.add(w.toNodeId);
   });
+  
   elements.forEach((e) => {
     if (!Array.isArray(e.nodes)) return;
     if (e.type === "microbit" || e.type === "microbitWithBreakout") {
@@ -461,11 +563,13 @@ function findEquivalenceClasses(elements: CircuitElement[], wires: Wire[]) {
         if (allNodeIds.has(n.id)) parent.set(n.id, n.id);
       });
     } else {
-      e.nodes.forEach((n) => {
-        if (!n || !n.id) return;
-        parent.set(n.id, n.id);
-        allNodeIds.add(n.id);
-      });
+      if (e.type === "pushbutton") {
+        e.nodes.forEach((n) => {
+          if (!n || !n.id) return;
+          parent.set(n.id, n.id);
+          allNodeIds.add(n.id);
+        });
+      }
 
       // For 4-pin pushbutton: 1a is always tied to 1b, and 2a is always tied to 2b.
       // This mirrors real hardware so wiring any top/bottom pin of a side shares the same net.
@@ -677,6 +781,11 @@ function buildMNAMatrices(
   const D = Array.from({ length: m }, () => zeroRow(m));
   const I = Array(n).fill(0);
   const E = Array(m).fill(0);
+
+  const LEAKAGE_CONDUCTANCE = 1e-12;
+  for (let i = 0; i < n; i++) {
+    G[i][i] += LEAKAGE_CONDUCTANCE;
+  }
 
   const safeNodeIndex = (nodeId?: string) => {
     if (!nodeId) return undefined;
@@ -1129,6 +1238,10 @@ function computeElementResults(
       const R = el.properties?.resistance ?? 1;
       current = voltage / R;
       power = voltage * current;
+    } else if (el.type === "slideswitch") {
+      current = 0;
+      voltage = 0;
+      power = 0;
     } else if (el.type === "led") {
       // Respect polarity: forward conduction only (anode is node[1], cathode is node[0] per createElement)
       const anodeId = nodeMap.get(el.nodes?.[1]?.id ?? "");

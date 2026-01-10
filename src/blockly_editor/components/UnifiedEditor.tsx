@@ -21,7 +21,7 @@ import BlockSearchPalette from "./BlockSearchPalette";
 import { getCategoryMeta } from "@/blockly_editor/utils/sharedBlockDefinitions";
 import { maskEditingTextFields } from "./UnifiedEditor/workspaceStyles";
 import { useToolboxSearch } from "./UnifiedEditor/hooks/useToolboxSearch";
-import { MicrobitFlasher, FlashProgress, ConnectionStatusType } from "@/python_code_editor/utils/microbitFlasher";
+import { MicrobitFlasher, FlashProgress, ConnectionStatusType, DeviceInfo } from "@/python_code_editor/utils/microbitFlasher";
 
 type EditorMode = "block" | "text";
 
@@ -104,6 +104,7 @@ export default function UnifiedEditor({
   const [showFlashModal, setShowFlashModal] = useState(false);
   const [flashStatus, setFlashStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [microbitConnectionStatus, setMicrobitConnectionStatus] = useState<ConnectionStatusType>('disconnected');
+  const [microbitDeviceInfo, setMicrobitDeviceInfo] = useState<DeviceInfo | undefined>(undefined);
   const microbitFlasherRef = useRef(new MicrobitFlasher());
   const isWebUSBSupported = typeof window !== 'undefined' && MicrobitFlasher.isWebUSBSupported();
   
@@ -112,9 +113,10 @@ export default function UnifiedEditor({
     const flasher = microbitFlasherRef.current;
     
     // Set up status change listener
-    flasher.onStatusChange((status) => {
+    flasher.onStatusChange((status, deviceInfo) => {
       setMicrobitConnectionStatus(status);
-      console.log('micro:bit connection status:', status);
+      setMicrobitDeviceInfo(deviceInfo);
+      console.log('micro:bit connection status:', status, deviceInfo);
     });
     
     // Initialize the flasher
@@ -795,6 +797,27 @@ export default function UnifiedEditor({
     }
   }, [isFlashing]);
 
+  // Handle connect to micro:bit
+  const handleConnectMicrobit = useCallback(async () => {
+    try {
+      const success = await microbitFlasherRef.current.connect();
+      if (!success) {
+        console.log('Connection cancelled or failed');
+      }
+    } catch (error) {
+      console.error('Failed to connect to micro:bit:', error);
+    }
+  }, []);
+
+  // Handle disconnect from micro:bit
+  const handleDisconnectMicrobit = useCallback(async () => {
+    try {
+      await microbitFlasherRef.current.disconnect();
+    } catch (error) {
+      console.error('Failed to disconnect from micro:bit:', error);
+    }
+  }, []);
+
   return (
     <div
       ref={resizeRef}
@@ -837,9 +860,12 @@ export default function UnifiedEditor({
         }}
         onDownloadHex={handleDownloadHex}
         onFlashToMicrobit={handleFlashToMicrobit}
+        onConnectMicrobit={handleConnectMicrobit}
+        onDisconnectMicrobit={handleDisconnectMicrobit}
         isFlashing={isFlashing}
         isWebUSBSupported={isWebUSBSupported}
         microbitConnectionStatus={microbitConnectionStatus}
+        microbitDeviceInfo={microbitDeviceInfo}
       />
 
       {!activeControllerId && controllers.length === 0 ? (

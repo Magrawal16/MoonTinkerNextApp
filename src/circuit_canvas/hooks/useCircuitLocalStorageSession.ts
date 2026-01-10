@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import type Konva from "konva";
 import type { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
+import { createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
+import { createInitialRgbLedRuntime } from "@/circuit_canvas/utils/rgbLedBehavior";
 
 export type CircuitSessionStorageKeys = {
   elementsKey: string;
@@ -11,6 +13,9 @@ export type CircuitSessionStorageKeys = {
 function sanitizeElements(elements: CircuitElement[]) {
   return (elements || []).map((el: any) => {
     const isMicrobit = el?.type === "microbit" || el?.type === "microbitWithBreakout";
+    const isLed = el?.type === "led";
+    const isRgbLed = el?.type === "rgb_led";
+    
     return {
       ...el,
       computed: {
@@ -19,6 +24,11 @@ function sanitizeElements(elements: CircuitElement[]) {
         power: undefined,
         measurement: el?.computed?.measurement ?? undefined,
       },
+      runtime: isLed
+        ? { led: createInitialLedRuntime() }
+        : isRgbLed
+        ? createInitialRgbLedRuntime()
+        : el?.runtime,
       controller: isMicrobit
         ? {
             leds: Array.from({ length: 5 }, () => Array(5).fill(0)),

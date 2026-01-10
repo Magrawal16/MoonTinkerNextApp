@@ -52,12 +52,19 @@ export interface FlashProgress {
 export type FlashProgressCallback = (progress: FlashProgress) => void;
 
 export type ConnectionStatusType = 'connected' | 'disconnected' | 'not-supported';
-export type ConnectionStatusCallback = (status: ConnectionStatusType) => void;
+export type ConnectionStatusCallback = (status: ConnectionStatusType, deviceInfo?: DeviceInfo) => void;
+
+export interface DeviceInfo {
+  serialNumber?: string;
+  boardVersion?: string;  // "V1" or "V2"
+  shortId: string;        // Last 4-5 chars of serial for easy identification
+}
 
 export class MicrobitFlasher {
   private connection: MicrobitWebUSBConnection | null = null;
   private statusCallback: ConnectionStatusCallback | null = null;
   private currentStatus: ConnectionStatusType = 'disconnected';
+  private currentDeviceInfo: DeviceInfo | undefined = undefined;
   
   /**
    * Check if WebUSB is supported in this browser
@@ -79,7 +86,7 @@ export class MicrobitFlasher {
   onStatusChange(callback: ConnectionStatusCallback): void {
     this.statusCallback = callback;
     // Immediately notify of current status
-    callback(this.currentStatus);
+    callback(this.currentStatus, this.currentDeviceInfo);
   }
   
   /**
@@ -93,12 +100,60 @@ export class MicrobitFlasher {
   }
   
   /**
+   * Get the current device info (if connected)
+   */
+  getDeviceInfo(): DeviceInfo | undefined {
+    return this.currentDeviceInfo;
+  }
+  
+  /**
+   * Update device info from the current connection
+   */
+  private updateDeviceInfo(): void {
+    if (!this.connection || this.connection.status !== ConnectionStatus.CONNECTED) {
+      this.currentDeviceInfo = undefined;
+      return;
+    }
+    
+    try {
+      const device = this.connection.getDevice?.();
+      const boardVersion = this.connection.getBoardVersion?.();
+      const serialNumber = device?.serialNumber;
+      
+      // Create a short ID from the serial number (last 4-5 chars)
+      const shortId = serialNumber 
+        ? serialNumber.slice(-5).toUpperCase()
+        : boardVersion || 'Unknown';
+      
+      this.currentDeviceInfo = {
+        serialNumber,
+        boardVersion,
+        shortId,
+      };
+      
+      console.log('Device info updated:', this.currentDeviceInfo);
+    } catch (e) {
+      console.warn('Could not get device info:', e);
+      this.currentDeviceInfo = undefined;
+    }
+  }
+  
+  /**
    * Update and notify connection status
    */
   private updateStatus(status: ConnectionStatusType): void {
-    if (this.currentStatus !== status) {
-      this.currentStatus = status;
-      this.statusCallback?.(status);
+    const statusChanged = this.currentStatus !== status;
+    this.currentStatus = status;
+    
+    // Update device info when status changes
+    if (status === 'connected') {
+      this.updateDeviceInfo();
+    } else {
+      this.currentDeviceInfo = undefined;
+    }
+    
+    if (statusChanged || status === 'connected') {
+      this.statusCallback?.(status, this.currentDeviceInfo);
     }
   }
   
@@ -279,15 +334,65 @@ export class MicrobitFlasher {
   }
   
   /**
-   * Disconnect from the micro:bit
+   * Connect to a micro:bit (always shows device picker for selection)
+   * Returns true if connected successfully, false otherwise
+   */
+  async connect(): Promise<boolean> {
+    try {
+      if (!MicrobitFlasher.isWebUSBSupported()) {
+        console.warn('WebUSB is not supported');
+        return false;
+      }
+      
+      // Always create a fresh connection to force device picker to show
+      // This ensures user can choose which micro:bit to connect to
+      if (this.connection) {
+        try {
+          await this.connection.disconnect();
+        } catch (e) {
+          // Ignore disconnect errors
+        }
+      }
+      
+      // Create a new connection - this will force the device picker to appear
+      this.connection = createWebUSBConnection();
+      await this.connection.initialize();
+      
+      // Listen for status changes from the connection
+      this.connection.addEventListener('status', () => {
+        const isConnected = this.connection?.status === ConnectionStatus.CONNECTED;
+        this.updateStatus(isConnected ? 'connected' : 'disconnected');
+      });
+      
+      // Trigger connection (will show device picker)
+      const status = await this.connection.connect();
+      const isConnected = status === ConnectionStatus.CONNECTED;
+      this.updateStatus(isConnected ? 'connected' : 'disconnected');
+      return isConnected;
+    } catch (error) {
+      console.warn('Failed to connect to micro:bit:', error);
+      this.updateStatus('disconnected');
+      return false;
+    }
+  }
+  
+  /**
+   * Disconnect from the micro:bit and clear the connection
+   * This ensures the next connect() will show the device picker
    */
   async disconnect(): Promise<void> {
     try {
       if (this.connection) {
         await this.connection.disconnect();
+        // Clear the connection so next connect() creates a fresh one
+        this.connection = null;
+        this.updateStatus('disconnected');
       }
     } catch (e) {
       console.warn('Error during disconnect:', e);
+      // Still clear the connection even if disconnect failed
+      this.connection = null;
+      this.updateStatus('disconnected');
     }
   }
   

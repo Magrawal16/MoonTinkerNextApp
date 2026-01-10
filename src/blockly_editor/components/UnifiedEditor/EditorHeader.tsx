@@ -4,6 +4,12 @@ import { FaArrowRight, FaCubes, FaCode } from "react-icons/fa6";
 type EditorMode = "block" | "text";
 type MicrobitConnectionStatus = "connected" | "disconnected" | "not-supported";
 
+interface DeviceInfo {
+  serialNumber?: string;
+  boardVersion?: string;
+  shortId: string;
+}
+
 interface EditorHeaderProps {
   editorMode: EditorMode;
   showCodePalette: boolean;
@@ -21,9 +27,12 @@ interface EditorHeaderProps {
   // Flash/Upload functionality
   onDownloadHex?: () => void;
   onFlashToMicrobit?: () => void;
+  onConnectMicrobit?: () => void;
+  onDisconnectMicrobit?: () => void;
   isFlashing?: boolean;
   isWebUSBSupported?: boolean;
   microbitConnectionStatus?: MicrobitConnectionStatus;
+  microbitDeviceInfo?: DeviceInfo;
 }
 
 export function EditorHeader({
@@ -42,10 +51,14 @@ export function EditorHeader({
   onSelectController,
   onDownloadHex,
   onFlashToMicrobit,
+  onConnectMicrobit,
+  onDisconnectMicrobit,
   isFlashing = false,
   isWebUSBSupported = false,
   microbitConnectionStatus = "disconnected",
+  microbitDeviceInfo,
 }: EditorHeaderProps) {
+  const isConnected = microbitConnectionStatus === 'connected';
   return (
     <div
       className="flex items-center justify-between px-6 py-4 border-b border-gray-200/80 bg-gradient-to-r from-slate-50 via-white to-slate-50 shadow-sm backdrop-blur-sm"
@@ -175,30 +188,25 @@ export function EditorHeader({
         {/* Upload to micro:bit buttons - visible in both block and text mode */}
         {activeControllerId && (
           <div className="flex items-center gap-1.5 ml-2 pl-2 border-l border-gray-300">
-            {/* micro:bit Connection Status Indicator */}
+            {/* micro:bit Connection Status Indicator - compact with tooltip */}
             {isWebUSBSupported && (
               <div 
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium border transition-all duration-300 ${
-                  microbitConnectionStatus === 'connected'
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
-                    : microbitConnectionStatus === 'not-supported'
-                    ? 'bg-gray-50 border-gray-300 text-gray-500'
-                    : 'bg-orange-50 border-orange-300 text-orange-600'
-                }`}
+                className="flex items-center gap-1.5 px-1.5 py-1 group relative"
                 title={
                   microbitConnectionStatus === 'connected'
-                    ? 'micro:bit is connected via USB'
+                    ? `micro:bit connected via USB${microbitDeviceInfo ? ` (${microbitDeviceInfo.boardVersion || ''} #${microbitDeviceInfo.shortId})` : ''}`
                     : microbitConnectionStatus === 'not-supported'
-                    ? 'WebUSB is not supported in this browser'
-                    : 'No micro:bit connected - click Flash to connect'
+                    ? 'WebUSB not supported'
+                    : 'micro:bit not connected'
                 }
               >
+                <span className="text-xs text-gray-500 font-medium">Status</span>
                 {/* Status dot with animation */}
-                <span className={`relative flex h-2 w-2 ${microbitConnectionStatus === 'connected' ? '' : ''}`}>
+                <span className={`relative flex h-2.5 w-2.5`}>
                   {microbitConnectionStatus === 'connected' && (
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   )}
-                  <span className={`relative inline-flex rounded-full h-2 w-2 ${
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
                     microbitConnectionStatus === 'connected'
                       ? 'bg-emerald-500'
                       : microbitConnectionStatus === 'not-supported'
@@ -206,25 +214,65 @@ export function EditorHeader({
                       : 'bg-orange-400'
                   }`}></span>
                 </span>
-                <span className="hidden sm:inline">
-                  {microbitConnectionStatus === 'connected' 
-                    ? 'USB Connected' 
-                    : microbitConnectionStatus === 'not-supported'
-                    ? 'N/A'
-                    : 'Disconnected'}
-                </span>
+                {/* Tooltip on hover - shows device info when connected */}
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1.5 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-50">
+                  {microbitConnectionStatus === 'connected' ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-medium text-emerald-400">Connected</span>
+                      {microbitDeviceInfo && (
+                        <>
+                          <span className="text-gray-300">
+                            {microbitDeviceInfo.boardVersion || 'micro:bit'} • ID: {microbitDeviceInfo.shortId}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ) : microbitConnectionStatus === 'not-supported' ? (
+                    'WebUSB not supported'
+                  ) : (
+                    'Disconnected'
+                  )}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900"></div>
+                </div>
               </div>
             )}
             
-            {/* Download HEX button */}
+            {/* Connect/Disconnect Button */}
+            {isWebUSBSupported && (
+              <button
+                onClick={isConnected ? onDisconnectMicrobit : onConnectMicrobit}
+                disabled={isFlashing}
+                className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border ${
+                  isFlashing
+                    ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                    : isConnected
+                    ? 'bg-orange-50 border-orange-300 text-orange-600 hover:bg-orange-100'
+                    : 'bg-indigo-50 border-indigo-300 text-indigo-600 hover:bg-indigo-100'
+                }`}
+                title={isConnected ? 'Disconnect micro:bit' : 'Connect to micro:bit'}
+              >
+                {isConnected ? (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    <span>Disconnect</span>
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    <span>Connect</span>
+                  </>
+                )}
+              </button>
+            )}
+            
+            {/* Download HEX button - always active */}
             <button
               onClick={onDownloadHex}
-              disabled={isFlashing}
-              className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border ${
-                isFlashing
-                  ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-blue-500 border-blue-500 text-white hover:bg-blue-600 shadow-sm'
-              }`}
+              className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border bg-blue-500 border-blue-500 text-white hover:bg-blue-600 shadow-sm"
               title="Download HEX file - drag to MICROBIT drive to flash"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -233,17 +281,25 @@ export function EditorHeader({
               <span>HEX</span>
             </button>
 
-            {/* Flash to micro:bit button (WebUSB) */}
+            {/* Flash to micro:bit button (WebUSB) - disabled when not connected, highlighted when connected */}
             {isWebUSBSupported && (
               <button
                 onClick={onFlashToMicrobit}
-                disabled={isFlashing}
+                disabled={isFlashing || !isConnected}
                 className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all duration-200 border ${
                   isFlashing
                     ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                    : 'bg-green-500 border-green-500 text-white hover:bg-green-600 shadow-sm'
+                    : !isConnected
+                    ? 'bg-gray-100 border-gray-300 text-gray-400 cursor-not-allowed opacity-60'
+                    : 'bg-green-500 border-green-500 text-white hover:bg-green-600 shadow-sm shadow-green-500/30 ring-2 ring-green-300 ring-opacity-50'
                 }`}
-                title="Flash directly to micro:bit via USB"
+                title={
+                  isFlashing 
+                    ? 'Flashing in progress...' 
+                    : !isConnected 
+                    ? 'Connect micro:bit first to enable direct flashing'
+                    : 'Flash directly to micro:bit via USB'
+                }
               >
                 {isFlashing ? (
                   <>

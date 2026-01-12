@@ -177,11 +177,12 @@ export default function CircuitStorage(props: CircuitManagerProps) {
   return (
     <>
       <button
-        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        className="px-2 py-1 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:shadow-blue-400 hover:scale-105"
         onClick={() => setIsOpen(true)}
+        title="Open saved circuits"
       >
-        <FaFolder />
-        <span>Saved Circuits</span>
+        <FaFolder size={11} />
+        <span>Saved</span>
       </button>
 
       {/* Toast Notifications */}

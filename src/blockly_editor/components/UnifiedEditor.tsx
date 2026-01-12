@@ -27,6 +27,19 @@ type EditorMode = "block" | "text";
 
 // Moved to BlockEditorPane
 
+// Interface exposed via onFlashRef for parent components to access flash functionality
+export interface FlashRefHandle {
+  handleDownloadHex: () => void;
+  handleFlashToMicrobit: () => void;
+  handleConnectMicrobit: () => void;
+  handleDisconnectMicrobit: () => void;
+  isFlashing: boolean;
+  isWebUSBSupported: boolean;
+  microbitConnectionStatus: ConnectionStatusType;
+  microbitDeviceInfo?: DeviceInfo;
+  hasActiveController: boolean;
+}
+
 interface UnifiedEditorProps {
   controllerCodeMap: Record<string, string>;
   activeControllerId: string | null;
@@ -40,6 +53,9 @@ interface UnifiedEditorProps {
   onSelectController?: (id: string) => void;
   onResetRef?: React.MutableRefObject<(() => void) | null>; // Ref to expose reset functionality
   isSimulationOn?: boolean; // Disable editing when simulation is running
+  onFlashRef?: React.MutableRefObject<FlashRefHandle | null>; // Ref to expose flash functionality
+  sharedFlasher?: MicrobitFlasher | null; // Shared flasher instance from parent
+  onFlashingChange?: (isFlashing: boolean) => void; // Callback to notify parent of flashing state
 }
 
 export default function UnifiedEditor({
@@ -53,6 +69,9 @@ export default function UnifiedEditor({
   onSelectController,
   onResetRef,
   isSimulationOn = false,
+  onFlashRef,
+  sharedFlasher,
+  onFlashingChange,
 }: UnifiedEditorProps) {
   const EDITOR_MODE_STORAGE_KEY = "moontinker_lastEditorMode";
   const CONTROLLER_MODE_MAP_KEY = "moontinker_controllerEditorModeMap";
@@ -98,32 +117,17 @@ export default function UnifiedEditor({
   const [showBlockSearch, setShowBlockSearch] = useState(false);
   const [toolboxSearch, setToolboxSearch] = useLocalState("");
 
-  // Flash/Upload state for micro:bit
+  // Flash/Upload state for micro:bit - uses shared flasher from parent
   const [isFlashing, setIsFlashing] = useState(false);
   const [flashProgress, setFlashProgress] = useState<FlashProgress | null>(null);
   const [showFlashModal, setShowFlashModal] = useState(false);
   const [flashStatus, setFlashStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [microbitConnectionStatus, setMicrobitConnectionStatus] = useState<ConnectionStatusType>('disconnected');
-  const [microbitDeviceInfo, setMicrobitDeviceInfo] = useState<DeviceInfo | undefined>(undefined);
-  const microbitFlasherRef = useRef(new MicrobitFlasher());
   const isWebUSBSupported = typeof window !== 'undefined' && MicrobitFlasher.isWebUSBSupported();
   
-  // Initialize microbit flasher and listen for connection status changes
+  // Notify parent when flashing state changes
   useEffect(() => {
-    const flasher = microbitFlasherRef.current;
-    
-    // Set up status change listener
-    flasher.onStatusChange((status, deviceInfo) => {
-      setMicrobitConnectionStatus(status);
-      setMicrobitDeviceInfo(deviceInfo);
-      console.log('micro:bit connection status:', status, deviceInfo);
-    });
-    
-    // Initialize the flasher
-    flasher.initialize().catch((err) => {
-      console.warn('Failed to initialize microbit flasher:', err);
-    });
-  }, []);
+    onFlashingChange?.(isFlashing);
+  }, [isFlashing, onFlashingChange]);
 
   const isDraggingRef = useRef(false);
   const { editorSize, resizeRef, handleResizeStart } = useEditorResizing(editorMode);
@@ -743,21 +747,29 @@ export default function UnifiedEditor({
 
   // Handle download HEX file
   const handleDownloadHex = useCallback(async () => {
+    if (!sharedFlasher) {
+      console.warn('No shared flasher available');
+      return;
+    }
     const code = getCurrentCodeForFlash();
     if (!code.trim()) {
       alert('No code to download. Please add some code first.');
       return;
     }
     try {
-      await microbitFlasherRef.current.downloadHex(code);
+      await sharedFlasher.downloadHex(code);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       alert(`Failed to download HEX file: ${errorMessage}`);
     }
-  }, [getCurrentCodeForFlash]);
+  }, [getCurrentCodeForFlash, sharedFlasher]);
 
   // Handle flash to micro:bit using WebUSB
   const handleFlashToMicrobit = useCallback(async () => {
+    if (!sharedFlasher) {
+      console.warn('No shared flasher available');
+      return;
+    }
     if (isFlashing) return;
     
     const code = getCurrentCodeForFlash();
@@ -767,12 +779,13 @@ export default function UnifiedEditor({
     }
     
     setIsFlashing(true);
+    onFlashingChange?.(true);
     setFlashStatus('idle');
     setShowFlashModal(true);
     setFlashProgress({ stage: 'connecting', progress: 0, message: 'Connecting to micro:bit...' });
     
     try {
-      const success = await microbitFlasherRef.current.flash(code, handleFlashProgress);
+      const success = await sharedFlasher.flash(code, handleFlashProgress);
       if (!success && flashProgress?.stage !== 'error') {
         setFlashStatus('error');
       }
@@ -785,8 +798,9 @@ export default function UnifiedEditor({
       });
     } finally {
       setIsFlashing(false);
+      onFlashingChange?.(false);
     }
-  }, [isFlashing, getCurrentCodeForFlash, handleFlashProgress, flashProgress]);
+  }, [isFlashing, getCurrentCodeForFlash, handleFlashProgress, flashProgress, sharedFlasher, onFlashingChange]);
 
   // Close flash modal
   const handleCloseFlashModal = useCallback(() => {
@@ -799,24 +813,49 @@ export default function UnifiedEditor({
 
   // Handle connect to micro:bit
   const handleConnectMicrobit = useCallback(async () => {
+    if (!sharedFlasher) {
+      console.warn('No shared flasher available');
+      return;
+    }
     try {
-      const success = await microbitFlasherRef.current.connect();
+      const success = await sharedFlasher.connect();
       if (!success) {
         console.log('Connection cancelled or failed');
       }
     } catch (error) {
       console.error('Failed to connect to micro:bit:', error);
     }
-  }, []);
+  }, [sharedFlasher]);
 
   // Handle disconnect from micro:bit
   const handleDisconnectMicrobit = useCallback(async () => {
+    if (!sharedFlasher) {
+      console.warn('No shared flasher available');
+      return;
+    }
     try {
-      await microbitFlasherRef.current.disconnect();
+      await sharedFlasher.disconnect();
     } catch (error) {
       console.error('Failed to disconnect from micro:bit:', error);
     }
-  }, []);
+  }, [sharedFlasher]);
+
+  // Expose flash functionality to parent via ref
+  useEffect(() => {
+    if (onFlashRef) {
+      onFlashRef.current = {
+        handleDownloadHex,
+        handleFlashToMicrobit,
+        handleConnectMicrobit,
+        handleDisconnectMicrobit,
+        isFlashing,
+        isWebUSBSupported,
+        microbitConnectionStatus: sharedFlasher?.getConnectionStatus() || 'disconnected',
+        microbitDeviceInfo: sharedFlasher?.getDeviceInfo(),
+        hasActiveController: !!activeControllerId,
+      };
+    }
+  }, [onFlashRef, handleDownloadHex, handleFlashToMicrobit, handleConnectMicrobit, handleDisconnectMicrobit, isFlashing, isWebUSBSupported, sharedFlasher, activeControllerId]);
 
   return (
     <div
@@ -858,14 +897,6 @@ export default function UnifiedEditor({
         onSelectController={(id) => {
           if (onSelectController) onSelectController(id);
         }}
-        onDownloadHex={handleDownloadHex}
-        onFlashToMicrobit={handleFlashToMicrobit}
-        onConnectMicrobit={handleConnectMicrobit}
-        onDisconnectMicrobit={handleDisconnectMicrobit}
-        isFlashing={isFlashing}
-        isWebUSBSupported={isWebUSBSupported}
-        microbitConnectionStatus={microbitConnectionStatus}
-        microbitDeviceInfo={microbitDeviceInfo}
       />
 
       {!activeControllerId && controllers.length === 0 ? (

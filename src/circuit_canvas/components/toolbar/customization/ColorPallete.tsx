@@ -41,14 +41,14 @@ export function ColorPaletteDropdown({
     <div ref={dropdownRef} className="relative inline-block text-left">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-1 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        className="px-2 py-1 bg-gray-200 rounded border border-gray-300 shadow text-gray-800 text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:bg-gray-300 hover:shadow-blue-400 hover:scale-105 transition-all duration-200"
         title={`Wire color: ${selectedColor || ""}`}
       >
         <div
-          className="w-4 h-4 rounded-full border"
+          className="w-4 h-4 rounded-full border border-gray-400"
           style={{ backgroundColor: selectedColor || "#ccc" }}
         />
-        <LuChevronDown className="w-4 h-4" />
+        <LuChevronDown className="w-3 h-3" />
       </button>
 
       {isOpen && (

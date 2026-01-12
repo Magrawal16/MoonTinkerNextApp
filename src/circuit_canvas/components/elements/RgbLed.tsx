@@ -102,6 +102,7 @@ export default function RgbLed(props: RgbLedProps) {
   const explosionImg = useKonvaImage(
     isRgbLedExploded(runtime) ? "assets/circuit_canvas/elements/Explosion.svg" : null
   );
+  const baseReady = Boolean(rgbLedImage);
 
   // Get individual channel states
   const redState = runtime.red;
@@ -264,7 +265,7 @@ export default function RgbLed(props: RgbLedProps) {
         )}
 
         {/* RGB Glow Effect */}
-        {glowVisible && (
+        {baseReady && glowVisible && (
           <Group listening={false}>
             {/* Main glow rectangle */}
             <Rect
@@ -314,7 +315,7 @@ export default function RgbLed(props: RgbLedProps) {
         )}
 
         {/* Hot overlay effect */}
-        {hotOverlayOpacity > 0 && (
+        {baseReady && hotOverlayOpacity > 0 && (
           <Rect
             x={glowPosition.rect.x - 4}
             y={glowPosition.rect.y - 8}
@@ -332,7 +333,7 @@ export default function RgbLed(props: RgbLedProps) {
         )}
 
         {/* Explosion image */}
-        {isExploded && explosionImg && (
+        {baseReady && isExploded && explosionImg && (
           <Image
             image={explosionImg}
             x={30}
@@ -348,7 +349,7 @@ export default function RgbLed(props: RgbLedProps) {
         )}
 
         {/* Smoke particles */}
-        {smokeParticles.map((p) => {
+        {baseReady && smokeParticles.map((p) => {
           if (!smokeStartedAt) return null;
           const progress = smokeElapsed / p.lifetime;
           if (progress > 1) return null;
@@ -372,7 +373,7 @@ export default function RgbLed(props: RgbLedProps) {
         })}
 
         {/* Warning notification on hover */}
-        {isHovered && warningMessage && (
+        {baseReady && isHovered && warningMessage && (
           <ShortCircuitNotification show={true} message={warningMessage} />
         )}
       </Group>

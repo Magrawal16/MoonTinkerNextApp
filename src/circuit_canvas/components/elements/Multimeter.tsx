@@ -67,6 +67,7 @@ export default function Multimeter(props: MultimeterProps) {
     image.onload = () => setImg(image);
     image.alt = "Multimeter";
   }, []);
+  const baseReady = Boolean(img);
 
   const SCALE = 180 / 240; // ~0.3333
 
@@ -113,18 +114,20 @@ export default function Multimeter(props: MultimeterProps) {
           y={-1}
           height={-1}
         /> */}
-        <Text
-          x={35}
-          y={35}
-          width={150}
-          align="center"
-          fontSize={24}
-          fill="black"
-          stroke="none"
-          strokeWidth={1}
-          text={getDisplayValue()}
-        />
-        {buttonDefs.map((btn) => {
+        {baseReady && (
+          <Text
+            x={35}
+            y={35}
+            width={150}
+            align="center"
+            fontSize={24}
+            fill="black"
+            stroke="none"
+            strokeWidth={1}
+            text={getDisplayValue()}
+          />
+        )}
+        {baseReady && buttonDefs.map((btn) => {
           const selected = mode === btn.mode;
           const FONT = Math.round(BTN_R * 1.2); // scale label with circle radius
           return (

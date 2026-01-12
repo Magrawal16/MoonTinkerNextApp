@@ -198,6 +198,7 @@ export default function Microbit({
 
   const showExplosion = Boolean(isShorted && isSimulationOn && explosionImg);
   const showShortNotification = Boolean(isShorted && isSimulationOn && isHovered);
+  const baseReady = Boolean(imgMicrobitWithBreakout);
 
   return (
     <BaseElement {...props} isSimulationOn={isSimulationOn}>
@@ -205,7 +206,7 @@ export default function Microbit({
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {imgOffState && !isSimulationOn && (
+        {baseReady && imgOffState && !isSimulationOn && (
           <Image
             image={imgOffState}
             width={coords.usbOff.width}
@@ -218,7 +219,7 @@ export default function Microbit({
             shadowOpacity={0}
           />
         )}
-        {imgOnnState && isSimulationOn && (
+        {baseReady && imgOnnState && isSimulationOn && (
           <Image
             image={imgOnnState}
             width={coords.usbOn.width}
@@ -244,23 +245,22 @@ export default function Microbit({
             shadowOpacity={0}
           />
         )}
+        {baseReady && (
+          <>
+            {/* Version label */}
+            <Text
+              text="V2"
+              x={coords.versionText.x}
+              y={coords.versionText.y}
+              fontSize={coords.versionText.fontSize}
+              fill={coords.versionText.color ?? "#FFFFFF"}
+              fontStyle="bold"
+              listening={false}
+            />
 
-        {/* Version label */}
-        <Text
-          text="V2"
-          x={coords.versionText.x}
-          y={coords.versionText.y}
-          fontSize={coords.versionText.fontSize}
-          fill={coords.versionText.color ?? "#FFFFFF"}
-          fontStyle="bold"
-          listening={false}
-        />
-
-        
-
-        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
-        {leds.map((row, y) =>
-          row.map((_, x) => {
+            {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
+            {leds.map((row, y) =>
+              row.map((_, x) => {
             const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
             
@@ -352,178 +352,180 @@ export default function Microbit({
                 )}
               </Group>
             );
-          })
-        )}
+              })
+            )}
 
-        {/* Touch (Logo) Sensor Overlay */}
-        <Group
-          x={coords.logo.x}
-          y={coords.logo.y}
-          listening={true}
-          onMouseEnter={onLogoEnter}
-          onMouseLeave={onLogoLeave}
-          onMouseDown={onLogoDown}
-          onMouseUp={onLogoUp}
-          onClick={onLogoClick}
-          onTouchStart={onLogoDown}
-          onTouchEnd={onLogoUp}
-        >
-          {/* Outer oval */}
-          <Rect
-            width={coords.logo.width}
-            height={coords.logo.height}
-            cornerRadius={24}
-            stroke={logoStroke}
-            strokeWidth={coords.logo.strokeWidth}
-            fill="rgba(0,0,0,0.55)"
-            opacity={0.95}
-          />
-          {/* Inner pads */}
-          <Circle x={coords.logo.width * 0.30} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
-          <Circle x={coords.logo.width * 0.70} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
-          {/* Invisible enlarged hit area */}
-          <Rect
-            width={coords.logo.width + 6}
-            height={coords.logo.height + 6}
-            x={-3}
-            y={-3}
-            cornerRadius={24}
-            fill="transparent"
-          />
-        </Group>
+            {/* Touch (Logo) Sensor Overlay */}
+            <Group
+              x={coords.logo.x}
+              y={coords.logo.y}
+              listening={true}
+              onMouseEnter={onLogoEnter}
+              onMouseLeave={onLogoLeave}
+              onMouseDown={onLogoDown}
+              onMouseUp={onLogoUp}
+              onClick={onLogoClick}
+              onTouchStart={onLogoDown}
+              onTouchEnd={onLogoUp}
+            >
+              {/* Outer oval */}
+              <Rect
+                width={coords.logo.width}
+                height={coords.logo.height}
+                cornerRadius={24}
+                stroke={logoStroke}
+                strokeWidth={coords.logo.strokeWidth}
+                fill="rgba(0,0,0,0.55)"
+                opacity={0.95}
+              />
+              {/* Inner pads */}
+              <Circle x={coords.logo.width * 0.30} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
+              <Circle x={coords.logo.width * 0.70} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
+              {/* Invisible enlarged hit area */}
+              <Rect
+                width={coords.logo.width + 6}
+                height={coords.logo.height + 6}
+                x={-3}
+                y={-3}
+                cornerRadius={24}
+                fill="transparent"
+              />
+            </Group>
 
-        {/* Button AB */}
-        <Group
-          onMouseDown={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("AB");
-          }}
-          onMouseUp={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("AB");
-          }}
-          onTouchStart={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("AB");
-          }}
-          onTouchEnd={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("AB");
-          }}
-          x={coords.buttons.AB.x}
-          y={coords.buttons.AB.y}
-        >
-          {buttonsPressed.has("AB") && (
-            <Rect
-              width={12}
-              height={12}
-              fill=""
-              stroke="red"
-              strokeWidth={1.5}
-              cornerRadius={12}
-              x={5.3}
-              y={10}
-            />
-          )}
-          <Rect width={12} height={12} x={5.4} y={10} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
+            {/* Button AB */}
+            <Group
+              onMouseDown={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("AB");
+              }}
+              onMouseUp={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("AB");
+              }}
+              onTouchStart={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("AB");
+              }}
+              onTouchEnd={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("AB");
+              }}
+              x={coords.buttons.AB.x}
+              y={coords.buttons.AB.y}
+            >
+              {buttonsPressed.has("AB") && (
+                <Rect
+                  width={12}
+                  height={12}
+                  fill=""
+                  stroke="red"
+                  strokeWidth={1.5}
+                  cornerRadius={12}
+                  x={5.3}
+                  y={10}
+                />
+              )}
+              <Rect width={12} height={12} x={5.4} y={10} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
 
-        {/* Button A */}
-        <Group
-          onMouseDown={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("A");
-          }}
-          onMouseUp={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("A");
-          }}
-          onTouchStart={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("A");
-          }}
-          onTouchEnd={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("A");
-          }}
-          x={coords.buttons.A.x}
-          y={coords.buttons.A.y}
-        >
-          {buttonsPressed.has("A") && (
-            <Rect
-              width={16}
-              height={16}
-              fill=""
-              stroke="#1B5FC5"
-              strokeWidth={1.2}
-              cornerRadius={12}
-              x={5.3}
-              y={7}
-            />
-          )}
-          <Rect width={10} height={15} x={8} y={6} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
+            {/* Button A */}
+            <Group
+              onMouseDown={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("A");
+              }}
+              onMouseUp={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("A");
+              }}
+              onTouchStart={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("A");
+              }}
+              onTouchEnd={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("A");
+              }}
+              x={coords.buttons.A.x}
+              y={coords.buttons.A.y}
+            >
+              {buttonsPressed.has("A") && (
+                <Rect
+                  width={16}
+                  height={16}
+                  fill=""
+                  stroke="#1B5FC5"
+                  strokeWidth={1.2}
+                  cornerRadius={12}
+                  x={5.3}
+                  y={7}
+                />
+              )}
+              <Rect width={10} height={15} x={8} y={6} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
 
-        {/* Button B */}
-        <Group
-          onMouseDown={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("B");
-          }}
-          onMouseUp={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("B");
-          }}
-          onTouchStart={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonDown("B");
-          }}
-          onTouchEnd={(e: any) => {
-            e.cancelBubble = true;
-            handleButtonUp("B");
-          }}
-          x={coords.buttons.B.x}
-          y={coords.buttons.B.y}
-        >
-          {buttonsPressed.has("B") && (
-            <Rect
-              width={16}
-              height={16}
-              fill=""
-              stroke="#1B5FC5"
-              strokeWidth={1.2}
-              cornerRadius={12}
-              x={1.6}
-              y={7}
-            />
-          )}
-          <Rect width={10} height={15} x={5} y={5} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
-        {/* Explosion overlay when 3.3V and any GND are shorted */}
-        {showExplosion && explosionImg && (
-          <Image
-            listening={false}
-            image={explosionImg}
-            x={coords.explosion.x}
-            y={coords.explosion.y}
-            width={coords.explosion.width}
-            height={coords.explosion.height}
-            shadowColor="#000000"
-            shadowBlur={12}
-            shadowOpacity={0.2}
-          />
-        )}
-        {/* Short-circuit notification on hover */}
-        {showShortNotification && (
-          <ShortCircuitNotification
-            show={true}
-            message="micro:bit broke because of: Output current is 330 mA, while the maximum current is 90.0 mA."
-            offsetX={50}
-            offsetY={-40}
-          />
+            {/* Button B */}
+            <Group
+              onMouseDown={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("B");
+              }}
+              onMouseUp={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("B");
+              }}
+              onTouchStart={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonDown("B");
+              }}
+              onTouchEnd={(e: any) => {
+                e.cancelBubble = true;
+                handleButtonUp("B");
+              }}
+              x={coords.buttons.B.x}
+              y={coords.buttons.B.y}
+            >
+              {buttonsPressed.has("B") && (
+                <Rect
+                  width={16}
+                  height={16}
+                  fill=""
+                  stroke="#1B5FC5"
+                  strokeWidth={1.2}
+                  cornerRadius={12}
+                  x={1.6}
+                  y={7}
+                />
+              )}
+              <Rect width={10} height={15} x={5} y={5} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
+            {/* Explosion overlay when 3.3V and any GND are shorted */}
+            {showExplosion && explosionImg && (
+              <Image
+                listening={false}
+                image={explosionImg}
+                x={coords.explosion.x}
+                y={coords.explosion.y}
+                width={coords.explosion.width}
+                height={coords.explosion.height}
+                shadowColor="#000000"
+                shadowBlur={12}
+                shadowOpacity={0.2}
+              />
+            )}
+            {/* Short-circuit notification on hover */}
+            {showShortNotification && (
+              <ShortCircuitNotification
+                show={true}
+                message="micro:bit broke because of: Output current is 330 mA, while the maximum current is 90.0 mA."
+                offsetX={50}
+                offsetY={-40}
+              />
+            )}
+          </>
         )}
       </Group>
     </BaseElement>

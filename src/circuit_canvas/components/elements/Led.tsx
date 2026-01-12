@@ -106,6 +106,7 @@ export default function Led(props: LedProps) {
   const explosionImg = useKonvaImage(
     runtime.exploded ? "assets/circuit_canvas/elements/Explosion.svg" : null
   );
+  const baseReady = Boolean(ledImage);
 
   const brightness = clamp(runtime.brightness ?? 0, 0, 1);
   const isExploded = !!runtime.exploded;
@@ -257,7 +258,7 @@ export default function Led(props: LedProps) {
           />
         )}
 
-        {glowVisible && (
+        {baseReady && glowVisible && (
           <Group listening={false}>
             <Rect
               x={pos.rect.x}
@@ -303,7 +304,7 @@ export default function Led(props: LedProps) {
           </Group>
         )}
 
-        {hotOverlayOpacity > 0 && (
+        {baseReady && hotOverlayOpacity > 0 && (
           <Rect
             x={pos.rect.x - 4}
             y={pos.rect.y - 8}
@@ -320,7 +321,7 @@ export default function Led(props: LedProps) {
           />
         )}
 
-        {isExploded && explosionImg && (
+        {baseReady && isExploded && explosionImg && (
           <Image
             image={explosionImg}
             x={5}
@@ -335,7 +336,7 @@ export default function Led(props: LedProps) {
           />
         )}
 
-        {smokeParticles.map((p) => {
+        {baseReady && smokeParticles.map((p) => {
           if (!runtime.smokeStartedAt) return null;
           const progress = smokeElapsed / p.lifetime;
           if (progress > 1) return null;
@@ -358,7 +359,7 @@ export default function Led(props: LedProps) {
           );
         })}
 
-        {isHovered && warningMessage && (
+        {baseReady && isHovered && warningMessage && (
           <ShortCircuitNotification show={true} message={warningMessage} />
         )}
       </Group>

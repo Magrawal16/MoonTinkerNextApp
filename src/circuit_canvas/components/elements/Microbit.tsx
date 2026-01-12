@@ -194,6 +194,7 @@ export default function Microbit({
 
   const showExplosion = Boolean(isShorted && isSimulationOn && explosionImg);
   const showShortNotification = Boolean(isShorted && isSimulationOn && isHovered);
+  const baseReady = Boolean(imgMicrobit);
 
   return (
     <BaseElement {...props} isSimulationOn={isSimulationOn}>
@@ -211,7 +212,7 @@ export default function Microbit({
           listening={true}
         />
         
-        {imgOffState && !isSimulationOn && (
+        {baseReady && imgOffState && !isSimulationOn && (
           <Image
             image={imgOffState}
             width={coords.usbOff.width}
@@ -225,7 +226,7 @@ export default function Microbit({
             listening={false}
           />
         )}
-        {imgOnnState && isSimulationOn && (
+        {baseReady && imgOnnState && isSimulationOn && (
           <Image
             image={imgOnnState}
             width={coords.usbOn.width}
@@ -253,21 +254,22 @@ export default function Microbit({
             listening={false}
           />
         )}
+        {baseReady && (
+          <>
+            {/* Version label */}
+            <Text
+              text="V2"
+              x={coords.versionText.x}
+              y={coords.versionText.y}
+              fontSize={coords.versionText.fontSize}
+              fill={coords.versionText.color ?? "#FFFFFF"}
+              fontStyle="bold"
+              listening={false}
+            />
 
-        {/* Version label */}
-        <Text
-          text="V2"
-          x={coords.versionText.x}
-          y={coords.versionText.y}
-          fontSize={coords.versionText.fontSize}
-          fill={coords.versionText.color ?? "#FFFFFF"}
-          fontStyle="bold"
-          listening={false}
-        />
-
-        {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
-        {leds.map((row, y) =>
-          row.map((_, x) => {
+            {/* 5x5 LED Grid (matrix is rows-first: leds[y][x]) */}
+            {leds.map((row, y) =>
+              row.map((_, x) => {
             const b = Math.max(0, Math.min(255, Number(leds[y][x] || 0)));
             const on = b > 0;
             
@@ -359,144 +361,146 @@ export default function Microbit({
                 )}
               </Group>
             );
-          })
-        )}
+              })
+            )}
 
-        {/* Touch (Logo) Sensor Overlay */}
-        <Group
-          x={coords.logo.x}
-          y={coords.logo.y}
-          listening={true}
-          onMouseEnter={onLogoEnter}
-          onMouseLeave={onLogoLeave}
-          onMouseDown={onLogoDown}
-          onMouseUp={onLogoUp}
-          onClick={onLogoClick}
-          onTouchStart={onLogoDown}
-          onTouchEnd={onLogoUp}
-        >
-          {/* Outer oval */}
-          <Rect
-            width={coords.logo.width}
-            height={coords.logo.height}
-            cornerRadius={20}
-            stroke={logoStroke}
-            strokeWidth={coords.logo.strokeWidth}
-            fill="rgba(0,0,0,0.55)"
-            opacity={10}
-          />
-          {/* Inner pads */}
-          <Circle x={coords.logo.width * 0.30} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
-          <Circle x={coords.logo.width * 0.70} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
-          {/* Invisible enlarged hit area */}
-          <Rect
-            width={coords.logo.width + 6}
-            height={coords.logo.height + 6}
-            x={-3}
-            y={-3}
-            cornerRadius={24}
-            fill="transparent"
-          />
-        </Group>
+            {/* Touch (Logo) Sensor Overlay */}
+            <Group
+              x={coords.logo.x}
+              y={coords.logo.y}
+              listening={true}
+              onMouseEnter={onLogoEnter}
+              onMouseLeave={onLogoLeave}
+              onMouseDown={onLogoDown}
+              onMouseUp={onLogoUp}
+              onClick={onLogoClick}
+              onTouchStart={onLogoDown}
+              onTouchEnd={onLogoUp}
+            >
+              {/* Outer oval */}
+              <Rect
+                width={coords.logo.width}
+                height={coords.logo.height}
+                cornerRadius={20}
+                stroke={logoStroke}
+                strokeWidth={coords.logo.strokeWidth}
+                fill="rgba(0,0,0,0.55)"
+                opacity={10}
+              />
+              {/* Inner pads */}
+              <Circle x={coords.logo.width * 0.30} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
+              <Circle x={coords.logo.width * 0.70} y={coords.logo.height / 2} radius={2.5} fill={logoStroke} />
+              {/* Invisible enlarged hit area */}
+              <Rect
+                width={coords.logo.width + 6}
+                height={coords.logo.height + 6}
+                x={-3}
+                y={-3}
+                cornerRadius={24}
+                fill="transparent"
+              />
+            </Group>
 
-        {/* Button AB */}
-        <Group
-          x={coords.buttons.AB.x}
-          y={coords.buttons.AB.y}
-          onMouseDown={() => handleButtonDown("AB")}
-          onMouseUp={() => handleButtonUp("AB")}
-          onTouchStart={() => handleButtonDown("AB")}
-          onTouchEnd={() => handleButtonUp("AB")}
-        >
-          {btnPressed === "AB" && (
-            <Rect
-              width={12}
-              height={12}
-              fill=""
-              stroke="red"
-              strokeWidth={1.5}
-              cornerRadius={12}
-              x={2.8}
-              y={0.6}
-            />
-          )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
+            {/* Button AB */}
+            <Group
+              x={coords.buttons.AB.x}
+              y={coords.buttons.AB.y}
+              onMouseDown={() => handleButtonDown("AB")}
+              onMouseUp={() => handleButtonUp("AB")}
+              onTouchStart={() => handleButtonDown("AB")}
+              onTouchEnd={() => handleButtonUp("AB")}
+            >
+              {btnPressed === "AB" && (
+                <Rect
+                  width={12}
+                  height={12}
+                  fill=""
+                  stroke="red"
+                  strokeWidth={1.5}
+                  cornerRadius={12}
+                  x={2.8}
+                  y={0.6}
+                />
+              )}
+              <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
 
-        {/* Button A */}
-        <Group
-          x={coords.buttons.A.x}
-          y={coords.buttons.A.y}
-          onMouseDown={() => handleButtonDown("A")}
-          onMouseUp={() => handleButtonUp("A")}
-          onTouchStart={() => handleButtonDown("A")}
-          onTouchEnd={() => handleButtonUp("A")}
-        >
-          {btnPressed === "A" && (
-            <Rect
-              width={16}
-              height={16}
-              fill=""
-              stroke="#1B5FC5"
-              strokeWidth={1.2}
-              cornerRadius={12}
-              x={2.8}
-              y={0.6}
-            />
-          )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
+            {/* Button A */}
+            <Group
+              x={coords.buttons.A.x}
+              y={coords.buttons.A.y}
+              onMouseDown={() => handleButtonDown("A")}
+              onMouseUp={() => handleButtonUp("A")}
+              onTouchStart={() => handleButtonDown("A")}
+              onTouchEnd={() => handleButtonUp("A")}
+            >
+              {btnPressed === "A" && (
+                <Rect
+                  width={16}
+                  height={16}
+                  fill=""
+                  stroke="#1B5FC5"
+                  strokeWidth={1.2}
+                  cornerRadius={12}
+                  x={2.8}
+                  y={0.6}
+                />
+              )}
+              <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
 
-        {/* Button B */}
-        <Group
-          x={coords.buttons.B.x}
-          y={coords.buttons.B.y}
-          onMouseDown={() => handleButtonDown("B")}
-          onMouseUp={() => handleButtonUp("B")}
-          onTouchStart={() => handleButtonDown("B")}
-          onTouchEnd={() => handleButtonUp("B")}
-        >
-          {btnPressed === "B" && (
-            <Rect
-              width={16}
-              height={16}
-              fill=""
-              stroke="#1B5FC5"
-              strokeWidth={1.2}
-              cornerRadius={12}
-              x={1.6}
-              y={0.6}
-            />
-          )}
-          <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
-          <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
-        </Group>
+            {/* Button B */}
+            <Group
+              x={coords.buttons.B.x}
+              y={coords.buttons.B.y}
+              onMouseDown={() => handleButtonDown("B")}
+              onMouseUp={() => handleButtonUp("B")}
+              onTouchStart={() => handleButtonDown("B")}
+              onTouchEnd={() => handleButtonUp("B")}
+            >
+              {btnPressed === "B" && (
+                <Rect
+                  width={16}
+                  height={16}
+                  fill=""
+                  stroke="#1B5FC5"
+                  strokeWidth={1.2}
+                  cornerRadius={12}
+                  x={1.6}
+                  y={0.6}
+                />
+              )}
+              <Rect width={20} height={20} fill="" cornerRadius={10} shadowBlur={3} />
+              <Text text="" fill="white" x={6} y={3} fontSize={12} fontStyle="bold" />
+            </Group>
 
-        {/* Explosion overlay when 3.3V and GND are shorted */}
-        {showExplosion && explosionImg && (
-          <Image
-            listening={false}
-            image={explosionImg}
-            x={coords.explosion.x}
-            y={coords.explosion.y}
-            width={coords.explosion.width}
-            height={coords.explosion.height}
-            shadowColor="#000000"
-            shadowBlur={12}
-            shadowOpacity={0.2}
-          />
-        )}
+            {/* Explosion overlay when 3.3V and GND are shorted */}
+            {showExplosion && explosionImg && (
+              <Image
+                listening={false}
+                image={explosionImg}
+                x={coords.explosion.x}
+                y={coords.explosion.y}
+                width={coords.explosion.width}
+                height={coords.explosion.height}
+                shadowColor="#000000"
+                shadowBlur={12}
+                shadowOpacity={0.2}
+              />
+            )}
 
-        {/* Short-circuit notification on hover */}
-        {showShortNotification && (
-          <ShortCircuitNotification
-            show={true}
-            message="micro:bit broke because of: Output current is 330 mA, while the maximum current is 90.0 mA."
-            offsetX={50}
-            offsetY={30}
-          />
+            {/* Short-circuit notification on hover */}
+            {showShortNotification && (
+              <ShortCircuitNotification
+                show={true}
+                message="micro:bit broke because of: Output current is 330 mA, while the maximum current is 90.0 mA."
+                offsetX={50}
+                offsetY={30}
+              />
+            )}
+          </>
         )}
       </Group>
     </BaseElement>

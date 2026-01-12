@@ -100,36 +100,33 @@ export default function PushButton({
         )}
 
         {/* Interactive button area with blue ring overlay when pressed */}
-        <Group
-          x={28} 
-          y={38} 
-          onMouseDown={handleButtonDown}
-          onMouseUp={handleButtonUp}
-          onTouchStart={handleButtonDown}
-          onTouchEnd={handleButtonUp}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* Blue ring overlay when button is pressed */}
-          {isPressed && isSimulationOn && (
-            <Circle
-              radius={15.5}
-              fill=""
-              stroke="#1B5FC5"
-              strokeWidth={2.5}
-              x={0}
-              y={0}
-            />
-          )}
-          
-          {/* Invisible enlarged hit area for easier clicking */}
-          <Circle
-            radius={18}
-            fill="transparent"
-            x={0}
-            y={0}
-          />
-        </Group>
+        {buttonImg && (
+          <Group
+            x={28}
+            y={38}
+            onMouseDown={handleButtonDown}
+            onMouseUp={handleButtonUp}
+            onTouchStart={handleButtonDown}
+            onTouchEnd={handleButtonUp}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* Blue ring overlay when button is pressed */}
+            {isPressed && isSimulationOn && (
+              <Circle
+                radius={15.5}
+                fill=""
+                stroke="#1B5FC5"
+                strokeWidth={2.5}
+                x={0}
+                y={0}
+              />
+            )}
+
+            {/* Invisible enlarged hit area for easier clicking */}
+            <Circle radius={18} fill="transparent" x={0} y={0} />
+          </Group>
+        )}
       </Group>
     </BaseElement>
   );

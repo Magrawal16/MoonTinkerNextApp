@@ -143,16 +143,16 @@ export default function PowerSupply(props: PowerSupplyProps) {
     <BaseElement {...props}>
       <Group draggable={false} name="powerSupplyContent">
         {img && (
-          <Image
-            image={img}
-            width={W}
-            height={H}
-            shadowColor={props.selected ? "#000000" : undefined}
-            shadowBlur={props.selected ? 10 : 0}
-            shadowOffset={{ x: 15, y: -15 }}
-            shadowOpacity={0}
-          />
-        )}
+          <>
+            <Image
+              image={img}
+              width={W}
+              height={H}
+              shadowColor={props.selected ? "#000000" : undefined}
+              shadowBlur={props.selected ? 10 : 0}
+              shadowOffset={{ x: 15, y: -15 }}
+              shadowOpacity={0}
+            />
 
         {/* ======= VOLTAGE (left bar) ======= */}
         <Group>
@@ -389,6 +389,8 @@ export default function PowerSupply(props: PowerSupplyProps) {
             strokeWidth={0.5}
           />
         </Group>
+          </>
+        )}
       </Group>
     </BaseElement>
   );

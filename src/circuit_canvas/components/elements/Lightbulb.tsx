@@ -95,66 +95,64 @@ export default function Lightbulb(props: LightbulbProps) {
   return (
     <BaseElement {...props}>
       <Group>
-        {/* Overloaded state */}
-        {isOverloaded ? (
-          <>
-            {/* Explosion effect */}
-            {explosion && (
-              <Image
-                image={explosion}
-                x={37.5}
-                y={30}
-                width={75}
-                height={75}
-                shadowColor="#000000"
-                shadowBlur={12}
-                shadowOffset={{ x: 1, y: -1 }}
-                shadowOpacity={0}
-                zIndex={1000}
-              />
-            )}
-            {/* Notification only on hover */}
-            {isHovered && (
-              <ShortCircuitNotification
-                show={true}
-                message={`Power ${rawPowerW.toFixed(
-                  2
-                )} W exceeds rated ${RATED_POWER_W.toFixed(2)} W`}
-              />
-            )}
-          </>
-        ) : (
-          // Normal glow
-          showGlow && (
-            <Group listening={false}>
-              {/* Core glow (helps visibility at low power) */}
-              <Circle
-                x={75}
-                y={60}
-                radius={innerRadius}
-                fill={tint}
-                opacity={innerOpacity}
-                shadowColor={tint}
-                shadowBlur={24 + 56 * displayBrightness}
-                shadowOpacity={shadowOpacity}
-              />
-              <Circle
-                x={75}
-                y={60}
-                radius={outerRadius}
-                fill={tint}
-                opacity={outerOpacity}
-                shadowColor={tint}
-                shadowBlur={38 + 96 * displayBrightness}
-                shadowOpacity={shadowOpacity}
-              />
-            </Group>
-          )
-        )}
-
-        {/* Bulb image */}
         {img && (
           <>
+            {/* Overloaded state */}
+            {isOverloaded ? (
+              <>
+                {/* Explosion effect */}
+                {explosion && (
+                  <Image
+                    image={explosion}
+                    x={37.5}
+                    y={30}
+                    width={75}
+                    height={75}
+                    shadowColor="#000000"
+                    shadowBlur={12}
+                    shadowOffset={{ x: 1, y: -1 }}
+                    shadowOpacity={0}
+                    zIndex={1000}
+                  />
+                )}
+                {/* Notification only on hover */}
+                {isHovered && (
+                  <ShortCircuitNotification
+                    show={true}
+                    message={`Power ${rawPowerW.toFixed(2)} W exceeds rated ${RATED_POWER_W.toFixed(2)} W`}
+                  />
+                )}
+              </>
+            ) : (
+              // Normal glow
+              showGlow && (
+                <Group listening={false}>
+                  {/* Core glow (helps visibility at low power) */}
+                  <Circle
+                    x={75}
+                    y={60}
+                    radius={innerRadius}
+                    fill={tint}
+                    opacity={innerOpacity}
+                    shadowColor={tint}
+                    shadowBlur={24 + 56 * displayBrightness}
+                    shadowOpacity={shadowOpacity}
+                  />
+                  <Circle
+                    x={75}
+                    y={60}
+                    radius={outerRadius}
+                    fill={tint}
+                    opacity={outerOpacity}
+                    shadowColor={tint}
+                    shadowBlur={38 + 96 * displayBrightness}
+                    shadowOpacity={shadowOpacity}
+                  />
+                </Group>
+              )
+            )}
+
+            {/* Bulb image */}
             <Image
               image={img}
               width={150}
@@ -169,14 +167,9 @@ export default function Lightbulb(props: LightbulbProps) {
               onMouseLeave={() => setIsHovered(false)}
             />
 
-            {/*
-              Glass fill tint: makes the whole bulb dome look illuminated.
-              Drawn after the image with source-atop so it only appears where the bulb pixels exist.
-              Visual-only; does not change electrical logic.
-            */}
+            {/* Glass fill tints */}
             {!isOverloaded && showGlassFill && glassFillOpacity > 0 && (
               <>
-                {/* Main dome fill */}
                 <Circle
                   listening={false}
                   x={75}
@@ -186,7 +179,6 @@ export default function Lightbulb(props: LightbulbProps) {
                   opacity={glassFillOpacity}
                   globalCompositeOperation="source-atop"
                 />
-                {/* Softer halo fill to even out the glass */}
                 <Circle
                   listening={false}
                   x={75}

@@ -435,7 +435,7 @@ export default function Microbit({
               onTouchStart={() => handleButtonDown("A")}
               onTouchEnd={() => handleButtonUp("A")}
             >
-              {btnPressed === "A" && (
+              {(btnPressed === "A" || btnPressed === "AB") && (
                 <Rect
                   width={16}
                   height={16}
@@ -460,7 +460,7 @@ export default function Microbit({
               onTouchStart={() => handleButtonDown("B")}
               onTouchEnd={() => handleButtonUp("B")}
             >
-              {btnPressed === "B" && (
+              {(btnPressed === "B" || btnPressed === "AB") && (
                 <Rect
                   width={16}
                   height={16}

@@ -450,7 +450,7 @@ export default function Microbit({
               x={coords.buttons.A.x}
               y={coords.buttons.A.y}
             >
-              {buttonsPressed.has("A") && (
+              {(buttonsPressed.has("A") || buttonsPressed.has("AB")) && (
                 <Rect
                   width={16}
                   height={16}
@@ -487,7 +487,7 @@ export default function Microbit({
               x={coords.buttons.B.x}
               y={coords.buttons.B.y}
             >
-              {buttonsPressed.has("B") && (
+              {(buttonsPressed.has("B") || buttonsPressed.has("AB")) && (
                 <Rect
                   width={16}
                   height={16}

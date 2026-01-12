@@ -948,62 +948,8 @@ function buildMNAMatrices(
         G[bi2][wi] -= gb;
         G[wi][bi2] -= gb;
       }
-    } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
-      // find pos/neg mapped nodes
-      const pos =
-        el.nodes.find((n) => n.polarity === "positive")?.id ?? el.nodes[1]?.id;
-      const neg =
-        el.nodes.find((n) => n.polarity === "negative")?.id ?? el.nodes[0]?.id;
-      const pIdx = safeNodeIndex(pos);
-      const nIdx = safeNodeIndex(neg);
-      const idx = safeCurrentIndex(el.id);
-      if (idx === undefined) continue; // don't stamp if no mapping for source
-
-      // Treat an explicitly switched-off power supply as inactive (no source stamped)
-      const psIsOn = (el.properties as any)?.isOn;
-      if (el.type === "powersupply" && psIsOn === false) {
-        continue;
-      }
-
-      if (pIdx !== undefined) B[pIdx][idx] -= 1;
-      if (nIdx !== undefined) B[nIdx][idx] += 1;
-      if (pIdx !== undefined) C[idx][pIdx] += 1;
-      if (nIdx !== undefined) C[idx][nIdx] -= 1;
-      // Battery has fixed params; powersupply is configurable
-      // If this supply is current limited (CC mode), model as current source instead of voltage source.
-      if (el.type === "powersupply" && currentLimitedIds?.has(el.id)) {
-        // Undo voltage source stamping we just made (remove B/C contributions and D/E entry) then inject current.
-        if (pIdx !== undefined) B[pIdx][idx] += 1; // reverse earlier subtraction
-        if (nIdx !== undefined) B[nIdx][idx] -= 1;
-        if (pIdx !== undefined) C[idx][pIdx] -= 1;
-        if (nIdx !== undefined) C[idx][nIdx] += 1;
-        // zero row/col for this source index so it becomes inert
-        for (let k = 0; k < D.length; k++) {
-          D[k][idx] = 0;
-          D[idx][k] = 0;
-        }
-        D[idx][idx] = 0;
-        E[idx] = 0;
-        // Inject current source: +I at positive node, -I at negative node.
-        const iLimit = (el.properties as any)?.iLimit ?? 1;
-        if (pIdx !== undefined) I[pIdx] += iLimit;
-        if (nIdx !== undefined) I[nIdx] -= iLimit;
-      } else {
-        // Normal voltage source stamping
-        if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery") {
-          const defaultV = el.type === "battery" ? 9 : (el.type === "cell3v" ? 3 : (el.type === "AA_battery" ? 1.5 : 1.5));
-          const defaultR = el.type === "battery" ? 1.45 : (el.type === "cell3v" ? 0.8 : (el.type === "AA_battery" ? 0.3 : 0.4));
-          D[idx][idx] += el.properties?.resistance ?? defaultR; // internal resistance
-          E[idx] = el.properties?.voltage ?? defaultV; // source voltage
-        } else {
-          D[idx][idx] += el.properties?.resistance ?? 0.2;
-          // Use setpoint if present for bench supply
-          const vSet = (el.properties as any)?.vSet;
-          E[idx] = vSet !== undefined ? vSet : el.properties?.voltage ?? 5;
-        }
-      }
-    } else if (el.type === "microbit" || el.type === "microbitWithBreakout") {
-      // Skip microbit stamping in the main elements loop
+    } else if (el.type === "microbit" || el.type === "microbitWithBreakout" || el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
+      // Skip battery/supply/microbit stamping in the main elements loop
       // They will be stamped in the elementsWithCurrent loop below
       continue;
     } else if (el.type === "multimeter") {

@@ -159,7 +159,7 @@ function solveSingleSubcircuitAfterMerge(
     for (const el of elements) {
       if (el.type !== "rgbled") continue;
       const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
-      const runtime = (el.runtime as any)?.rgbled;
+      const runtime = el.runtime as any;
       
       // RGB LED nodes: [red, common, green, blue]
       const redNodeId = el.nodes?.[0]?.id;
@@ -859,7 +859,7 @@ function buildMNAMatrices(
       // For common-cathode: common is cathode (negative), colors are anodes (positive)
       // For common-anode: common is anode (positive), colors are cathodes (negative)
       const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
-      const runtime = (el.runtime as any)?.rgbled;
+      const runtime = el.runtime as any;
       
       const redNodeId = el.nodes?.[0]?.id;
       const commonNodeId = el.nodes?.[1]?.id;
@@ -1178,6 +1178,8 @@ function computeElementResults(
       power = 0,
       measurement = 0;
     let forwardVoltage: number | undefined;
+    // RGB LED channel results
+    let rgbLedChannels: { red: any; green: any; blue: any } | undefined;
     let reverseVoltage: number | undefined;
 
     if (["resistor", "lightbulb", "pushbutton"].includes(el.type)) {
@@ -1215,7 +1217,7 @@ function computeElementResults(
       // RGB LED has 3 channels, compute results for each channel
       // Nodes: [red, common, green, blue]
       const rgbLedType = (el.properties as any)?.rgbLedType ?? "common-cathode";
-      const runtime = (el.runtime as any)?.rgbled;
+      const runtime = el.runtime as any;
       
       const redNodeId = nodeMap.get(el.nodes?.[0]?.id ?? "");
       const commonNodeId = nodeMap.get(el.nodes?.[1]?.id ?? "");
@@ -1262,11 +1264,8 @@ function computeElementResults(
       const greenResult = computeChannel("green", Vgreen);
       const blueResult = computeChannel("blue", Vblue);
       
-      // Store computed values for each channel
-      (el as any).computed = {
-        voltage: 0,
-        current: 0,
-        power: 0,
+      // Store RGB LED channel results for inclusion in final computed result
+      rgbLedChannels = {
         red: redResult,
         green: greenResult,
         blue: blueResult,
@@ -1357,6 +1356,8 @@ function computeElementResults(
       ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
         ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }
         : {}),
+      // Include RGB LED channel data if present
+      ...(rgbLedChannels ? rgbLedChannels : {}),
     };
 
     if (isMicrobit) {

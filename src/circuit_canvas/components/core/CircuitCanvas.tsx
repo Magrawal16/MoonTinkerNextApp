@@ -10,6 +10,7 @@ import { DebugBox } from "@/common/components/debugger/DebugBox";
 import createElement, { updateMicrobitNodes } from "@/circuit_canvas/utils/createElement";
 import solveCircuit from "@/circuit_canvas/utils/kirchhoffSolver";
 import { updateLedRuntime, createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
+import { updateRgbLedRuntime } from "@/circuit_canvas/utils/rgbLedBehavior";
 import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
 import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
 import Konva from "konva";
@@ -1338,6 +1339,37 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
           };
         }
 
+         if (updated.type === "rgbled") {
+          const computedData = updated.computed as any;
+          const runtime = updateRgbLedRuntime({
+            prev: (oldEl.runtime as any),
+            electrical: {
+              red: {
+                forwardVoltage: computedData?.red?.forwardVoltage ?? 0,
+                current: computedData?.red?.current ?? 0,
+                power: computedData?.red?.power ?? 0,
+              },
+              green: {
+                forwardVoltage: computedData?.green?.forwardVoltage ?? 0,
+                current: computedData?.green?.current ?? 0,
+                power: computedData?.green?.power ?? 0,
+              },
+              blue: {
+                forwardVoltage: computedData?.blue?.forwardVoltage ?? 0,
+                current: computedData?.blue?.current ?? 0,
+                power: computedData?.blue?.power ?? 0,
+              },
+            },
+            dt: dtSeconds,
+            nowMs,
+          });
+
+          next = {
+            ...next,
+            runtime: runtime as any,
+          };
+        }
+
         return next;
       });
     },
@@ -2283,8 +2315,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
 
             <CircuitStorage
-              onCircuitSelect={(circuitId) => {
-                const data = getCircuitById(circuitId);
+              onCircuitSelect={async (circuitId) => {
+                const data = await getCircuitById(circuitId);
                 if (!data) return;
                 pushToHistory(elements, wires);
                 resetState();

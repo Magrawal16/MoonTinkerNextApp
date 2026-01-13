@@ -30,6 +30,7 @@ type ToastMessage = {
 export default function CircuitStorage(props: CircuitManagerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCircuitID, setSelectedCircuitID] = useState<string | null>(null);
+  const [selectedCircuitData, setSelectedCircuitData] = useState<any>(null);
   const [circuitName, setCircuitName] = useState("");
   const [selectedCircuitName, setSelectedCircuitName] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -53,11 +54,11 @@ export default function CircuitStorage(props: CircuitManagerProps) {
     }
   };
 
-  const [savedCircuits, setSavedCircuits] = useState(getSavedCircuitsList());
+  const [savedCircuits, setSavedCircuits] = useState<{ id: string; name: string; createdAt?: string; updatedAt?: string }[]>([]);
 
   useEffect(() => {
     if (isOpen) {
-      setSavedCircuits(getSavedCircuitsList());
+      getSavedCircuitsList().then(setSavedCircuits);
       document.addEventListener("mousedown", handleClickOutside);
       // Focus save input when modal opens
       setTimeout(() => saveInputRef.current?.focus(), 100);
@@ -72,78 +73,84 @@ export default function CircuitStorage(props: CircuitManagerProps) {
     };
   }, [isOpen]);
 
-  const handleCircuitSelect = (circuitId: string) => {
+  const handleCircuitSelect = async (circuitId: string) => {
     props.onCircuitSelect(circuitId);
-    const selected = getCircuitById(circuitId);
+    const selected = await getCircuitById(circuitId);
     setSelectedCircuitName(selected?.name ?? "");
     showToast(`Circuit "${selected?.name}" loaded successfully!`, 'success');
     setIsOpen(false);
   };
 
-  const handleSaveCircuit = () => {
+  const handleSaveCircuit = async () => {
     if (!circuitName.trim()) {
       showToast('Please enter a circuit name', 'error');
       return;
     }
     setIsSaving(true);
-    setTimeout(() => {
-      try {
-        SaveCircuit(
-          circuitName.trim(),
-          props.currentElements ?? [],
-          props.currentWires ?? [],
-          props.getSnapshot?.() ?? ""
-        );
-        setSavedCircuits(getSavedCircuitsList());
-        showToast(`Circuit "${circuitName}" saved successfully!`, 'success');
-        setCircuitName("");
-      } catch (error) {
-        showToast('Failed to save circuit', 'error');
-      } finally {
-        setIsSaving(false);
-      }
-    }, 100);
+    try {
+      await SaveCircuit(
+        circuitName.trim(),
+        props.currentElements ?? [],
+        props.currentWires ?? [],
+        props.getSnapshot?.() ?? ""
+      );
+      const updatedList = await getSavedCircuitsList();
+      setSavedCircuits(updatedList);
+      showToast(`Circuit "${circuitName}" saved successfully!`, 'success');
+      setCircuitName("");
+    } catch (error) {
+      showToast('Failed to save circuit', 'error');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleDeleteCircuit = (id: string) => {
-    const circuit = getCircuitById(id);
-    if (deleteCircuitById(id)) {
-      setSavedCircuits(getSavedCircuitsList());
+  const handleDeleteCircuit = async (id: string) => {
+    const circuit = await getCircuitById(id);
+    const deleted = await deleteCircuitById(id);
+    if (deleted) {
+      const updatedList = await getSavedCircuitsList();
+      setSavedCircuits(updatedList);
       setSelectedCircuitID(null);
       showToast(`Circuit "${circuit?.name}" deleted`, 'info');
       setDeleteConfirmId(null);
     }
   };
 
-  const handleDuplicateCircuit = (id: string) => {
-    const newId = duplicateCircuit(id);
+  const handleDuplicateCircuit = async (id: string) => {
+    const newId = await duplicateCircuit(id);
     if (newId) {
-      setSavedCircuits(getSavedCircuitsList());
+      const updatedList = await getSavedCircuitsList();
+      setSavedCircuits(updatedList);
       setSelectedCircuitID(newId);
-      const circuit = getCircuitById(newId);
+      const circuit = await getCircuitById(newId);
       setSelectedCircuitName(circuit?.name ?? "");
       showToast('Circuit duplicated successfully!', 'success');
     }
   };
 
-  const handleRename = () => {
+  const handleRename = async () => {
     if (!selectedCircuitID || !selectedCircuitName.trim()) return;
-    if (editCircuitName(selectedCircuitID, selectedCircuitName.trim())) {
-      setSavedCircuits(getSavedCircuitsList());
+    const renamed = await editCircuitName(selectedCircuitID, selectedCircuitName.trim());
+    if (renamed) {
+      const updatedList = await getSavedCircuitsList();
+      setSavedCircuits(updatedList);
       showToast('Circuit renamed successfully!', 'success');
     }
   };
 
-  const handleOverride = () => {
+  const handleOverride = async () => {
     if (!selectedCircuitID) return;
-    const circuit = getCircuitById(selectedCircuitID);
-    if (overrideCircuit(
+    const circuit = await getCircuitById(selectedCircuitID);
+    const overridden = await overrideCircuit(
       selectedCircuitID,
       props.currentElements ?? [],
       props.currentWires ?? [],
       props.getSnapshot?.() ?? ""
-    )) {
-      setSavedCircuits(getSavedCircuitsList());
+    );
+    if (overridden) {
+      const updatedList = await getSavedCircuitsList();
+      setSavedCircuits(updatedList);
       showToast(`Circuit "${circuit?.name}" updated successfully!`, 'success');
     }
   };
@@ -267,10 +274,12 @@ export default function CircuitStorage(props: CircuitManagerProps) {
                               ? 'bg-blue-50 border-blue-400 shadow-md'
                               : 'bg-gray-50 border-transparent hover:bg-gray-100 hover:border-gray-300'
                           }`}
-                          onClick={() => {
+                          onClick={async () => {
                             setSelectedCircuitID(circuit.id);
                             setSelectedCircuitName(circuit.name);
                             setDeleteConfirmId(null);
+                            const data = await getCircuitById(circuit.id);
+                            setSelectedCircuitData(data);
                           }}
                         >
                           <div className="font-semibold text-gray-800 truncate">{circuit.name}</div>
@@ -293,9 +302,9 @@ export default function CircuitStorage(props: CircuitManagerProps) {
                       {/* Preview */}
                       <div>
                         <h3 className="font-semibold text-gray-700 mb-2">Preview</h3>
-                        {getCircuitById(selectedCircuitID)?.snapshot ? (
+                        {selectedCircuitData?.snapshot ? (
                           <img
-                            src={getCircuitById(selectedCircuitID)!.snapshot}
+                            src={selectedCircuitData.snapshot}
                             className="w-full aspect-video object-contain rounded-lg border border-gray-200 bg-gray-50"
                             alt="Circuit Snapshot"
                           />
@@ -372,8 +381,8 @@ export default function CircuitStorage(props: CircuitManagerProps) {
 
                       {/* Info */}
                       <div className="text-xs text-gray-500 mt-2 space-y-1">
-                        <div>Created: {formatDate(getCircuitById(selectedCircuitID)?.createdAt)}</div>
-                        <div>Last updated: {formatDate(getCircuitById(selectedCircuitID)?.updatedAt)}</div>
+                        <div>Created: {formatDate(selectedCircuitData?.createdAt)}</div>
+                        <div>Last updated: {formatDate(selectedCircuitData?.updatedAt)}</div>
                       </div>
                     </>
                   ) : (

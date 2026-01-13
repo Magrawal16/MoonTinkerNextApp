@@ -14,7 +14,7 @@ const SavedCircuitsPage = () => {
 
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
-      setSavedCircuits(getSavedCircuitsList());
+      getSavedCircuitsList().then(setSavedCircuits);
     }
   }, []);
 
@@ -23,12 +23,13 @@ const SavedCircuitsPage = () => {
     if (deleteConfirmId) setShowDeleteDialog(true);
     else setShowDeleteDialog(false);
   }, [deleteConfirmId]);
-  const handleDeleteCircuit = (id: string) => {
+  const handleDeleteCircuit = async (id: string) => {
     if (typeof window !== 'undefined') {
-      // Import here to avoid SSR issues
       const { deleteCircuitById, getSavedCircuitsList } = require("@/circuit_canvas/utils/circuitStorage");
-      if (deleteCircuitById(id)) {
-        setSavedCircuits(getSavedCircuitsList());
+      const deleted = await deleteCircuitById(id);
+      if (deleted) {
+        const updatedList = await getSavedCircuitsList();
+        setSavedCircuits(updatedList);
       }
     }
     setDeleteConfirmId(null);
@@ -42,9 +43,9 @@ const SavedCircuitsPage = () => {
     setShowDeleteDialog(false);
   };
 
-  const handleLoad = (id: string) => {
+  const handleLoad = async (id: string) => {
     if (typeof window !== 'undefined') {
-      const circuit = getCircuitById(id);
+      const circuit = await getCircuitById(id);
       if (circuit) {
         localStorage.setItem('mt_circuit_elements', JSON.stringify(circuit.elements));
         localStorage.setItem('mt_circuit_wires', JSON.stringify(circuit.wires));

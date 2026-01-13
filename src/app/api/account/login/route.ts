@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
+import { EXTERNAL_API_BASE } from "@/common/config/api";
 
 // Proxy route: forward client POSTs to the external API and inject server-side key
 // Use environment variables when available so UAT/Prod can be configured without code changes.
-const EXTERNAL_API_BASE = process.env.API_BASE || "https://dev.moonr.com/MoonTinkerService/api";
 const API_SECURITY_KEY = process.env.API_SECURITY_KEY || "X2DPR-RO1WTR-98007-PRS70-VEQ12Y";
 const DEFAULT_ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || "http://localhost:3000";
 
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
       "security-key": API_SECURITY_KEY,
     };
 
-    const upstreamUrl = `${EXTERNAL_API_BASE.replace(/\/+$/,'')}/account/login`;
+    const upstreamUrl = `${EXTERNAL_API_BASE}/account/login`;
     console.log('[proxy] forwarding to upstream:', upstreamUrl);
     const upstreamRes = await fetch(upstreamUrl, {
       method: "POST",

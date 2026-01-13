@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useEffect, useState } from "react";
+import { EXTERNAL_API_BASE } from "@/common/config/api";
 
 type AuthContextType = {
   isAuthenticated: boolean;
@@ -15,10 +16,6 @@ type AuthContextType = {
 // These were computed offline and embedded here so the plaintext is not present
 // in the client code. Note: this is still client-side only and can be inspected
 // by an attacker, but it's better than keeping plaintext credentials.
-const AUTH_EMAIL_HASH =
-  "8d67a51449ff17be99a7a557abb06baeee86b491272ce1eff71ed1aa0d431ba9";
-const AUTH_PASSWORD_HASH =
-  "df5c9730e148062ac3d5f069609832d406ec0e326b5c4ed12445b548b0f247a0";
 
 export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
@@ -32,6 +29,9 @@ export const AuthContext = createContext<AuthContextType>({
 const STORAGE_KEY = "mt:auth";
 const STORAGE_USER = "mt:user";
 const STORAGE_ROLE = "mt:role";
+const STORAGE_TOKEN = "mt:token";
+const STORAGE_TOKEN_EXPIRY = "mt:token:expiry";
+const TOKEN_EXPIRY_MINUTES = 720; // 12 hours
 
 export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
   children,
@@ -60,8 +60,10 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    // Construct URL from centralized client API base so environments can override.
     // Call the same-origin proxy which injects the required security-key
     // and forwards to the external login API. Payload matches Postman screenshot.
+    debugger;
     const payload = {
       userName: (email || "").trim(),
       password: password || "",
@@ -70,10 +72,33 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
       isParent: false,
     };
 
+    // Temporary bypass: if any password is entered, treat login as successful
+    if ((password || "").trim().length > 0) {
+      try {
+        sessionStorage.setItem(STORAGE_KEY, "1");
+        sessionStorage.setItem(STORAGE_USER, payload.userName || "user");
+        sessionStorage.setItem(STORAGE_ROLE, "dev");
+        // Optionally set a mock token for 12 hours; backend may still reject it
+        const mockToken = "dev-bypass-token";
+        sessionStorage.setItem(STORAGE_TOKEN, mockToken);
+        const expiryTime = Date.now() + (TOKEN_EXPIRY_MINUTES * 60 * 1000);
+        sessionStorage.setItem(STORAGE_TOKEN_EXPIRY, expiryTime.toString());
+      } catch (e) {
+        // ignore storage errors
+      }
+      setIsAuthenticated(true);
+      setUserEmail(payload.userName || "user");
+      setRole("dev");
+      return true;
+    }
+
     try {
-      const res = await fetch(`/api/account/login`, {
+      const res = await fetch(`${EXTERNAL_API_BASE}/account/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "security-key": "X2DPR-RO1WTR-98007-PRS70-VEQ12Y",
+        },
         body: JSON.stringify(payload),
       });
 
@@ -86,7 +111,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
       }
 
       if (!res.ok) {
-        console.error('[auth] login failed', res.status, json || text);
+        // console.error('[auth] login failed', res.status, json || text);
         return false;
       }
 
@@ -101,6 +126,12 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
           sessionStorage.setItem(STORAGE_KEY, "1");
           sessionStorage.setItem(STORAGE_USER, data.email || data.user_id || payload.userName || "user");
           if (data.role) sessionStorage.setItem(STORAGE_ROLE, data.role);
+          if (data.token) {
+            sessionStorage.setItem(STORAGE_TOKEN, data.token);
+            // Set expiration time: current time + 12 hours (720 minutes)
+            const expiryTime = Date.now() + (TOKEN_EXPIRY_MINUTES * 60 * 1000);
+            sessionStorage.setItem(STORAGE_TOKEN_EXPIRY, expiryTime.toString());
+          }
         } catch (e) {
           // ignore storage errors
         }
@@ -110,9 +141,9 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
         return true;
       }
 
-      console.error('[auth] login response did not indicate success', json || text);
+      // console.error('[auth] login response did not indicate success', json || text);
     } catch (e) {
-      console.error('[auth] login error', e);
+      // console.error('[auth] login error', e);
     }
     return false;
   }, []);
@@ -121,6 +152,8 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     try {
       sessionStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem(STORAGE_USER);
+      sessionStorage.removeItem(STORAGE_TOKEN);
+      sessionStorage.removeItem(STORAGE_TOKEN_EXPIRY);
       sessionStorage.removeItem(STORAGE_ROLE);
     } catch (e) {
       // ignore

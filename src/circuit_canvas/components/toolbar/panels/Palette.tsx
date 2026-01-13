@@ -42,31 +42,37 @@ export default function CircuitSelector() {
               e.dataTransfer.setData("application/element-type", JSON.stringify(el));
               
               // Create a custom drag image showing only the element icon
-              const img = document.createElement('img');
-              img.src = el.iconPath;
-              img.style.position = 'absolute';
-              img.style.top = '-1000px';
-              img.style.left = '-1000px';
-              img.style.width = '60px';
-              img.style.height = '60px';
-              img.style.objectFit = 'contain';
-              
-              document.body.appendChild(img);
-              
-              // Set the custom drag image centered on cursor
-              e.dataTransfer.setDragImage(img, 30, 30);
-              
-              // Clean up the temporary element after drag starts
-              setTimeout(() => {
-                document.body.removeChild(img);
-              }, 0);
+              if (el.iconPath) {
+                const img = document.createElement('img');
+                img.src = el.iconPath;
+                img.style.position = 'absolute';
+                img.style.top = '-1000px';
+                img.style.left = '-1000px';
+                img.style.width = '60px';
+                img.style.height = '60px';
+                img.style.objectFit = 'contain';
+                
+                document.body.appendChild(img);
+                
+                // Set the custom drag image centered on cursor
+                e.dataTransfer.setDragImage(img, 30, 30);
+                
+                // Clean up the temporary element after drag starts
+                setTimeout(() => {
+                  document.body.removeChild(img);
+                }, 0);
+              }
             }}
           >
-            <img
-              src={el.iconPath}
-              alt={el.label}
-              className="w-14 h-13 object-contain filter drop-shadow-md"
-            />
+            {el.customIcon ? (
+              el.customIcon()
+            ) : (
+              <img
+                src={el.iconPath}
+                alt={el.label}
+                className="w-14 h-13 object-contain filter drop-shadow-md"
+              />
+            )}
             <span className="text-xs text-center truncate max-w-[100%] text-black">
               {el.label}
             </span>

@@ -154,7 +154,7 @@ export default function RenderElement(props: RenderElementProps) {
               power: (element.computed as any)?.blue?.power,
             },
           }}
-          runtime={element.runtime as any}
+          runtime={(element.runtime as any)?.rgbled}
           selected={props.selectedElementId === element.id}
           rgbLedType={(element.properties as any)?.rgbLedType}
           draggable={false}

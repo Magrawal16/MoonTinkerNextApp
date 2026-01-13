@@ -10,7 +10,7 @@ import { DebugBox } from "@/common/components/debugger/DebugBox";
 import createElement, { updateMicrobitNodes } from "@/circuit_canvas/utils/createElement";
 import solveCircuit from "@/circuit_canvas/utils/kirchhoffSolver";
 import { updateLedRuntime, createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
-import { updateRgbLedRuntime } from "@/circuit_canvas/utils/rgbLedBehavior";
+import { updateRgbLedRuntime, createInitialRgbLedRuntime } from "@/circuit_canvas/utils/rgbLedBehavior";
 import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
 import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
 import Konva from "konva";
@@ -762,28 +762,34 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     React.startTransition(() => {
       setSimulationRunning(false);
       setElements((prev) =>
-        prev.map((el) => ({
-          ...el,
-          // set computed values to undefined when simulation stops
-          computed: {
-            current: undefined,
-            voltage: undefined,
-            power: undefined,
-            measurement: el.computed?.measurement ?? undefined,
-          },
-          // Reset LED runtime to initial state (no explosion, no thermal energy)
-          runtime: el.type === "led"
-            ? { led: createInitialLedRuntime() }
-            : el.runtime,
-          // Immediately clear controller visuals (LEDs off, pins cleared)
-          controller: el.controller
-            ? {
-                leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
-                pins: {},
-                logoTouched: false,
-              }
-            : el.controller,
-        }))
+        prev.map((el) => {
+          const resetRuntime =
+            el.type === "led"
+              ? { led: createInitialLedRuntime() }
+              : el.type === "rgbled"
+              ? { rgbled: createInitialRgbLedRuntime() }
+              : el.runtime;
+          return {
+            ...el,
+            // set computed values to undefined when simulation stops
+            computed: {
+              current: undefined,
+              voltage: undefined,
+              power: undefined,
+              measurement: el.computed?.measurement ?? undefined,
+            },
+            // Reset runtime for elements that have per-tick state
+            runtime: resetRuntime,
+            // Immediately clear controller visuals (LEDs off, pins cleared)
+            controller: el.controller
+              ? {
+                  leds: Array.from({ length: 5 }, () => Array(5).fill(0)),
+                  pins: {},
+                  logoTouched: false,
+                }
+              : el.controller,
+          };
+        })
       );
     });
 
@@ -1342,7 +1348,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
          if (updated.type === "rgbled") {
           const computedData = updated.computed as any;
           const runtime = updateRgbLedRuntime({
-            prev: (oldEl.runtime as any),
+            prev: (oldEl.runtime as any)?.rgbled,
             electrical: {
               red: {
                 forwardVoltage: computedData?.red?.forwardVoltage ?? 0,
@@ -1366,7 +1372,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
           next = {
             ...next,
-            runtime: runtime as any,
+            runtime: { ...(oldEl.runtime || {}), rgbled: runtime } as any,
           };
         }
 

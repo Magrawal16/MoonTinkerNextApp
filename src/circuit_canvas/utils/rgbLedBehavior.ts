@@ -36,7 +36,6 @@ export const RGB_LED_LIMITS = {
     green: 3.0, // V
     blue: 3.2,  // V
   },
-  // Max current per channel
   maxCurrent: 0.02, // A (20 mA)
   // Max power per channel
   maxPower: 0.065, // W (65 mW)
@@ -44,8 +43,8 @@ export const RGB_LED_LIMITS = {
   maxReverseVoltage: 5, // V (lower than single LED, typical for RGB)
   // Thermal behavior
   thermalExplosionThreshold: 0.6,
-  thermalGain: 2.0,
-  thermalCooldownPerSec: 0.35,
+  thermalGain: 1.5,
+  thermalCooldownPerSec: 0.4, 
   flickerStart: 0.5,
   explosionDelayMs: { min: 200, max: 300 },
 };
@@ -214,25 +213,25 @@ export function updateRgbLedChannelRuntime(params: {
     const stress = Math.max(overCurrentRatio, overPowerRatio);
 
     if (forwardOn) {
-      const baseRise = forwardCurrent > 0 ? 0.05 : 0;
-      thermalEnergy += (baseRise + stress * RGB_LED_LIMITS.thermalGain) * params.dt;
+      if (stress > 0) {
+        thermalEnergy += stress * RGB_LED_LIMITS.thermalGain * params.dt;
+      }
     } else {
       thermalEnergy = Math.max(0, thermalEnergy - RGB_LED_LIMITS.thermalCooldownPerSec * params.dt);
     }
 
     if (stress > 0) {
       failureReason = overPowerRatio >= overCurrentRatio ? "overpower" : "overcurrent";
-      thermalEnergy += stress * RGB_LED_LIMITS.thermalGain * params.dt;
     }
 
     if (thermalEnergy >= RGB_LED_LIMITS.thermalExplosionThreshold && !pendingExplosionAt) {
       pendingExplosionAt = params.nowMs + explosionDelayMs(runtime.flickerSeed + thermalEnergy * 11);
     }
 
-    // Apply gamma correction for better visibility at lower currents
+    // Calculate brightness linearly based on current (matches Tinkercad behavior)
+    // At max current (20mA), brightness = 1.0; at 0 current, brightness = 0.0
     const normalizedCurrent = forwardOn ? clamp(forwardCurrent / RGB_LED_LIMITS.maxCurrent, 0, 1) : 0;
-    const gamma = 0.5;
-    brightness = Math.pow(normalizedCurrent, gamma);
+    brightness = normalizedCurrent;
     
     if (thermalEnergy > RGB_LED_LIMITS.flickerStart && brightness > 0) {
       const wobbleStrength = Math.min(0.25, (thermalEnergy - RGB_LED_LIMITS.flickerStart) * 0.4);

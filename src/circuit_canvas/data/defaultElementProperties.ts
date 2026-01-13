@@ -1,11 +1,16 @@
 // /src/common/data/elements-api.ts
+"use client";
 
+import React from "react";
 import { PaletteElementType } from "../types/circuit";
+import { ReactNode } from "react";
+import { SlideSwitchPreview } from "../components/palette/SlideSwitchPreview";
 
 export interface PaletteElement {
   type: PaletteElementType;
   label: string;
-  iconPath: string; // Relative to public/assets
+  iconPath?: string; // Relative to public/assets
+  customIcon?: () => ReactNode; 
   hidden?: boolean; // Hide from palette without removing support
   defaultProps?: {
     resistance?: number;
@@ -108,6 +113,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "slideswitch",
     label: "Slide Switch",
+    customIcon: () => React.createElement(SlideSwitchPreview),
     iconPath: "assets/circuit_canvas/elements/SlideSwitch.svg",
     defaultProps: { resistance: 0.01 }, // Low resistance when connected
   },

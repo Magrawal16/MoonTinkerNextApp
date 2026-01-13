@@ -1178,7 +1178,6 @@ function computeElementResults(
       power = 0,
       measurement = 0;
     let forwardVoltage: number | undefined;
-    // RGB LED channel results
     let rgbLedChannels: { red: any; green: any; blue: any } | undefined;
     let reverseVoltage: number | undefined;
 
@@ -1356,7 +1355,6 @@ function computeElementResults(
       ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
         ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }
         : {}),
-      // Include RGB LED channel data if present
       ...(rgbLedChannels ? rgbLedChannels : {}),
     };
 

@@ -94,7 +94,18 @@ const playPopSound = () => {
 
 export default function RgbLed(props: RgbLedProps) {
   const fallbackRuntimeRef = useRef<RgbLedRuntimeState>(createInitialRgbLedRuntime());
-  const runtime = props.runtime ?? fallbackRuntimeRef.current;
+  const runtime: RgbLedRuntimeState = useMemo(() => {
+    const incoming: any = props.runtime;
+    const base = fallbackRuntimeRef.current;
+    if (!incoming || !incoming.red || !incoming.green || !incoming.blue) {
+      return base;
+    }
+    return {
+      red: { ...base.red, ...incoming.red },
+      green: { ...base.green, ...incoming.green },
+      blue: { ...base.blue, ...incoming.blue },
+    } as RgbLedRuntimeState;
+  }, [props.runtime]);
   const [isHovered, setIsHovered] = useState(false);
 
   // Load the RGB LED image
@@ -192,8 +203,9 @@ export default function RgbLed(props: RgbLedProps) {
 
   // Glow position for RGB LED (centered on the bulb area)
   const glowPosition = useMemo(() => ({
-    rect: { x: 25, y: 20, width: 55, height: 25 },
-    arcTop: { x: 52, y: 20, outerRadius: 27 },
+    rect: { x: 42, y: 27, width: 27.5, height: 16 },
+    arcTop: { x: 55.8, y: 27, outerRadius: 13.8},
+    arcBottom: { x: 55.8, y: 42.98, outerRadius: 13.8},
   }), []);
 
   const glowVisible = overallBrightness > 0.02 && !isExploded;
@@ -252,8 +264,8 @@ export default function RgbLed(props: RgbLedProps) {
             x={0}
             y={0}
             image={rgbLedImage}
-            width={105}
-            height={110}
+            width={110}
+            height={100}
             opacity={baseOpacity}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 7 : 0}
@@ -298,7 +310,7 @@ export default function RgbLed(props: RgbLedProps) {
               globalCompositeOperation="lighten"
             />
             {/* Bottom reflection */}
-            <Ellipse
+            {/* <Ellipse
               x={glowPosition.rect.x + glowPosition.rect.width / 2}
               y={glowPosition.rect.y + glowPosition.rect.height + 15}
               radiusX={glowPosition.rect.width * 0.4}
@@ -308,6 +320,21 @@ export default function RgbLed(props: RgbLedProps) {
               shadowColor={combinedColor}
               shadowBlur={15 + 35 * overallBrightness}
               shadowOpacity={0.25 + 0.45 * overallBrightness}
+              listening={false}
+              globalCompositeOperation="lighten"
+            /> */}
+            <Arc
+              x={glowPosition.arcBottom.x}
+              y={glowPosition.arcBottom.y}
+              innerRadius={0}
+              outerRadius={glowPosition.arcBottom.outerRadius}
+              angle={180}
+              rotation={360}
+              fill={combinedColor}
+              opacity={0.15 + 0.75 * overallBrightness}
+              shadowColor={combinedColor}
+              shadowBlur={40 + 80 * overallBrightness}
+              shadowOpacity={0.2 + 0.6 * overallBrightness}
               listening={false}
               globalCompositeOperation="lighten"
             />
@@ -336,7 +363,7 @@ export default function RgbLed(props: RgbLedProps) {
         {baseReady && isExploded && explosionImg && (
           <Image
             image={explosionImg}
-            x={30}
+            x={34}
             y={10}
             width={45}
             height={45}

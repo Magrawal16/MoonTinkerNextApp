@@ -32,10 +32,10 @@ export function getRgbLedNodePositions(): RgbLedNodePositions {
   // Element dimensions: 105x110
   // Horizontal spacing adjusted for the bent leg positions
   return {
-    red: { x: 26, y: 80 },      // First leg (leftmost) - Red
-    common: { x: 44, y: 80 },   // Second leg - Common (Cathode/Anode)
-    green: { x: 62, y: 80 },    // Third leg - Green
-    blue: { x: 80, y: 80 },     // Fourth leg (rightmost) - Blue
+    red: { x: 25, y: 80 },      // First leg (leftmost) - Red
+    common: { x: 44.5, y: 80 },   // Second leg - Common (Cathode/Anode)
+    green: { x: 64.5, y: 80 },    // Third leg - Green
+    blue: { x: 85, y: 80 },     // Fourth leg (rightmost) - Blue
   };
 }
 

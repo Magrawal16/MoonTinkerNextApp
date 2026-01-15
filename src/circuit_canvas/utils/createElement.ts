@@ -286,6 +286,44 @@ export default function createElement(
     displayProperties: ["resistance"],
   };
 
+  const ldrElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 24,
+        y: 60,
+        parentId: id,
+        placeholder: "Terminal 1",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-2",
+        x: 37,
+        y: 60,
+        parentId: id,
+        placeholder: "Terminal 2",
+        fillColor: "red",
+      },
+    ],
+
+    properties: {
+      // 🌞 ENVIRONMENT INPUT (what slider controls)
+      lightLevel: props.properties?.lightLevel ?? 50, // 0–100
+
+      // 🔧 INTERNAL PARAMETER (computed from lightLevel)
+      minResistance: 506,       // bright light
+      maxResistance: 180000,    // darkness
+    },
+
+    displayProperties: [],
+  };
+
   const multimeterElement = {
     id,
     type: props.type,
@@ -912,6 +950,9 @@ export default function createElement(
       break;
     case "resistor":
       element = resistorElement;
+      break;
+    case "ldr":
+      element = ldrElement;
       break;
     case "multimeter":
       element = multimeterElement;

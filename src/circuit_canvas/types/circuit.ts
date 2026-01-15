@@ -10,28 +10,42 @@ export type CircuitElement = {
   type: string;
 
   properties?: {
-    voltage?: number; // for power sources like batteries
-    resistance?: number; // all components can have resistance
-    ratio?: number; // for potentiometers, the ratio of resistance
-    mode?: "voltage" | "current" | "resistance"; // multimeter modes: V, A, Ω
-    distance?: number; // cm
+    // -------- Common electrical --------
+    voltage?: number;
+    resistance?: number;
+    ratio?: number;
+    mode?: "voltage" | "current" | "resistance";
+
+    // -------- Sensors / environment --------
+    distance?: number;
     temperature?: number;
     brightness?: number;
+
+    // 🌞 LDR (Light Dependent Resistor)
+    lightLevel?: number;        // 0–100 (environment input)
+    minResistance?: number;     // default: 506
+    maxResistance?: number;     // default: 180000
+
+    // -------- Visual / UI --------
     color?: string;
     gesture?: string;
-    // For 1.5V battery form factor (AA or AAA) to mirror Tinkercad UI
+
+    // -------- Battery --------
     batteryType?: "AA" | "AAA";
-    // For battery count (1-4 batteries in series) to mirror Tinkercad UI
     batteryCount?: number;
-    // For notes
-    text?: string; // note text content
-    width?: number; // note width
-    height?: number; // note height
-    backgroundColor?: string; // note background color
-    collapsed?: boolean; // note collapsed state
-    pressed?: boolean; // push button state
-    switchPosition?: "left" | "right"; // slide switch position
-    // For RGB LED - common cathode or common anode
+
+    // -------- Notes --------
+    text?: string;
+    width?: number;
+    height?: number;
+    backgroundColor?: string;
+    collapsed?: boolean;
+
+    // -------- Switches / buttons --------
+    pressed?: boolean;
+    switchPosition?: "left" | "right";
+
+    // -------- RGB LED --------
     rgbLedType?: "common-cathode" | "common-anode";
   };
   computed?: {
@@ -141,13 +155,20 @@ export type CircuitElementProps = {
   idNumber: number;
   pos: { x: number; y: number };
   rotation?: number;
+
   properties?: {
-    resistance?: number;
     voltage?: number;
+    resistance?: number;
     ratio?: number;
+
+    // 🌞 LDR
+    lightLevel?: number;
+
     temperature?: number;
     brightness?: number;
     color?: string;
+
+    // Notes
     text?: string;
     width?: number;
     height?: number;
@@ -155,6 +176,7 @@ export type CircuitElementProps = {
     collapsed?: boolean;
   };
 };
+
 
 export type PaletteElementType =
   | "lightbulb"
@@ -166,6 +188,7 @@ export type PaletteElementType =
   | "multimeter"
   | "potentiometer"
   | "led"
+  | "ldr"
   | "rgbled"
   | "microbit"
   | "ultrasonicsensor4p"

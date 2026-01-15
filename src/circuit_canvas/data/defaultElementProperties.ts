@@ -60,6 +60,12 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     defaultProps: { resistance: 1000 },
   },
   {
+    type: "ldr",
+    label: "LDR (Light-dependent resistor)",
+    iconPath: "assets/circuit_canvas/elements/LDR.svg",
+    defaultProps: { resistance: 10000 },
+  },
+  {
     type: "multimeter",
     label: "Multimeter",
     iconPath: "assets/circuit_canvas/elements/multimeter.svg",

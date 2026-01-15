@@ -12,7 +12,8 @@ import solveCircuit from "@/circuit_canvas/utils/kirchhoffSolver";
 import { updateLedRuntime, createInitialLedRuntime } from "@/circuit_canvas/utils/ledBehavior";
 import { updateRgbLedRuntime, createInitialRgbLedRuntime } from "@/circuit_canvas/utils/rgbLedBehavior";
 import PropertiesPanel from "@/circuit_canvas/components/core/PropertiesPanel";
-import { getCircuitById } from "@/circuit_canvas/utils/circuitStorage";
+import { getCircuitById, updateCircuit } from "@/circuit_canvas/utils/circuitStorage";
+import { getRandomCircuitName } from "@/circuit_canvas/utils/circuitNames";
 import Konva from "konva";
 import styles from "@/circuit_canvas/styles/CircuitCanvas.module.css";
 import AuthHeader from "@/components/AuthHeader";
@@ -361,6 +362,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   );
   const [loadingSavedCircuit, setLoadingSavedCircuit] = useState(false);
   const [stopDisabled, setStopDisabled] = useState(false);
+  const [currentCircuitName, setCurrentCircuitName] = useState<string>("");
+  const [currentCircuitId, setCurrentCircuitId] = useState<string>("");
   // Progress overlay refs (avoid frequent React re-renders)
   const progressRef = useRef<HTMLDivElement | null>(null);
   const progressRafRef = useRef<number | null>(null);
@@ -532,6 +535,77 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     controllerCodeMap,
   });
 
+  // Persist circuit name to localStorage
+  useEffect(() => {
+    if (currentCircuitName) {
+      try {
+        localStorage.setItem('mt_circuit_name', currentCircuitName);
+      } catch (e) {
+        console.warn("Failed to save circuit name to localStorage:", e);
+      }
+    }
+  }, [currentCircuitName]);
+
+  // Persist circuit ID to localStorage
+  useEffect(() => {
+    if (currentCircuitId) {
+      try {
+        localStorage.setItem('mt_circuit_id', currentCircuitId);
+      } catch (e) {
+        console.warn("Failed to save circuit ID to localStorage:", e);
+      }
+    }
+  }, [currentCircuitId]);
+
+  // Load circuit name from localStorage on mount (or set random name for new circuits)
+  useEffect(() => {
+    try {
+      // Check if this is a new circuit creation
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const isCreatingNew = params.get("new") === "1";
+        
+        if (isCreatingNew) {
+          // Generate random name for new circuit
+          setCurrentCircuitName(getRandomCircuitName());
+        } else {
+          // Load existing name from localStorage
+          const savedName = localStorage.getItem('mt_circuit_name');
+          if (savedName) {
+            setCurrentCircuitName(savedName);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to load circuit name from localStorage:", e);
+    }
+  }, []);
+
+  // Load circuit ID from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedId = localStorage.getItem('mt_circuit_id');
+      if (savedId) {
+        setCurrentCircuitId(savedId);
+      }
+    } catch (e) {
+      console.warn("Failed to load circuit ID from localStorage:", e);
+    }
+  }, []);
+
+  // If currentCircuitId changes and we have a circuit loaded, fetch its name from API
+  useEffect(() => {
+    if (currentCircuitId) {
+      getCircuitById(currentCircuitId).then((circuit) => {
+        if (circuit?.name) {
+          setCurrentCircuitName(circuit.name);
+        }
+      }).catch((e) => {
+        console.warn("Failed to fetch circuit name:", e);
+      });
+    }
+  }, [currentCircuitId]);
+
   const { createAndAttachSimulator } = useMicrobitSimulators({
     elements,
     controllerMap,
@@ -579,7 +653,9 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     setControllerCodeMap({});
     setActiveControllerId(null);
     setOpenCodeEditor(false);
-    setCopiedElement(null); 
+    setCopiedElement(null);
+    setCurrentCircuitName(getRandomCircuitName()); // Set random circuit name for new session
+    setCurrentCircuitId(""); // Clear circuit ID when creating new session
     resetState();
     // Also reset history root to empty
     initializeHistory([], []);
@@ -1871,6 +1947,39 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               className="h-9 w-auto mr-2 select-none"
               style={{ display: 'block' }}
             />
+            
+            {/* Display current circuit name - editable */}
+            {currentCircuitName && (
+              <input
+                type="text"
+                value={currentCircuitName}
+                onChange={(e) => setCurrentCircuitName(e.target.value)}
+                onBlur={async () => {
+                  if (currentCircuitId && currentCircuitName.trim()) {
+                    try {
+                      const success = await updateCircuit(currentCircuitId, { name: currentCircuitName.trim() });
+                      if (success) {
+                        showMessage('Circuit renamed successfully', 'success');
+                      } else {
+                        showMessage('Failed to rename circuit', 'error');
+                      }
+                    } catch (error) {
+                      showMessage('Failed to rename circuit', 'error');
+                    }
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="px-2 py-1 bg-transparent text-lg text-gray-800 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors"
+                style={{ minWidth: '200px', width: 'auto' }}
+                size={currentCircuitName.length || 20}
+                placeholder="Circuit Name"
+              />
+            )}
+            
             {/* ...existing code for the rest of the header controls... */}
             {/* File Menu - Contains Export & Import */}
             <CollapsibleToolbar
@@ -2324,6 +2433,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               onCircuitSelect={async (circuitId) => {
                 const data = await getCircuitById(circuitId);
                 if (!data) return;
+                setCurrentCircuitName(data.name);
+                setCurrentCircuitId(circuitId);
                 pushToHistory(elements, wires);
                 resetState();
                 setLoadingSavedCircuit(true);
@@ -2340,6 +2451,13 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               currentElements={elements}
               currentWires={wires}
               getSnapshot={() => stageRef.current?.toDataURL() || ""}
+              onOpenModal={() => {
+                stopSimulation();
+                setSelectedElement(null);
+              }}
+              onCircuitNameChange={(name) => setCurrentCircuitName(name)}
+              currentCircuitId={currentCircuitId}
+              currentCircuitName={currentCircuitName}
             /> 
 
             <AuthHeader inline />
@@ -2517,6 +2635,9 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                         pushToHistory(next, wiresRef.current);
                         return next;
                       });
+                      if (simulationRunning) {
+                        computeCircuit(wiresRef.current || []);
+                      }
                     }}
                     onPowerSupplySettingsChange={(id, settings) => {
                       setElements((prev) =>

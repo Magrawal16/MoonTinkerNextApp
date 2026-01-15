@@ -67,6 +67,8 @@ export function getElementCenter(element: CircuitElement): {
       return { x: 73, y: 70 }; // Approximate center of lightbulb
     case "resistor":
       return { x: 20, y: 21 }; // Approximate center of resistor
+    case "ldr":
+      return { x: 25, y: 25 }; // Approximate center for LDR asset
     case "multimeter":
       return { x: 20, y: 15 }; // Approximate center of multimeter
     case "potentiometer":
@@ -104,6 +106,8 @@ export function getElementDimensions(element: CircuitElement): {
       return { width: 146, height: 140 };
     case "resistor":
       return { width: 40, height: 42 };
+    case "ldr":
+      return { width: 60, height: 60 };
     case "multimeter":
       return { width: 40, height: 30 };
     case "potentiometer":

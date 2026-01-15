@@ -14,7 +14,7 @@ const BASES: Record<EnvName, { client: string; external: string }> = {
   },
   uat: {
     client: "/api",
-    external: "http://dev.moonr.com/MoonTinkerService/api",
+    external: "https://dev.moonr.com/MoonTinkerService/api",
   },
   production: {
     client: "/api",
@@ -25,7 +25,7 @@ const BASES: Record<EnvName, { client: string; external: string }> = {
 
 // Select the active environment here.
 // Switch to "development" for local, "uat" for testing, "production" when ready.
-const ACTIVE_ENV: EnvName = "development";
+const ACTIVE_ENV: EnvName = "uat";
 // const ACTIVE_ENV: EnvName = "development";
 // const ACTIVE_ENV: EnvName = "production";
 

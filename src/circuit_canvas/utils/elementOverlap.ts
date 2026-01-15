@@ -21,6 +21,7 @@ function getElementSize(type: string): { width: number; height: number } {
     multimeter: { width: 165, height: 80 },
     potentiometer: { width: 50, height: 35 },
     led: { width: 75, height: 95 },
+    ldr: { width: 60, height: 80 },
     // Microbit: only the main board body (not including connector area)
     microbit: { width: 100, height: 50 },
     microbitWithBreakout: { width: 210, height: 180 },
@@ -62,6 +63,19 @@ export function getElementRegions(
         y: element.y - center.y + 98,
         width: 170,
         height: 130,
+      },
+    ];
+  }
+
+  // LDR: small round sensor with terminals at the bottom — keep a tight region
+  if (element.type === "ldr") {
+    return [
+      {
+        type: 'rect',
+        x: element.x - center.x + 4,
+        y: element.y - center.y + 6,
+        width: 52,
+        height: 56,
       },
     ];
   }

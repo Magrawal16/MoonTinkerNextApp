@@ -1,6 +1,8 @@
 import { CircuitElement, Wire } from "../types/circuit";
 import { getLedForwardVoltage, getLedSeriesResistance } from "./ledBehavior";
 import { getRgbLedForwardVoltage, getRgbLedSeriesResistance } from "./rgbLedBehavior";
+import { lightLevelToResistance } from "./ldrUtils";
+
 const DEBUG = false;
 
 // Multimeter modeling constants
@@ -811,11 +813,23 @@ function buildMNAMatrices(
 
     if (
       el.type === "resistor" ||
+      el.type === "ldr" ||
       el.type === "lightbulb" ||
       el.type === "pushbutton"
     ) {
-      const R = el.type === "lightbulb" ? 48 : (el.properties?.resistance ?? 1);
-      const g = 1 / R;
+    let R: number;
+
+    if (el.type === "ldr") {
+      const lightLevel = el.properties?.lightLevel ?? 50;
+      R = lightLevelToResistance(lightLevel);
+    } else if (el.type === "lightbulb") {
+      R = 48;
+    } else {
+      R = el.properties?.resistance ?? 1;
+    }
+
+    const g = 1 / R;
+
       if (ai !== undefined) G[ai][ai] += g;
       if (bi !== undefined) G[bi][bi] += g;
       if (ai !== undefined && bi !== undefined) {
@@ -1181,8 +1195,14 @@ function computeElementResults(
     let rgbLedChannels: { red: any; green: any; blue: any } | undefined;
     let reverseVoltage: number | undefined;
 
-    if (["resistor", "lightbulb", "pushbutton"].includes(el.type)) {
-      const R = el.properties?.resistance ?? 1;
+    if (["resistor", "lightbulb", "pushbutton", "ldr"].includes(el.type)) {
+      let R: number;
+      if (el.type === "ldr") {
+        const lightLevel = el.properties?.lightLevel ?? 50;
+        R = lightLevelToResistance(lightLevel);
+      } else {
+        R = el.properties?.resistance ?? 1;
+      }
       current = voltage / R;
       power = voltage * current;
     } else if (el.type === "slideswitch") {

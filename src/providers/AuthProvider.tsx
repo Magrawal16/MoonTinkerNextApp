@@ -73,25 +73,25 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     };
 
     // Temporary bypass: if any password is entered, treat login as successful
-    if ((password || "").trim().length > 0) {
-      try {
-        sessionStorage.setItem(STORAGE_KEY, "1");
-        sessionStorage.setItem(STORAGE_USER, payload.userName || "user");
-        sessionStorage.setItem(STORAGE_ROLE, "dev");
-        // Optionally set a mock token for 12 hours; backend may still reject it
-        const mockToken = "dev-bypass-token";
-        sessionStorage.setItem(STORAGE_TOKEN, mockToken);
-        const expiryTime = Date.now() + (TOKEN_EXPIRY_MINUTES * 60 * 1000);
-        sessionStorage.setItem(STORAGE_TOKEN_EXPIRY, expiryTime.toString());
-      } catch (e) {
-        // ignore storage errors
-      }
-      setIsAuthenticated(true);
-      setUserEmail(payload.userName || "user");
-      setRole("dev");
-      return true;
-    }
-
+    // if ((password || "").trim().length > 0) {
+    //   try {
+    //     sessionStorage.setItem(STORAGE_KEY, "1");
+    //     sessionStorage.setItem(STORAGE_USER, payload.userName || "user");
+    //     sessionStorage.setItem(STORAGE_ROLE, "dev");
+    //     // Optionally set a mock token for 12 hours; backend may still reject it
+    //     const mockToken = "dev-bypass-token";
+    //     sessionStorage.setItem(STORAGE_TOKEN, mockToken);
+    //     const expiryTime = Date.now() + (TOKEN_EXPIRY_MINUTES * 60 * 1000);
+    //     sessionStorage.setItem(STORAGE_TOKEN_EXPIRY, expiryTime.toString());
+    //   } catch (e) {
+    //     // ignore storage errors
+    //   }
+    //   setIsAuthenticated(true);
+    //   setUserEmail(payload.userName || "user");
+    //   setRole("dev");
+    //   return true;
+    // }
+debugger;
     try {
       const res = await fetch(`${EXTERNAL_API_BASE}/account/login`, {
         method: "POST",

@@ -16,6 +16,7 @@ import RgbLed from "@/circuit_canvas/components/elements/RgbLed";
 import Resistor from "@/circuit_canvas/components/elements/Resistor";
 import Multimeter from "@/circuit_canvas/components/elements/Multimeter";
 import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
+import Ldr from "@/circuit_canvas/components/elements/Ldr";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
@@ -252,6 +253,22 @@ export default function RenderElement(props: RenderElementProps) {
           bandHeights={[12.4, 10, 10, 12.2]} // heights for each band
           bandGaps={[3, 4, 6]} // gaps between bands
           isSimulationOn={props.isSimulationOn}
+        />
+      )}
+      {props.showBody !== false && element.type === "ldr" && (
+        <Ldr
+          id={element.id}
+          x={1}
+          y={22}
+          selected={props.selectedElementId === element.id}
+          draggable={false}
+          isSimulationOn={props.isSimulationOn}
+          lightLevel={element.properties?.lightLevel}
+          onLightChange={(level: number) => {
+            props.onUpdateElementProperties?.(element.id, {
+              lightLevel: level,
+            });
+          }}
         />
       )}
       {props.showBody !== false && element.type === "multimeter" && (

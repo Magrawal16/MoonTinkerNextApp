@@ -1,6 +1,9 @@
 "use client";
 import { CircuitElement, Wire } from "../types/circuit";
 import { CLIENT_API_BASE, EXTERNAL_API_BASE } from "@/common/config/api";
+import { apiFetch, handle404Error } from "@/common/utils/apiErrorHandler";
+import { showErrorToast, showSuccessToast } from "@/common/utils/toastNotification";
+import { APP_MESSAGES } from "@/common/constants/messages";
 
 const API_SECURITY_KEY = "X2DPR-RO1WTR-98007-PRS70-VEQ12Y";
 
@@ -56,7 +59,7 @@ export async function SaveCircuit(
   debugger;
 
     const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/createCircuit`, {
+    const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/createCircuit`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -74,16 +77,16 @@ export async function SaveCircuit(
     // Handle different response shapes from backend
     return result.data?.id || result.id || crypto.randomUUID();
   } catch (error) {
-    console.error('[SaveCircuit] API call failed:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_SAVE_FAILED);
     throw error;
   }
 }
 
-export async function getSavedCircuitsList(): Promise<{ id: string; name: string }[]> {
+export async function getSavedCircuitsList(): Promise<{ id: string; name: string; createdAt?: string; updatedAt?: string }[]> {
   debugger;
   try {
     const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/getCircuits`, {
+    const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/getCircuits`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -103,9 +106,11 @@ export async function getSavedCircuitsList(): Promise<{ id: string; name: string
     return circuitList.map((circuit: any) => ({
       id: circuit.id,
       name: circuit.name,
+      createdAt: circuit.createdAt || circuit.CreatedAt,
+      updatedAt: circuit.updatedAt || circuit.UpdatedAt,
     }));
   } catch (error) {
-    console.error('[getSavedCircuitsList] API call failed:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_LOAD_FAILED);
     return [];
   }
 }
@@ -117,6 +122,8 @@ export async function getCircuitById(id: string): Promise<
     elements: CircuitElement[];
     wires: Wire[];
     snapshot?: string;
+    createdAt?: string;
+    updatedAt?: string;
   }
   | undefined
 > {
@@ -124,7 +131,7 @@ export async function getCircuitById(id: string): Promise<
   debugger;
 
     const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/getCircuitById/${id}`, {
+    const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/getCircuitById/${id}`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
@@ -138,9 +145,39 @@ export async function getCircuitById(id: string): Promise<
     }
 
     const result = await response.json();
-    return result.data || result;
+    const data = result.data || result;
+
+    // Normalize backend DTO -> client shape
+    const elementsJson = data.ElementsJson || data.elementsJson || data.elements;
+    const wiresJson = data.WiresJson || data.wiresJson || data.wires;
+
+    let parsedElements: CircuitElement[] = [];
+    let parsedWires: Wire[] = [];
+    try {
+      if (typeof elementsJson === "string") parsedElements = JSON.parse(elementsJson);
+      else if (Array.isArray(elementsJson)) parsedElements = elementsJson;
+    } catch (e) {
+      console.warn('[getCircuitById] Failed to parse ElementsJson');
+    }
+
+    try {
+      if (typeof wiresJson === "string") parsedWires = JSON.parse(wiresJson);
+      else if (Array.isArray(wiresJson)) parsedWires = wiresJson;
+    } catch (e) {
+      console.warn('[getCircuitById] Failed to parse WiresJson');
+    }
+
+    return {
+      id: data.id || data.Id,
+      name: data.name || data.Name,
+      elements: parsedElements,
+      wires: parsedWires,
+      snapshot: data.snapshot || data.Snapshot || null,
+      createdAt: data.createdAt || data.CreatedAt,
+      updatedAt: data.updatedAt || data.UpdatedAt,
+    };
   } catch (error) {
-    console.error('[getCircuitById] API call failed:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_LOAD_FAILED);
     return undefined;
   }
 }
@@ -150,7 +187,7 @@ export async function deleteCircuitById(id: string): Promise<boolean> {
   debugger;
 
     const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/deleteCircuit/${id}`, {
+    const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/deleteCircuit/${id}`, {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
@@ -165,69 +202,77 @@ export async function deleteCircuitById(id: string): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error('[deleteCircuitById] API call failed:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_DELETE_FAILED);
     return false;
   }
 }
 
-export async function editCircuitName(id: string, newName: string): Promise<boolean> {
-  try {
-  debugger;
-
-    const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/updateCircuit/${id}`, {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-          "security-key": API_SECURITY_KEY,
-
-        "Authorization": token ? `Bearer ${token}` : "",
-      },
-      body: JSON.stringify({ name: newName }),
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to update circuit name: ${response.statusText}`);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('[editCircuitName] API call failed:', error);
-    return false;
-  }
-}
-
-export async function overrideCircuit(
+export async function updateCircuit(
   id: string,
-  newElements: CircuitElement[],
-  newWires: Wire[],
-  newSnapshot?: string
+  {
+    name,
+    elements,
+    wires,
+    snapshot,
+  }: {
+    name?: string;
+    elements?: CircuitElement[];
+    wires?: Wire[];
+    snapshot?: string | null;
+  }
 ): Promise<boolean> {
   try {
-  debugger;
+    debugger;
+
+    // Ensure we have full circuit data. If any field is missing, fetch existing circuit.
+    let targetName = name;
+    let targetElements = elements;
+    let targetWires = wires;
+    let targetSnapshot = snapshot;
+
+    if (!targetName || !targetElements || !targetWires) {
+      const existingCircuit = await getCircuitById(id);
+      if (!existingCircuit) {
+        showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_NOT_FOUND);
+        return false;
+      }
+      targetName = targetName || existingCircuit.name;
+      targetElements = targetElements || existingCircuit.elements;
+      targetWires = targetWires || existingCircuit.wires;
+      targetSnapshot = targetSnapshot ?? existingCircuit.snapshot ?? null;
+    }
+
+    // Strip out computed fields from elements before sending
+    const sanitizedElements = (targetElements || []).map(
+      ({ computed: _computed, ...rest }) => rest
+    );
+
+    const updateData = {
+      Id: id,
+      Name: targetName || "",
+      ElementsJson: JSON.stringify(sanitizedElements),
+      WiresJson: JSON.stringify(targetWires || []),
+      Snapshot: targetSnapshot || null,
+    };
+
     const token = getAuthToken();
-    const response = await fetch(`${EXTERNAL_API_BASE}/Circuit/updateCircuit/${id}`, {
+    const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/updateCircuit/${id}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-          "security-key": API_SECURITY_KEY,
-
+        "security-key": API_SECURITY_KEY,
         "Authorization": token ? `Bearer ${token}` : "",
       },
-      body: JSON.stringify({
-        elements: newElements,
-        wires: newWires,
-        snapshot: newSnapshot || null,
-      }),
+      body: JSON.stringify(updateData),
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to override circuit: ${response.statusText}`);
+      throw new Error(`Failed to update circuit: ${response.statusText}`);
     }
 
     return true;
   } catch (error) {
-    console.error('[overrideCircuit] API call failed:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_UPDATE_FAILED);
     return false;
   }
 }
@@ -238,15 +283,34 @@ export async function duplicateCircuit(id: string): Promise<string | null> {
   if (!circuit) return null;
   
   try {
+    // Get all existing circuits to check for name conflicts
+    const existingCircuits = await getSavedCircuitsList();
+    const existingNames = new Set(existingCircuits.map(c => c.name));
+    
+    // Remove any existing (Copy) or (Copy_X) suffix to get the base name
+    let baseName = circuit.name;
+    const copyPattern = /\s*\(Copy(?:_\d+)?\)\s*$/;
+    baseName = baseName.replace(copyPattern, '').trim();
+    
+    // Generate a unique name for the duplicated circuit
+    let newName = `${baseName} (Copy)`;
+    let copyNumber = 2;
+    
+    // If the base "(Copy)" name exists, try numbered copies
+    while (existingNames.has(newName)) {
+      newName = `${baseName} (Copy_${copyNumber})`;
+      copyNumber++;
+    }
+    
     const newId = await SaveCircuit(
-      `${circuit.name} (Copy)`,
+      newName,
       circuit.elements,
       circuit.wires,
       circuit.snapshot
     );
     return newId;
   } catch (error) {
-    console.error('[duplicateCircuit] Failed to duplicate:', error);
+    showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_DUPLICATE_FAILED);
     return null;
   }
 }

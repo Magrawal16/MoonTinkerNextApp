@@ -795,6 +795,56 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     return () => container.removeEventListener("pointerenter", handleEnter);
   }, []);
 
+  // Keyboard shortcuts for rotation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+      ) {
+        return;
+      }
+
+      if (!selectedElement) return;
+
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        setElements((prev) => {
+          const next = prev.map((el) =>
+            el.id === selectedElement.id
+              ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
+              : el
+          );
+          elementsRef.current = next;
+          updateWiresDirect();
+          pushToHistory(next, wiresRef.current);
+          return next;
+        });
+        stopSimulation();
+      }
+      else if (e.key === 'e' || e.key === 'E') {
+        e.preventDefault();
+        setElements((prev) => {
+          const next = prev.map((el) =>
+            el.id === selectedElement.id
+              ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
+              : el
+          );
+          elementsRef.current = next;
+          updateWiresDirect();
+          pushToHistory(next, wiresRef.current);
+          return next;
+        });
+        stopSimulation();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedElement, pushToHistory, stopSimulation, updateWiresDirect]);
+
   function resetState() {
     // Reset canvas and seed history with an initial empty state
     setElements([]);
@@ -2051,7 +2101,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               {/* Rotate Left */}
               <ToolButton
                 icon={<FaRotateLeft size={14} />}
-                title="Rotate Left"
+                title="Rotate Left (E)"
                 disabled={!selectedElement}
                 onClick={() => {
                   if (!selectedElement) return;
@@ -2073,7 +2123,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               {/* Rotate Right */}
               <ToolButton
                 icon={<FaRotateRight size={14} />}
-                title="Rotate Right"
+                title="Rotate Right (R)"
                 disabled={!selectedElement}
                 onClick={() => {
                   if (!selectedElement) return;

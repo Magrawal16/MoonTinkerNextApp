@@ -61,6 +61,16 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
       keys: ["delete"],
     },
     {
+      name: "Rotate Right",
+      description: "Rotate selected element clockwise",
+      keys: ["r"],
+    },
+    {
+      name: "Rotate Left",
+      description: "Rotate selected element counter-clockwise",
+      keys: ["e"],
+    },
+    {
       name: "Clear wires",
       description: "Delete all wires",
       keys: ["shift", "w"],
@@ -175,6 +185,54 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             setSelectedElement(null);
             setCreatingWireStartNode(null);
             // ...existing code...
+          },
+        };
+      case "r":
+        return {
+          ...meta,
+          handler: () => {
+            if (!selectedElement) return;
+            setElements((prev) => {
+              const next = prev.map((el) =>
+                el.id === selectedElement.id
+                  ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
+                  : el
+              );
+              if (pushToHistorySnapshot) {
+                pushToHistorySnapshot(next, wires);
+              } else {
+                pushToHistory();
+              }
+              return next;
+            });
+            if (args.updateWiresDirect) {
+              args.updateWiresDirect();
+            }
+            stopSimulation();
+          },
+        };
+      case "e":
+        return {
+          ...meta,
+          handler: () => {
+            if (!selectedElement) return;
+            setElements((prev) => {
+              const next = prev.map((el) =>
+                el.id === selectedElement.id
+                  ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
+                  : el
+              );
+              if (pushToHistorySnapshot) {
+                pushToHistorySnapshot(next, wires);
+              } else {
+                pushToHistory();
+              }
+              return next;
+            });
+            if (args.updateWiresDirect) {
+              args.updateWiresDirect();
+            }
+            stopSimulation();
           },
         };
       case "shift+w":

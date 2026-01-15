@@ -3,7 +3,7 @@ import { useCallback, useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
 import { Rect, Group, Text, Label, Tag, Path } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
-import { getElementCenter } from "@/circuit_canvas/utils/rotationUtils";
+import { getElementCenter, getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
 import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
 import { shouldHideNode, getElementRegions } from "@/circuit_canvas/utils/elementOverlap";
 import Lightbulb from "@/circuit_canvas/components/elements/Lightbulb";
@@ -526,49 +526,64 @@ export default function RenderElement(props: RenderElementProps) {
                 shadowEnabled={isSnapTarget || isTargetForEndpoint}
               />
 
-              {/* Tooltip (shows on hover or when targeted during endpoint drag) */}
-              {node.placeholder && (isHovered || isTargetForEndpoint) && (
-                <Label
-                  x={node.x + 8}
-                  y={node.y - 22}
-                  opacity={1}
-                  rotation={-(element.rotation || 0)}
-                  listening={false}
-                >
-                  <Tag
-                    fill="rgba(30, 41, 59, 0.95)"
-                    stroke="#3b82f6"
-                    strokeWidth={1.5}
-                    cornerRadius={6}
-                    shadowColor="rgba(0, 0, 0, 0.4)"
-                    shadowBlur={8}
-                    shadowOffset={{ x: 0, y: 2 }}
-                    shadowOpacity={0.5}
-                    pointerDirection="down"
-                    pointerWidth={6}
-                    pointerHeight={4}
-                  />
-                  <Text
-                    text={
-                      (element.type === "microbitWithBreakout" && 
-                       ["P3", "P4", "P6", "P7", "P9", "P10", "P12", "P19", "P20"].includes(node.placeholder))
-                        ? "Not Supported"
-                        : node.placeholder
-                    }
-                    fontSize={11}
-                    fontFamily="Arial, sans-serif"
-                    fontStyle="500"
-                    padding={8}
-                    fill="#ffffff"
-                    letterSpacing={0.3}
-                  />
-                </Label>
-              )}
             </Group>
           );
         })}
       </Group>
-      {/* End of inner rotation group */}
+
+      {props.showNodes !== false &&
+        element.nodes.map((node) => {
+          const isHovered = node.id === hoveredNodeId;
+          const isTargetForEndpoint = node.id === props.hoveredNodeForEndpoint;
+          
+          if (!node.placeholder || !(isHovered || isTargetForEndpoint)) {
+            return null;
+          }
+
+          const absoluteNodePos = getAbsoluteNodePosition(node, element);
+          
+          const tooltipX = absoluteNodePos.x - element.x + 8;
+          const tooltipY = absoluteNodePos.y - element.y - 22;
+
+          return (
+            <Label
+              key={`tooltip-${node.id}`}
+              x={tooltipX}
+              y={tooltipY}
+              opacity={1}
+              rotation={0}
+              listening={false}
+            >
+              <Tag
+                fill="rgba(30, 41, 59, 0.95)"
+                stroke="#3b82f6"
+                strokeWidth={1.5}
+                cornerRadius={6}
+                shadowColor="rgba(0, 0, 0, 0.4)"
+                shadowBlur={8}
+                shadowOffset={{ x: 0, y: 2 }}
+                shadowOpacity={0.5}
+                pointerDirection="down"
+                pointerWidth={6}
+                pointerHeight={4}
+              />
+              <Text
+                text={
+                  (element.type === "microbitWithBreakout" && 
+                   ["P3", "P4", "P6", "P7", "P9", "P10", "P12", "P19", "P20"].includes(node.placeholder))
+                    ? "Not Supported"
+                    : node.placeholder
+                }
+                fontSize={11}
+                fontFamily="Arial, sans-serif"
+                fontStyle="500"
+                padding={8}
+                fill="#ffffff"
+                letterSpacing={0.3}
+              />
+            </Label>
+          );
+        })}
     </Group>
   );
 }

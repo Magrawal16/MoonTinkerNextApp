@@ -7,6 +7,7 @@ interface NoteProps {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
   text?: string;
   width?: number;
   height?: number;
@@ -24,6 +25,7 @@ const Note: React.FC<NoteProps> = ({
   id,
   x,
   y,
+  rotation = 0,
   text = "",
   width = 150,
   height = 100,
@@ -118,7 +120,7 @@ const Note: React.FC<NoteProps> = ({
   const previewText = text ? text.split('\n')[0].substring(0, 40) + (text.length > 40 ? '...' : '') : 'Empty note';
 
   return (
-    <Group x={0} y={0} ref={groupRef} opacity={0.70}>
+    <Group x={0} y={0} rotation={rotation} ref={groupRef} opacity={0.70}>
       {/* Background */}
       <Rect
         x={0}

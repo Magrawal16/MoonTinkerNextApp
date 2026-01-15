@@ -228,6 +228,7 @@ export interface MicrobitProps {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
   selected?: boolean;
 
   // Accepts buttons and the logo touch sensor
@@ -250,6 +251,7 @@ export interface BaseElementProps {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
   selected?: boolean;
   draggable?: boolean;
 }

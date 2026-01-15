@@ -5,6 +5,7 @@ export interface BaseElementProps {
   id: string;
   x: number;
   y: number;
+  rotation?: number;
   selected?: boolean;
   onSelect?: (id: string) => void;
   onDragEnd?: (id: string, x: number, y: number) => void;
@@ -18,6 +19,7 @@ export function BaseElement({
   id,
   x,
   y,
+  rotation = 0,
   onSelect,
   onDragEnd,
   children,
@@ -31,6 +33,7 @@ export function BaseElement({
     <Group
       x={x}
       y={y}
+      rotation={rotation}
       draggable={isDraggable}
       onClick={() => onSelect?.(id)}
       onDragEnd={(e) => onDragEnd?.(id, e.target.x(), e.target.y())}

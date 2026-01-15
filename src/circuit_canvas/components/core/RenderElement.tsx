@@ -82,12 +82,8 @@ export default function RenderElement(props: RenderElementProps) {
   return (
     <Group
       ref={microbitGroupRef}
-      
       x={element.x}
       y={element.y}
-      offsetX={center.x}
-      offsetY={center.y}
-      rotation={element.rotation || 0}
       onDragMove={props.onDragMove}
       onDragStart={props.onDragStart}
       onDragEnd={props.onDragEnd}
@@ -98,10 +94,16 @@ export default function RenderElement(props: RenderElementProps) {
             : element.id
         }
       name={element.type}
-
       // Only the body layer should be draggable, and not while simulation is running
       draggable={props.showBody !== false && !props.isSimulationOn}
     >
+      <Group
+        x={center.x}
+        y={center.y}
+        offsetX={center.x}
+        offsetY={center.y}
+        rotation={element.rotation || 0}
+      >
       
       {/* Render circuit elements (conditionally hidden in nodes-only overlay) */}
       {props.showBody !== false && element.type === "lightbulb" && (
@@ -565,6 +567,8 @@ export default function RenderElement(props: RenderElementProps) {
             </Group>
           );
         })}
+      </Group>
+      {/* End of inner rotation group */}
     </Group>
   );
 }

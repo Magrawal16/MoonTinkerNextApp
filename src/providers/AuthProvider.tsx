@@ -64,6 +64,20 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     // Call the same-origin proxy which injects the required security-key
     // and forwards to the external login API. Payload matches Postman screenshot.
     debugger;
+    
+    // Clear all circuit-related localStorage data before logging in
+    // This prevents data from previous user sessions being accessible
+    try {
+      localStorage.removeItem('mt_circuit_id');
+      localStorage.removeItem('mt_circuit_name');
+      localStorage.removeItem('mt_circuit_elements');
+      localStorage.removeItem('mt_circuit_wires');
+      localStorage.removeItem('mt_controller_code_map');
+      localStorage.removeItem('mt:importedCircuit');
+    } catch (e) {
+      // ignore storage errors
+    }
+    
     const payload = {
       userName: (email || "").trim(),
       password: password || "",
@@ -150,11 +164,20 @@ debugger;
 
   const logout = useCallback(() => {
     try {
+      // Clear auth data from sessionStorage
       sessionStorage.removeItem(STORAGE_KEY);
       sessionStorage.removeItem(STORAGE_USER);
       sessionStorage.removeItem(STORAGE_TOKEN);
       sessionStorage.removeItem(STORAGE_TOKEN_EXPIRY);
       sessionStorage.removeItem(STORAGE_ROLE);
+      
+      // Clear all circuit-related data from localStorage
+      localStorage.removeItem('mt_circuit_id');
+      localStorage.removeItem('mt_circuit_name');
+      localStorage.removeItem('mt_circuit_elements');
+      localStorage.removeItem('mt_circuit_wires');
+      localStorage.removeItem('mt_controller_code_map');
+      localStorage.removeItem('mt:importedCircuit');
     } catch (e) {
       // ignore
     }

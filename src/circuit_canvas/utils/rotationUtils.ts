@@ -52,6 +52,7 @@ export function getAbsoluteNodePosition(
 /**
  * Gets the center point of an element based on its type and dimensions
  * This is used as the rotation origin for elements
+
  */
 export function getElementCenter(element: CircuitElement): {
   x: number;
@@ -60,31 +61,43 @@ export function getElementCenter(element: CircuitElement): {
   // Define center points for each element type based on their visual dimensions
   switch (element.type) {
     case "battery":
-      return { x: 80, y: 40 }; // Battery is 160x80, so center is 80x40
+      return { x: 60, y: 90 };
+    case "cell3v":
+      return { x: 60, y: 90 };
+    case "AA_battery":
+      return { x: 60, y: 90 };
+    case "AAA_battery":
+      return { x: 60, y: 90 };
     case "powersupply":
-      return { x: 80, y: 40 }; // Same footprint as battery asset
+      return { x: 80, y: 65 };
     case "lightbulb":
-      return { x: 73, y: 70 }; // Approximate center of lightbulb
+      return { x: 75, y: 75 };
     case "resistor":
-      return { x: 20, y: 21 }; // Approximate center of resistor
+      return { x: 1 + 25, y: 22 + 30 };
     case "ldr":
-      return { x: 25, y: 25 }; // Approximate center for LDR asset
+      return { x: 1 + 30, y: 22 + 30 };
     case "multimeter":
-      return { x: 20, y: 15 }; // Approximate center of multimeter
+      return { x: 1 + 90, y: 22 + 37.5 }; 
     case "potentiometer":
-      return { x: 26, y: 20 }; // Approximate center of potentiometer
+      return { x: 1 + 25, y: 22 + 25 };
     case "led":
-      return { x: 34, y: 30 }; // Approximate center of LED
+      return { x: 25, y: 35 };
     case "rgbled":
-      return { x: 52, y: 55 }; // Approximate center of RGB LED (105x110)
+      return { x: 52.5, y: 55 };
     case "microbit":
-      return { x: 111, y: 113 }; // Approximate center of microbit
+      return { x: 1 + 85.5, y: 22 + 67.5 };
     case "microbitWithBreakout":
-      return { x: 111, y: 113 }; // Approximate center of microbit with breakout
+      return { x: 1 + 85.5, y: 22 + 67.5 };
     case "ultrasonicsensor4p":
-      return { x: 60, y: 30 }; // Approximate center of ultrasonic sensor
+      return { x: 60, y: 30 };
     case "pushbutton":
-      return { x: 30.5, y: 40.5 }; // Approximate center of push button (61x81)
+      return { x: 30.5, y: 40.5 };
+    case "slideswitch":
+      return { x: 75, y: 45 };
+    case "note":
+      const noteWidth = element.properties?.width ?? 200;
+      const noteHeight = element.properties?.height ?? 150;
+      return { x: noteWidth / 2, y: noteHeight / 2 };
     default:
       return { x: 0, y: 0 };
   }
@@ -99,31 +112,44 @@ export function getElementDimensions(element: CircuitElement): {
 } {
   switch (element.type) {
     case "battery":
-      return { width: 160, height: 80 };
+      return { width: 120, height: 180 };
+    case "cell3v":
+      return { width: 120, height: 180 };
+    case "AA_battery":
+      return { width: 120, height: 180 };
+    case "AAA_battery":
+      return { width: 120, height: 180 };
     case "powersupply":
-      return { width: 160, height: 80 };
+      return { width: 160, height: 130 };
     case "lightbulb":
-      return { width: 146, height: 140 };
+      return { width: 150, height: 150 };
     case "resistor":
-      return { width: 40, height: 42 };
+      return { width: 50, height: 60 };
     case "ldr":
       return { width: 60, height: 60 };
     case "multimeter":
-      return { width: 40, height: 30 };
+      return { width: 180, height: 75 }; 
     case "potentiometer":
-      return { width: 52, height: 40 };
+      return { width: 50, height: 50 };
     case "led":
-      return { width: 68, height: 60 };
+      return { width: 50, height: 70 };
     case "rgbled":
       return { width: 105, height: 110 };
     case "microbit":
-      return { width: 222, height: 226 };
+      return { width: 171, height: 135 };
     case "microbitWithBreakout":
-      return { width: 222, height: 226 };
+      return { width: 171, height: 135 };
     case "ultrasonicsensor4p":
-      return { width: 120, height: 40 };
+      return { width: 120, height: 60 };
     case "pushbutton":
       return { width: 61, height: 81 };
+    case "slideswitch":
+      return { width: 150, height: 90 };
+    case "note":
+      return { 
+        width: element.properties?.width ?? 200, 
+        height: element.properties?.height ?? 150 
+      };
     default:
       return { width: 50, height: 50 };
   }

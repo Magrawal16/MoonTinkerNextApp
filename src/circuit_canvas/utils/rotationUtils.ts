@@ -18,6 +18,24 @@ export function rotatePoint(
   };
 }
 
+
+function getRenderOffset(
+  element: CircuitElement
+): { x: number; y: number } {
+ 
+  switch (element.type) {
+    case "resistor":
+    case "ldr":
+    case "multimeter":
+    case "potentiometer":
+    case "microbit":
+    case "microbitWithBreakout":
+      return { x: 1, y: 22 };
+    default:
+      return { x: 0, y: 0 };
+  }
+}
+
 /**
  * Gets the absolute position of a node, taking into account the element's position and rotation
  */
@@ -27,25 +45,26 @@ export function getAbsoluteNodePosition(
 ): { x: number; y: number } {
   const rotation = element.rotation || 0;
   const center = getElementCenter(element);
+  const renderOffset = getRenderOffset(element);
 
-  // If there's no rotation, return the calculation with center offset
+  const nodeX = node.x;
+  const nodeY = node.y;
+
   if (rotation === 0) {
     return {
-      x: element.x + node.x - center.x,
-      y: element.y + node.y - center.y,
+      x: element.x + nodeX,
+      y: element.y + nodeY,
     };
   }
 
-  // Translate node position relative to center, rotate, then translate back
-  const relativeX = node.x - center.x;
-  const relativeY = node.y - center.y;
+  const relativeX = nodeX - center.x;
+  const relativeY = nodeY - center.y;
 
-  // Rotate the node's position relative to the element's center
   const rotatedNode = rotatePoint(relativeX, relativeY, rotation);
 
   return {
-    x: element.x + rotatedNode.x,
-    y: element.y + rotatedNode.y,
+    x: element.x + rotatedNode.x + center.x,
+    y: element.y + rotatedNode.y + center.y,
   };
 }
 

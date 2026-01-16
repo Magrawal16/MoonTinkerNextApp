@@ -934,6 +934,10 @@ function buildMNAMatrices(
         if (cathodeIdx !== undefined) I[cathodeIdx] -= Is;
       }
     } else if (el.type === "potentiometer") {
+      // Potentiometer: 3 terminals - A (Terminal 1), W (Wiper), B (Terminal 2)
+      // Physical behavior:
+      // ratio = 0 (dial left/CCW): Wiper far from Terminal 2, so Rb ≈ R, Ra ≈ 0
+      // ratio = 1 (dial right/CW): Wiper close to Terminal 2, so Rb ≈ 0, Ra ≈ R
       const [nodeA, nodeW, nodeB] = el.nodes;
       const aMapped = nodeMap.get(nodeA?.id ?? "");
       const wMapped = nodeMap.get(nodeW?.id ?? "");
@@ -942,10 +946,14 @@ function buildMNAMatrices(
       const wi = wMapped ? nodeIndex.get(wMapped) : undefined;
       const bi2 = bMapped ? nodeIndex.get(bMapped) : undefined;
 
-      const R = el.properties?.resistance ?? 1;
+      const R = el.properties?.resistance ?? 10000; // Default 10kΩ
       const t = el.properties?.ratio ?? 0.5;
-      const Ra = R * (1 - t);
-      const Rb = R * t;
+      // CORRECTED for proper Tinkercad behavior:
+      // When dial is LEFT (ratio=0): Rb should be minimum (wiper near Terminal 2)
+      // When dial is RIGHT (ratio=1): Rb should be maximum (wiper far from Terminal 2)
+      const MIN_R = 1; // Minimum resistance to prevent division by zero (1Ω)
+      const Rb = Math.max(MIN_R, R * t);        // Wiper to Terminal 2 - increases with ratio
+      const Ra = Math.max(MIN_R, R * (1 - t));  // Terminal 1 to Wiper - decreases with ratio
       const ga = 1 / Ra;
       const gb = 1 / Rb;
 
@@ -1295,20 +1303,30 @@ function computeElementResults(
       current = redResult.current + greenResult.current + blueResult.current;
       power = redResult.power + greenResult.power + blueResult.power;
     } else if (el.type === "potentiometer") {
+      // Potentiometer result computation
+      // Same formula as stamping: Ra = R * t, Rb = R * (1 - t)
       const [nodeA, nodeW, nodeB] = el.nodes;
       const Va2 = nodeVoltages[nodeMap.get(nodeA.id) ?? ""] ?? 0;
       const Vw = nodeVoltages[nodeMap.get(nodeW.id) ?? ""] ?? 0;
       const Vb2 = nodeVoltages[nodeMap.get(nodeB.id) ?? ""] ?? 0;
 
-      const R = el.properties?.resistance ?? 1;
+      const R = el.properties?.resistance ?? 10000;
       const t = el.properties?.ratio ?? 0.5;
-      const Ra = R * (1 - t);
+      const MIN_R = 1;
+      const Rb = Math.max(MIN_R, R * t);        // Wiper to Terminal 2 - increases with ratio
+      const Ra = Math.max(MIN_R, R * (1 - t));  // Terminal 1 to Wiper - decreases with ratio
 
-      const Ia = (Va2 - Vw) / (Ra || 1e-12);
+      // Current through A-W segment
+      const Ia = (Va2 - Vw) / Ra;
+      // Current through W-B segment  
+      const Ib = (Vw - Vb2) / Rb;
 
+      // Total voltage across the potentiometer (A to B)
       const totalVoltage = Va2 - Vb2;
-      const totalCurrent = Ia; // still an approximation
-      const totalPower = totalVoltage * totalCurrent;
+      // In a proper circuit, Ia ≈ Ib (Kirchhoff's current law at wiper)
+      // Use average for better accuracy
+      const totalCurrent = (Math.abs(Ia) + Math.abs(Ib)) / 2;
+      const totalPower = Math.abs(totalVoltage * totalCurrent);
 
       current = totalCurrent;
       voltage = totalVoltage;

@@ -104,6 +104,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const [controllerCodeMap, setControllerCodeMap] = useState<
     Record<string, string>
   >({});
+  const [controllerXmlMap, setControllerXmlMap] = useState<Record<string, string>>({});
   const [showNewSessionModal, setShowNewSessionModal] = useState(false);
   // Delete confirmation modal for programmable controllers (micro:bit variants)
   const [showDeleteControllerModal, setShowDeleteControllerModal] = useState(false);
@@ -496,6 +497,60 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     }
   }, [elements, wires, selectedElement, showPropertiesPannel]);
 
+  // Position properties panel vertically aligned with the selected element (keep right-aligned)
+  // Compute initial vertical position when panel is opened and keep it fixed (do not follow drags)
+  useEffect(() => {
+    if (!showPropertiesPannel || !selectedElement) {
+      // panel top is fixed; no dynamic update needed
+      return;
+    }
+    const stage = stageRef.current;
+    if (!stage) return;
+
+    try {
+      const rect = stage.container().getBoundingClientRect();
+      const scale = stage.scaleX() || 1;
+
+      let anchorY = 0;
+
+      if (selectedElement.type === 'wire') {
+        const wire = wires.find((w) => w.id === selectedElement.id);
+        if (wire) {
+          const fromNode = getNodeById(wire.fromNodeId);
+          const toNode = getNodeById(wire.toNodeId);
+          if (fromNode && toNode) {
+            const p1 = getAbsoluteNodePosition(fromNode, getElementById(fromNode.parentId) || ({} as any));
+            const p2 = getAbsoluteNodePosition(toNode, getElementById(toNode.parentId) || ({} as any));
+            anchorY = (p1.y + p2.y) / 2;
+          }
+        }
+      } else {
+        const el = getElementById(selectedElement.id) || selectedElement;
+        if (el.nodes && el.nodes.length) {
+          const n = el.nodes[0];
+          const abs = getAbsoluteNodePosition(n, el);
+          anchorY = abs.y;
+        } else {
+          anchorY = el.y;
+        }
+      }
+
+      const stagePos = stage.position();
+      const clientY = rect.top + stagePos.y + anchorY * scale;
+
+      // Use a fixed offset so panel aligns with component box left corner visually
+      const PANEL_H = 220;
+      const desiredTop = Math.round(clientY - 40); // shift upward to align with component box top
+      const top = Math.max(12, Math.min(desiredTop, window.innerHeight - PANEL_H - 12));
+      // panel top is fixed; no dynamic update needed
+    } catch (e) {
+      // ignore
+    }
+    // Intentionally omit `elements` and `wires` so panel position stays fixed after opening
+  }, [showPropertiesPannel, selectedElement, propertiesPanelRight]);
+
+  // (properties panel uses right-aligned placement by default; don't anchor to elements)
+
   // Load saved circuit and code map from localStorage on first mount; else start clean
   useHydrateCircuitFromLocalStorage({
     keys: {
@@ -651,6 +706,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
     // Reset app state
     setControllerCodeMap({});
+    setControllerXmlMap({});
     setActiveControllerId(null);
     setOpenCodeEditor(false);
     setCopiedElement(null);
@@ -709,6 +765,10 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     setControllerCodeMap(prev => {
       const { [id]: _code, ...rest } = prev;
       return rest;
+    });
+    setControllerXmlMap(prev => {
+      const { [id]: _xml, ...rest } = prev as any;
+      return rest as Record<string, string>;
     });
     try {
       if (typeof window !== 'undefined') {
@@ -824,7 +884,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         });
         stopSimulation();
       }
-      else if (e.key === 'e' || e.key === 'E') {
+      else if (e.key === 'a' || e.key === 'A') {
         e.preventDefault();
         setElements((prev) => {
           const next = prev.map((el) =>
@@ -960,10 +1020,13 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         console.warn('⚠️ Failed to init shared blocks in ensureAllControllerCode:', regErr);
       }
       
-      const centralizedXmlRaw = typeof window !== 'undefined' ? window.localStorage.getItem('moontinker_controllerXmlMap') : null;
-      let centralizedXmlMap: Record<string, string> = {};
-      if (centralizedXmlRaw) {
-        try { centralizedXmlMap = JSON.parse(centralizedXmlRaw); } catch(e) {}
+      // Prefer XML map from backend/state; fallback to localStorage
+      let centralizedXmlMap: Record<string, string> = controllerXmlMap || {};
+      if ((!centralizedXmlMap || Object.keys(centralizedXmlMap).length === 0) && typeof window !== 'undefined') {
+        const centralizedXmlRaw = window.localStorage.getItem('moontinker_controllerXmlMap');
+        if (centralizedXmlRaw) {
+          try { centralizedXmlMap = JSON.parse(centralizedXmlRaw); } catch(e) {}
+        }
       }
       
       const updated: Record<string,string> = {};
@@ -1002,7 +1065,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       console.warn('⚠️ Blockly dynamic import failed while reconstructing controller code:', e);
       return { ...controllerCodeMap };
     }
-  }, [controllerCodeMap]);
+  }, [controllerCodeMap, controllerXmlMap]);
 
   async function startSimulation() {
     // Start flag first to update UI immediately
@@ -1987,14 +2050,14 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         {/* Toolbar */}
         <div
           id="circuit-top-toolbar"
-          className="w-full h-12 bg-gray-100 flex items-center px-4 space-x-4 py-2 justify-between shadow-md"
+          className="w-full bg-gray-100 flex flex-col px-4 py-2 gap-2 shadow-md"
         >
           {/* Logo on the extreme left */}
           <div className="flex items-center gap-3 w-full">
             <img
               src="/assets/common/mp_logo.svg"
               alt="MoonTinker Logo"
-              className="h-9 w-auto mr-2 select-none"
+              className={`h-9 w-auto mr-2 select-none transform transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer ${styles.logo}`}
               style={{ display: 'block' }}
             />
             
@@ -2023,7 +2086,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                     e.currentTarget.blur();
                   }
                 }}
-                className="px-2 py-1 bg-transparent text-lg text-gray-800 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors"
+                className="px-2 py-1 bg-transparent text-lg text-gray-800 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors hover:underline"
                 style={{ minWidth: '200px', width: 'auto' }}
                 size={currentCircuitName.length || 20}
                 placeholder="Circuit Name"
@@ -2031,494 +2094,471 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
             )}
             
             {/* ...existing code for the rest of the header controls... */}
-            {/* File Menu - Contains Export & Import */}
-            <CollapsibleToolbar
-              label="Circuit"
-              icon={<FaFolder size={12} />}
-              direction="dropdown"
-            >
-              <DropdownItem
-                icon={<FaPlus size={14} />}
-                label="New"
-                onClick={openNewSessionModal}
-                className="bg-orange-100 hover:!bg-orange-200 text-orange-800 font-semibold"
-              />
-              <DropdownItem
-                icon={<FaLink size={14} />}
-                label="Export"
-                onClick={handleExportCircuit}
-                className="bg-blue-100 hover:!bg-blue-200 text-blue-800"
-              />
-              <DropdownItem
-                icon={<FaUpload size={14} />}
-                label="Import"
-                onClick={handleImportCircuit}
-                className="bg-green-100 hover:!bg-green-200 text-green-800"
-              />
-            </CollapsibleToolbar>
+            {/* File Menu - Contains Export & Import (moved to right group) */}
 
-            {/* Color Palette */}
-            <div title="Wire colour">
-              <ColorPaletteDropdown
-                colors={defaultColors}
-                selectedColor={selectedWireColor}
-                onColorSelect={(color) => {
-                  setSelectedWireColor(color);
-                  const selectedId = selectedElement?.id;
-                  if (!selectedId) return;
-                  // If a wire is selected, change its color, push AFTER change
-                  setWires((prev) => {
-                    const exists = prev.some((w) => w.id === selectedId);
-                    if (!exists) return prev;
-                    const next = prev.map((w) =>
-                      w.id === selectedId ? { ...w, color } : w
-                    );
-                    // Push AFTER mutation so undo only reverts the color
-                    pushToHistory(elementsRef.current, next);
-                    return next;
-                  });
-                }}
-              />
-            </div>
+            {/* Color Palette and shortcuts moved to tools row (after Fit to View) */}
+            <div className="ml-auto flex items-center gap-2">
+              {/* File Menu - Contains Export & Import */}
+              <CollapsibleToolbar
+                label="Circuit"
+                icon={<FaFolder size={16} />}
+                direction="dropdown"
+              >
+                <DropdownItem
+                  icon={<FaPlus size={16} />}
+                  label="New"
+                  onClick={openNewSessionModal}
+                  className="bg-orange-100 hover:!bg-orange-200 text-orange-800 font-semibold"
+                />
+                <DropdownItem
+                  icon={<FaLink size={16} />}
+                  label="Export"
+                  onClick={handleExportCircuit}
+                  className="bg-blue-100 hover:!bg-blue-200 text-blue-800"
+                />
+                <DropdownItem
+                  icon={<FaUpload size={16} />}
+                  label="Import"
+                  onClick={handleImportCircuit}
+                  className="bg-green-100 hover:!bg-green-200 text-green-800"
+                />
+              </CollapsibleToolbar>
+              
 
-            {/* Tools Menu - Expands horizontally with animation */}
-            <CollapsibleToolbar
-              label="Tools"
-              icon={<FaWrench size={12} />}
-              direction="horizontal"
-            >
-              {/* Notes Tool */}
-              <ToolButton
-                icon={<FaNoteSticky size={14} />}
-                title="Notes Tool"
-                onClick={() => setNotesToolActive(!notesToolActive)}
-                className={notesToolActive ? "!bg-blue-500 !text-white" : ""}
-              />
-
-              {/* Divider */}
-              <div className="w-px h-5 bg-gray-300 mx-1" />
-
-              {/* Rotate Left */}
-              <ToolButton
-                icon={<FaRotateLeft size={14} />}
-                title="Rotate Left (E)"
-                disabled={!selectedElement}
-                onClick={() => {
-                  if (!selectedElement) return;
-                  setElements((prev) => {
-                    const next = prev.map((el) =>
-                      el.id === selectedElement.id
-                        ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
-                        : el
-                    );
-                    elementsRef.current = next;
-                    updateWiresDirect();
-                    pushToHistory(next, wiresRef.current);
-                    return next;
-                  });
-                  stopSimulation();
-                }}
-              />
-
-              {/* Rotate Right */}
-              <ToolButton
-                icon={<FaRotateRight size={14} />}
-                title="Rotate Right (R)"
-                disabled={!selectedElement}
-                onClick={() => {
-                  if (!selectedElement) return;
-                  setElements((prev) => {
-                    const next = prev.map((el) =>
-                      el.id === selectedElement.id
-                        ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
-                        : el
-                    );
-                    elementsRef.current = next;
-                    updateWiresDirect();
-                    pushToHistory(next, wiresRef.current);
-                    return next;
-                  });
-                  stopSimulation();
-                }}
-              />
-
-              {/* Divider */}
-              <div className="w-px h-5 bg-gray-300 mx-1" />
-
-              {/* Copy */}
-              <ToolButton
-                icon={<FaCopy size={14} />}
-                title="Copy"
-                disabled={!selectedElement || selectedElement.type === "wire"}
-                onClick={() => {
-                  if (!selectedElement || selectedElement.type === "wire") return;
-                  setCopiedElement(selectedElement);
-                }}
-              />
-
-              {/* Paste */}
-              <ToolButton
-                icon={<FaPaste size={14} />}
-                title="Paste"
-                disabled={!copiedElement}
-                onClick={() => {
-                  if (!copiedElement) return;
-                  if (simulationRunning) stopSimulation();
-                  
-                  const newElement = createElement({
-                    type: copiedElement.type,
-                    idNumber: getNextIdNumberForType(copiedElement.type),
-                    pos: { x: copiedElement.x + 50, y: copiedElement.y + 50 },
-                    properties: { ...copiedElement.properties },
-                  });
-                  
-                  if (!newElement) return;
-                  
-                  setElements((prev) => {
-                    const next = [...prev, newElement];
-                    pushToHistory(next, wires);
-                    return next;
-                  });
-                  
-                  setSelectedElement(newElement);
-                  setShowPropertiesPannel(true);
-                }}
-              />
-
-              {/* Divider */}
-              <div className="w-px h-5 bg-gray-300 mx-1" />
-
-              {/* Delete */}
-              <ToolButton
-                icon={<FaTrash size={14} />}
-                title="Delete"
-                disabled={!selectedElement}
-                onClick={() => {
-                  if (!selectedElement) return;
-                  if (simulationRunning) stopSimulation();
-                  
-                  if (selectedElement.type === "wire") {
-                    setWires((prev) => {
-                      const next = prev.filter((w) => w.id !== selectedElement.id);
-                      pushToHistory(elementsRef.current, next);
-                      return next;
-                    });
-                  } else {
-                    if (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") {
-                      openDeleteControllerModal(selectedElement);
-                      return;
-                    }
-                    
-                    const elementNodeIds = selectedElement.nodes.map((n) => n.id);
-                    setWires((prev) => prev.filter((w) => 
-                      !elementNodeIds.includes(w.fromNodeId) && 
-                      !elementNodeIds.includes(w.toNodeId)
-                    ));
-                    setElements((prev) => {
-                      const next = prev.filter((el) => el.id !== selectedElement.id);
-                      pushToHistory(next, wiresRef.current);
-                      return next;
-                    });
+              <CircuitStorage
+                onCircuitSelect={async (circuitId) => {
+                  const data = await getCircuitById(circuitId);
+                  if (!data) return;
+                  setCurrentCircuitName(data.name);
+                  setCurrentCircuitId(circuitId);
+                  pushToHistory(elements, wires);
+                  resetState();
+                  setLoadingSavedCircuit(true);
+                  setElements(data.elements);
+                  loadWires(data.wires);
+                  // Load controller code if available
+                  if (data.controllerCodeMap) {
+                    setControllerCodeMap(data.controllerCodeMap);
                   }
-                  
-                  setSelectedElement(null);
-                  setShowPropertiesPannel(false);
-                  setCreatingWireStartNode(null);
+                  if (data.controllerXmlMap) {
+                    setControllerXmlMap(data.controllerXmlMap);
+                  }
+                  setTimeout(() => {
+                    const pos = stageRef.current?.getPointerPosition();
+                    if (pos) setMousePos(pos);
+                  }, 0);
+                  setTimeout(() => {
+                    setLoadingSavedCircuit(false);
+                  }, 500);
                 }}
+                currentElements={elements}
+                currentWires={wires}
+                getSnapshot={() => stageRef.current?.toDataURL() || ""}
+                onOpenModal={() => {
+                  stopSimulation();
+                  setSelectedElement(null);
+                }}
+                onCircuitNameChange={(name) => setCurrentCircuitName(name)}
+                currentCircuitId={currentCircuitId}
+                currentCircuitName={currentCircuitName}
+                controllerCodeMap={controllerCodeMap}
+                onControllerCodeMapLoad={(codeMap) => setControllerCodeMap(codeMap)}
+                controllerXmlMap={controllerXmlMap}
+                onControllerXmlMapLoad={(xmlMap) => setControllerXmlMap(xmlMap)}
               />
 
-              {/* Fit to View */}
-              <ToolButton
-                icon={<FaExpand size={14} />}
-                title="Fit to View"
-                disabled={elements.length === 0}
-                onClick={handleFitToView}
-              />
-            </CollapsibleToolbar>
-
-            {/* Tooltip Group + Simulation Timer */}
-            <div className="relative group flex items-center gap-3">
-              {/* Trigger Button */}
-              <div className="w-6 h-6 flex items-center justify-center shadow-lg bg-gray-200 rounded-full cursor-pointer hover:shadow-blue-400 hover:scale-105 transition">
-                ?
-              </div>
-              {/* Tooltip Box */}
-              <div className="absolute bg-gray-100 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-                <div className="font-semibold text-sm mb-2 text-gray-800">
-                  Keyboard Shortcuts
-                </div>
-                <table className="w-full text-sm border-separate border-spacing-y-1">
-                  <thead>
-                    <tr>
-                      <th className="text-left w-32 font-medium text-gray-700">
-                        Keybind
-                      </th>
-                      <th className="text-left font-medium text-gray-700">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {getShortcutMetadata().map((s) => (
-                      <tr key={s.name}>
-                        <td className="py-1 pr-4 align-top">
-                          {s.keys.map((k, i) => (
-                            <React.Fragment key={`${s.name}-key-${k}`}>
-                              <kbd className="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 text-xs font-mono">
-                                {k}
-                              </kbd>
-                              {i < s.keys.length - 1 && (
-                                <span className="mx-1">+</span>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </td>
-                        <td className="py-1 align-middle">{s.description}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <AuthHeader inline />
             </div>
           </div>
 
           <div className="flex flex-row items-center gap-2">
-            {/* micro:bit Flash/Upload Controls - visible when there are microbit controllers in the circuit */}
-            {elements.some((el) => el.type === "microbit" || el.type === "microbitWithBreakout") && (
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-sm border border-gray-200">
-                {/* micro:bit Connection Status Indicator */}
-                {isWebUSBSupported && (
-                  <div 
-                    className="flex items-center gap-1.5 px-1.5 py-0.5 group relative"
-                    title={
-                      microbitConnectionStatus === 'connected'
-                        ? `micro:bit connected via USB${microbitDeviceInfo ? ` (${microbitDeviceInfo.boardVersion || ''} #${microbitDeviceInfo.shortId})` : ''}`
-                        : 'micro:bit not connected'
+
+            {/* removed Run/Code/Debugger/Auth from top row; moved to second row */}
+            {/* Second header row: tools */}
+            <div className="w-full flex items-center justify-between">
+              <div className="flex items-center gap-1 px-2 py-1 bg-gray-50 rounded-lg border border-gray-200">
+                <ToolButton
+                  icon={<FaNoteSticky size={18} />}
+                  title="Notes Tool"
+                  onClick={() => setNotesToolActive(!notesToolActive)}
+                  className={notesToolActive ? "!bg-blue-500 !text-white" : ""}
+                />
+
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+
+                <ToolButton
+                  icon={<FaRotateLeft size={18} />}
+                  title="Rotate Left (E)"
+                  disabled={!selectedElement}
+                  onClick={() => {
+                    if (!selectedElement) return;
+                    setElements((prev) => {
+                      const next = prev.map((el) =>
+                        el.id === selectedElement.id
+                          ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
+                          : el
+                      );
+                      elementsRef.current = next;
+                      updateWiresDirect();
+                      pushToHistory(next, wiresRef.current);
+                      return next;
+                    });
+                    stopSimulation();
+                  }}
+                />
+
+                <ToolButton
+                  icon={<FaRotateRight size={18} />}
+                  title="Rotate Right (R)"
+                  disabled={!selectedElement}
+                  onClick={() => {
+                    if (!selectedElement) return;
+                    setElements((prev) => {
+                      const next = prev.map((el) =>
+                        el.id === selectedElement.id
+                          ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
+                          : el
+                      );
+                      elementsRef.current = next;
+                      updateWiresDirect();
+                      pushToHistory(next, wiresRef.current);
+                      return next;
+                    });
+                    stopSimulation();
+                  }}
+                />
+
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+
+                <ToolButton
+                  icon={<FaCopy size={18} />}
+                  title="Copy"
+                  disabled={!selectedElement || selectedElement.type === "wire"}
+                  onClick={() => {
+                    if (!selectedElement || selectedElement.type === "wire") return;
+                    setCopiedElement(selectedElement);
+                  }}
+                />
+
+                <ToolButton
+                  icon={<FaPaste size={18} />}
+                  title="Paste"
+                  disabled={!copiedElement}
+                  onClick={() => {
+                    if (!copiedElement) return;
+                    if (simulationRunning) stopSimulation();
+                    const newElement = createElement({
+                      type: copiedElement.type,
+                      idNumber: getNextIdNumberForType(copiedElement.type),
+                      pos: { x: copiedElement.x + 50, y: copiedElement.y + 50 },
+                      properties: { ...copiedElement.properties },
+                    });
+                    if (!newElement) return;
+                    setElements((prev) => {
+                      const next = [...prev, newElement];
+                      pushToHistory(next, wires);
+                      return next;
+                    });
+                    setSelectedElement(newElement);
+                    setShowPropertiesPannel(true);
+                  }}
+                />
+
+                <div className="w-px h-5 bg-gray-300 mx-1" />
+
+                <ToolButton
+                  icon={<FaTrash size={18} />}
+                  title="Delete"
+                  disabled={!selectedElement}
+                  onClick={() => {
+                    if (!selectedElement) return;
+                    if (simulationRunning) stopSimulation();
+                    if (selectedElement.type === "wire") {
+                      setWires((prev) => {
+                        const next = prev.filter((w) => w.id !== selectedElement.id);
+                        pushToHistory(elementsRef.current, next);
+                        return next;
+                      });
+                    } else {
+                      if (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") {
+                        openDeleteControllerModal(selectedElement);
+                        return;
+                      }
+                      const elementNodeIds = selectedElement.nodes.map((n) => n.id);
+                      setWires((prev) => prev.filter((w) => 
+                        !elementNodeIds.includes(w.fromNodeId) && 
+                        !elementNodeIds.includes(w.toNodeId)
+                      ));
+                      setElements((prev) => {
+                        const next = prev.filter((el) => el.id !== selectedElement.id);
+                        pushToHistory(next, wiresRef.current);
+                        return next;
+                      });
                     }
-                  >
-                    <span className="text-xs text-gray-500 font-medium">Status</span>
-                    {/* Status dot with animation */}
-                    <span className="relative flex h-2.5 w-2.5">
-                      {microbitConnectionStatus === 'connected' && (
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      )}
-                      <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${
-                        microbitConnectionStatus === 'connected'
-                          ? 'bg-emerald-500'
-                          : 'bg-orange-400'
-                      }`}></span>
-                    </span>
-                    {/* Tooltip on hover */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1.5 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100]">
-                      {microbitConnectionStatus === 'connected' ? (
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-medium text-emerald-400">Connected</span>
-                          {microbitDeviceInfo && (
-                            <span className="text-gray-300">
-                              {microbitDeviceInfo.boardVersion || 'micro:bit'} • ID: {microbitDeviceInfo.shortId}
-                            </span>
+                    setSelectedElement(null);
+                    setShowPropertiesPannel(false);
+                    setCreatingWireStartNode(null);
+                  }}
+                />
+
+                <ToolButton
+                  icon={<FaExpand size={18} />}
+                  title="Fit to View"
+                  disabled={elements.length === 0}
+                  onClick={handleFitToView}
+                />
+                {/* Color Palette */}
+                <div title="Wire colour">
+                  <ColorPaletteDropdown
+                    colors={defaultColors}
+                    selectedColor={selectedWireColor}
+                    onColorSelect={(color) => {
+                      setSelectedWireColor(color);
+                      const selectedId = selectedElement?.id;
+                      if (!selectedId) return;
+                      // If a wire is selected, change its color, push AFTER change
+                      setWires((prev) => {
+                        const exists = prev.some((w) => w.id === selectedId);
+                        if (!exists) return prev;
+                        const next = prev.map((w) =>
+                          w.id === selectedId ? { ...w, color } : w
+                        );
+                        // Push AFTER mutation so undo only reverts the color
+                        pushToHistory(elementsRef.current, next);
+                        return next;
+                      });
+                    }}
+                  />
+                </div>
+
+                {/* Tooltip Group + Keyboard Shortcuts */}
+                <div className="relative group flex items-center gap-3">
+                  <div className="w-6 h-6 flex items-center justify-center shadow-lg bg-gray-200 rounded-full cursor-pointer hover:shadow-blue-400 hover:scale-105 transition">?
+                  </div>
+                  <div className="absolute bg-gray-100 bg-clip-padding border border-gray-300 shadow-2xl rounded-xl text-sm top-full left-0 mt-2 w-[300px] z-50 p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+                    <div className="font-semibold text-sm mb-2 text-gray-800">Keyboard Shortcuts</div>
+                    <table className="w-full text-sm border-separate border-spacing-y-1">
+                      <thead>
+                        <tr>
+                          <th className="text-left w-32 font-medium text-gray-700">Keybind</th>
+                          <th className="text-left font-medium text-gray-700">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {getShortcutMetadata().map((s) => (
+                          <tr key={s.name}>
+                            <td className="py-1 pr-4 align-top">
+                              {s.keys.map((k, i) => (
+                                <React.Fragment key={`${s.name}-key-${k}`}>
+                                  <kbd className="inline-block bg-gray-100 text-gray-800 px-2 py-1 rounded border border-gray-300 text-xs font-mono">{k}</kbd>
+                                  {i < s.keys.length - 1 && (<span className="mx-1">+</span>)}
+                                </React.Fragment>
+                              ))}
+                            </td>
+                            <td className="py-1 align-middle">{s.description}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+
+              
+
+              <div className="flex items-center gap-2">
+                {/* Micro:bit status / HEX / WebUSB controls moved next to Run button */}
+                {elements.some((el) => el.type === "microbit" || el.type === "microbitWithBreakout") && (
+                  <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 rounded-sm border border-gray-200 mr-2">
+                    {isWebUSBSupported && (
+                      <div 
+                        className="flex items-center gap-2 px-2 py-1 group relative"
+                        title={
+                          microbitConnectionStatus === 'connected'
+                            ? `micro:bit connected via USB${microbitDeviceInfo ? ` (${microbitDeviceInfo.boardVersion || ''} #${microbitDeviceInfo.shortId})` : ''}`
+                            : 'micro:bit not connected'
+                        }
+                      >
+                        <span className="text-sm text-gray-600 font-medium">Status</span>
+                        <span className="relative flex h-3 w-3">
+                          {microbitConnectionStatus === 'connected' && (
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          )}
+                          <span className={`relative inline-flex rounded-full h-3 w-3 ${
+                            microbitConnectionStatus === 'connected'
+                              ? 'bg-emerald-500'
+                              : 'bg-orange-400'
+                          }`}></span>
+                        </span>
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1.5 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-[100]">
+                          {microbitConnectionStatus === 'connected' ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium text-emerald-400">Connected</span>
+                              {microbitDeviceInfo && (
+                                <span className="text-gray-300">
+                                  {microbitDeviceInfo.boardVersion || 'micro:bit'} • ID: {microbitDeviceInfo.shortId}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            'Disconnected'
                           )}
                         </div>
-                      ) : (
-                        'Disconnected'
-                      )}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 border-4 border-transparent border-b-gray-900"></div>
-                    </div>
+                      </div>
+                    )}
+
+                    {isWebUSBSupported && (
+                      <button
+                        onClick={() => {
+                          if (microbitConnectionStatus === 'connected') {
+                            handleDisconnectMicrobit();
+                          } else {
+                            handleConnectMicrobit();
+                          }
+                        }}
+                        disabled={isFlashing}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all duration-200 border ${
+                          isFlashing
+                            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                            : microbitConnectionStatus === 'connected'
+                            ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 shadow-sm'
+                            : 'bg-indigo-500 border-indigo-500 text-white hover:bg-indigo-600 shadow-sm'
+                        }`}
+                        title={microbitConnectionStatus === 'connected' ? 'Disconnect micro:bit' : 'Connect to micro:bit'}
+                      >
+                        {microbitConnectionStatus === 'connected' ? (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={handleDownloadHex}
+                      className="flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all duration-200 border bg-blue-500 border-blue-500 text-white hover:bg-blue-600 shadow-sm"
+                      title="Download HEX file - drag to MICROBIT drive to flash"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+
+                    {isWebUSBSupported && (
+                      <button
+                        onClick={handleFlashToMicrobit}
+                        disabled={isFlashing || microbitConnectionStatus !== 'connected'}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded text-sm font-medium transition-all duration-200 border ${
+                          isFlashing
+                            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                            : microbitConnectionStatus !== 'connected'
+                            ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                            : 'bg-green-500 border-green-500 text-white hover:bg-green-600 shadow-sm'
+                        }`}
+                        title={
+                          isFlashing 
+                            ? 'Flashing in progress...' 
+                            : microbitConnectionStatus !== 'connected'
+                            ? 'Connect micro:bit first to enable direct flashing'
+                            : 'Flash directly to micro:bit via USB'
+                        }
+                      >
+                        {isFlashing ? (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    )}
                   </div>
                 )}
-                
-                {/* Connect/Disconnect Button */}
-                {isWebUSBSupported && (
+                <div className="relative">
                   <button
-                    onClick={() => {
-                      if (microbitConnectionStatus === 'connected') {
-                        handleDisconnectMicrobit();
-                      } else {
-                        handleConnectMicrobit();
-                      }
-                    }}
-                    disabled={isFlashing}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all duration-200 border ${
-                      isFlashing
-                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                        : microbitConnectionStatus === 'connected'
-                        ? 'bg-orange-500 border-orange-500 text-white hover:bg-orange-600 shadow-sm'
-                        : 'bg-indigo-500 border-indigo-500 text-white hover:bg-indigo-600 shadow-sm'
-                    }`}
-                    title={microbitConnectionStatus === 'connected' ? 'Disconnect micro:bit' : 'Connect to micro:bit'}
+                      className={`rounded border border-gray-300 shadow text-black px-3 py-2 text-sm font-medium cursor-pointer ${
+                      simulationRunning
+                      ? "bg-blue-300 hover:shadow-blue-400"
+                      : "bg-emerald-300 hover:shadow-emerald-400"
+                      } flex items-center space-x-1.5 hover:scale-105 transition-all duration-200 ${stopDisabled ? "opacity-50 cursor-not-allowed" : ""
+                      } relative z-10`}
+                    onClick={() =>
+                      simulationRunning ? stopSimulation() : startSimulation()
+                    }
+                    disabled={stopDisabled && simulationRunning}
+                    title={simulationRunning ? "Stop simulation" : "Run simulation"}
                   >
-                    {microbitConnectionStatus === 'connected' ? (
+                    {simulationRunning ? (
                       <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                        </svg>
+                        <FaStop size={16} />
+                        <span className="font-mono font-bold text-gray-900">{formatTime(simulationTime)}</span>
                       </>
                     ) : (
                       <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                        </svg>
+                        <FaPlay size={16} />
+                        <span className="text-sm font-medium">Run</span>
                       </>
                     )}
                   </button>
-                )}
-                
-                {/* Download HEX button */}
+
+                  {/* Progress bar overlay */}
+                  {simulationRunning && stopDisabled && (
+                    <div
+                      ref={progressRef}
+                      className="absolute top-0 left-0 h-full bg-blue-200 opacity-50 rounded-sm z-0"
+                      style={{ width: "100%" }}
+                    />
+                  )}
+                </div>
+
                 <button
-                  onClick={handleDownloadHex}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all duration-200 border bg-blue-500 border-blue-500 text-white hover:bg-blue-600 shadow-sm"
-                  title="Download HEX file - drag to MICROBIT drive to flash"
+                  onClick={() => {
+                    // Toggle: if editor is already open, close it
+                    if (openCodeEditor) {
+                      setOpenCodeEditor(false);
+                      return;
+                    }
+
+                    // If a micro:bit is selected, open for that; else open editor with no active controller
+                    if (selectedElement && (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout")) {
+                      setActiveControllerId(selectedElement.id);
+                    } else {
+                      setActiveControllerId(null);
+                    }
+                    setOpenCodeEditor(true);
+                  }}
+                  title="Open block/text editor"
+                  className="px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
                 >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
+                    <FaCode size={16} />
+                    <span className="text-sm font-medium">Code</span>
                 </button>
 
-                {/* Flash to micro:bit button (WebUSB) */}
-                {isWebUSBSupported && (
-                  <button
-                    onClick={handleFlashToMicrobit}
-                    disabled={isFlashing || microbitConnectionStatus !== 'connected'}
-                    className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-all duration-200 border ${
-                      isFlashing
-                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                        : microbitConnectionStatus !== 'connected'
-                        ? 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-                        : 'bg-green-500 border-green-500 text-white hover:bg-green-600 shadow-sm'
-                    }`}
-                    title={
-                      isFlashing 
-                        ? 'Flashing in progress...' 
-                        : microbitConnectionStatus !== 'connected'
-                        ? 'Connect micro:bit first to enable direct flashing'
-                        : 'Flash directly to micro:bit via USB'
-                    }
-                  >
-                    {isFlashing ? (
-                      <>
-                        <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowDebugBox((prev) => !prev)}
+                  className="px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+                >
+                    <VscDebug size={16} />
+                    <span className="text-sm font-medium">Debugger</span>
+                </button>
+
+
+                
               </div>
-            )}
-
-            <div className="relative">
-              <button
-                className={`rounded border border-gray-300 shadow text-black px-2 py-1 text-xs font-medium cursor-pointer ${
-                  simulationRunning
-                  ? "bg-blue-300 hover:shadow-blue-400"
-                  : "bg-emerald-300 hover:shadow-emerald-400"
-                  } flex items-center space-x-1.5 hover:scale-105 transition-all duration-200 ${stopDisabled ? "opacity-50 cursor-not-allowed" : ""
-                  } relative z-10`}
-                onClick={() =>
-                  simulationRunning ? stopSimulation() : startSimulation()
-                }
-                disabled={stopDisabled && simulationRunning}
-                title={simulationRunning ? "Stop simulation" : "Run simulation"}
-              >
-                {simulationRunning ? (
-                  <>
-                    <FaStop size={11} />
-                    <span className="font-mono font-bold text-gray-900">{formatTime(simulationTime)}</span>
-                  </>
-                ) : (
-                  <>
-                    <FaPlay size={11} />
-                    <span>Run</span>
-                  </>
-                )}
-              </button>
-
-              {/* Progress bar overlay */}
-              {simulationRunning && stopDisabled && (
-                <div
-                  ref={progressRef}
-                  className="absolute top-0 left-0 h-full bg-blue-200 opacity-50 rounded-sm z-0"
-                  style={{ width: "100%" }}
-                />
-              )}
             </div>
-
-            <button
-              onClick={() => {
-                // Toggle: if editor is already open, close it
-                if (openCodeEditor) {
-                  setOpenCodeEditor(false);
-                  return;
-                }
-
-                // If a micro:bit is selected, open for that; else open editor with no active controller
-                if (selectedElement && (selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout")) {
-                  setActiveControllerId(selectedElement.id);
-                } else {
-                  setActiveControllerId(null);
-                }
-                setOpenCodeEditor(true);
-              }}
-              title="Open block/text editor"
-              className="px-2 py-1 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:shadow-blue-400 hover:scale-105"
-            >
-              <FaCode size={11} />
-              <span>Code</span>
-            </button>
-
-            <button
-              onClick={() => setShowDebugBox((prev) => !prev)}
-              className="px-2 py-1 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:shadow-blue-400 hover:scale-105"
-            >
-              <VscDebug size={11} />
-              <span>Debugger</span>
-            </button>
-
-
-            <CircuitStorage
-              onCircuitSelect={async (circuitId) => {
-                const data = await getCircuitById(circuitId);
-                if (!data) return;
-                setCurrentCircuitName(data.name);
-                setCurrentCircuitId(circuitId);
-                pushToHistory(elements, wires);
-                resetState();
-                setLoadingSavedCircuit(true);
-                setElements(data.elements);
-                loadWires(data.wires);
-                setTimeout(() => {
-                  const pos = stageRef.current?.getPointerPosition();
-                  if (pos) setMousePos(pos);
-                }, 0);
-                setTimeout(() => {
-                  setLoadingSavedCircuit(false);
-                }, 500);
-              }}
-              currentElements={elements}
-              currentWires={wires}
-              getSnapshot={() => stageRef.current?.toDataURL() || ""}
-              onOpenModal={() => {
-                stopSimulation();
-                setSelectedElement(null);
-              }}
-              onCircuitNameChange={(name) => setCurrentCircuitName(name)}
-              currentCircuitId={currentCircuitId}
-              currentCircuitName={currentCircuitName}
-            /> 
-
-            <AuthHeader inline />
-
-            {/* auth dropdown removed (use global AuthHeader component) */}
           </div>
         </div>
         {selectedElement && showPropertiesPannel ? (
           <div
-            className={`absolute top-2 me-73 mt-12 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}
-            style={{ right: `${propertiesPanelRight}px` }}
+            className={`absolute me-73 z-40 rounded-xl border border-gray-300 w-[240px] max-h-[90%] overflow-y-auto backdrop-blur-sm bg-white/10 shadow-2xl transition-all duration-200 ${propertiesPanelClosing ? "opacity-0 translate-y-1" : "opacity-100 translate-y-0"}`}
+            style={{
+              right: `${propertiesPanelRight}px`,
+              top: openCodeEditor ? '132px' : '108px',
+            }}
           >
             <div className="p-1">
               <div className="flex items-center justify-start px-3 py-2 border-b border-gray-200">
@@ -3297,9 +3337,10 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
       <div
         id="circuit-palette-panel"
-        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute top-0 right-0 z-30 ${showPalette ? "w-72" : "w-10"}`}
+        className={`transition-all duration-300 h-max mt-15 m-0.5 overflow-visible absolute right-0 z-30 ${showPalette ? "w-72" : "w-10"}`}
         style={{
           pointerEvents: "auto",
+          top: "72px",
           // Glass effect
           background: "rgba(255, 255, 255, 0.1)", // white with 10% opacity
           backdropFilter: "blur(15px)", // blur the background behind
@@ -3331,7 +3372,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       {/* Conditionally render editor only when open to properly clean up DOM (toolbox, etc.) */}
       {openCodeEditor && (
         <div
-          className="absolute right-0 top-13 z-50"
+          className="absolute right-0 z-50"
+          style={{ top: '108px' }}
         >
           <UnifiedEditor
             controllerCodeMap={controllerCodeMap}
@@ -3345,6 +3387,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
             sharedFlasher={sharedFlasherRef.current}
             onFlashingChange={setIsFlashing}
             isSimulationOn={simulationRunning}
+            externalControllerXmlMap={controllerXmlMap}
+            onControllerXmlMapChange={setControllerXmlMap}
             controllers={(() => {
               const list = elements.filter((el) => el.type === "microbit" || el.type === "microbitWithBreakout");
               let microbitCount = 0;

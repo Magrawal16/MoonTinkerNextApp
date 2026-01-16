@@ -41,58 +41,50 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
     ? "inline-flex items-center gap-2"
     : styles.inlineWrapperInner;
   const profileIconClass = inline
-    ? "w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white flex-shrink-0"
+    ? "w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0 transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-300 transform transition-transform duration-150 hover:scale-110 active:scale-95"
     : styles.profileIcon;
   const chevronBtnClass = inline
-    ? "w-8 h-8 inline-flex items-center justify-center bg-white border border-gray-200 rounded-lg cursor-pointer"
+    ? "w-10 h-10 inline-flex items-center justify-center bg-white border border-gray-200 rounded-lg cursor-pointer"
     : styles.chevronButton;
   const dropdownInlineClass =
     "absolute top-full right-0 mt-2 bg-white rounded-lg shadow-lg py-2 min-w-[180px] z-[10000]";
   const dropdownHeaderClass =
-    "px-4 py-2 text-[13px] text-gray-500 border-b border-gray-100 whitespace-nowrap";
+    "px-4 py-2 text-[16px] text-gray-500 border-b border-gray-100 whitespace-nowrap";
   const signOutBtnClass =
-    "w-full px-4 py-2 flex items-center gap-2 bg-transparent text-red-600 text-[13px] text-left hover:bg-red-50";
+    "w-full px-4 py-2 flex items-center gap-2 bg-transparent text-red-600 text-[16px] text-left hover:bg-red-50";
 
   return (
     <div className={wrapperClass}>
       {auth.isAuthenticated ? (
         <div ref={dropdownRef} style={{ position: 'relative' }}>
           <div className={innerClass}>
-            <div className={profileIconClass} aria-hidden>
-              <svg 
-                width="16" 
-                height="16" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                stroke="currentColor" 
-                strokeWidth="2"
-              >
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-            </div>
-
-            <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              aria-expanded={isDropdownOpen}
-              aria-label="Open user menu"
-              className={chevronBtnClass}
-            >
-              <svg
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                style={{
-                  transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0)',
-                  transition: 'transform 0.15s'
-                }}
-              >
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
+            {
+              (() => {
+                const avatarClass = inline
+                  ? `${profileIconClass} ${isDropdownOpen ? 'bg-blue-600' : 'bg-yellow-400'} cursor-pointer`
+                  : `${profileIconClass} ${isDropdownOpen ? styles.profileIconActive : ''} ${styles.profileButton} cursor-pointer`;
+                return (
+                  <button
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                    aria-expanded={isDropdownOpen}
+                    aria-label="Open user menu"
+                    className={avatarClass}
+                  >
+                    <svg 
+                      width="20" 
+                      height="20" 
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      strokeWidth="2"
+                    >
+                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                      <circle cx="12" cy="7" r="4" />
+                    </svg>
+                  </button>
+                );
+              })()
+            }
           </div>
 
           {isDropdownOpen && (
@@ -111,7 +103,7 @@ export const AuthHeader: React.FC<{ inline?: boolean }> = ({ inline = false }) =
                 onClick={handleSignOut}
                 className={inline ? signOutBtnClass : styles.signOutButton}
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <polyline points="16 17 21 12 16 7" />
                   <line x1="21" y1="12" x2="9" y2="12" />

@@ -4,7 +4,7 @@ import {
   BaseElement,
   BaseElementProps,
 } from "@/circuit_canvas/components/core/BaseElement";
-import { Circle, Group, Line } from "react-konva";
+import { Circle, Group, Line, Image, Path } from "react-konva";
 import Konva from "konva";
 import { KonvaEventObject } from "konva/lib/Node";
 
@@ -15,140 +15,261 @@ interface PotentiometerProps extends BaseElementProps {
 }
 
 function Potentiometer(props: PotentiometerProps) {
-  const [angle, setAngle] = useState(135);
+  // Tinkercad-compatible potentiometer dial
+  // LEFT endpoint = 225° (7:30 position)
+  // RIGHT endpoint = 135° (4:30 position)  
+  // Sweep is 270° through the top (no rotation allowed between 135°–225°)
+  const SWEEP_START = 225;  // Left endpoint
+  const SWEEP_END = 135;    // Right endpoint
+  const SWEEP_LENGTH = 270; // Total degrees of valid rotation
+  
+  // Convert angle (degrees) to ratio (0-1) - EXACT Tinkercad mapping
+  const angleToRatio = (angleDeg: number): number => {
+    // Normalize angle to 0–360
+    angleDeg = ((angleDeg % 360) + 360) % 360;
+    
+    // Calculate distance from sweep start (225°) going clockwise through the top
+    let dist = (angleDeg - SWEEP_START + 360) % 360;
+    
+    // Clamp to sweep length
+    if (dist > SWEEP_LENGTH) dist = SWEEP_LENGTH;
+    
+    return Math.min(1, Math.max(0, dist / SWEEP_LENGTH));
+  };
+  
+  // Convert ratio (0-1) to angle (degrees)
+  const ratioToAngle = (ratio: number): number => {
+    // Clamp ratio to 0-1
+    ratio = Math.min(1, Math.max(0, ratio));
+    
+    // Calculate angle from ratio
+    const offset = ratio * SWEEP_LENGTH;
+    let angle = SWEEP_START + offset;
+    
+    // Normalize to 0-360
+    if (angle >= 360) angle -= 360;
+    
+    return angle;
+  };
+  
+  // Check if angle is in the dead zone (135° to 225°)
+  const isInDeadZone = (deg: number): boolean => {
+    const normalized = ((deg % 360) + 360) % 360;
+    return normalized > SWEEP_END && normalized < SWEEP_START;
+  };
+  
+  // Get initial angle from props.ratio
+  const getInitialAngle = (): number => {
+    if (typeof props.ratio === "number") {
+      return ratioToAngle(props.ratio);
+    }
+    return SWEEP_START; // Start at left endpoint (ratio = 0)
+  };
+  
+  const initialAngle = getInitialAngle();
+  const [angle, setAngle] = useState(initialAngle);
   const [isDragging, setIsDragging] = useState(false);
+  const [img, setImg] = useState<HTMLImageElement | null>(null);
   const groupRef = useRef<Konva.Group>(null);
+  const lastValidAngleRef = useRef(initialAngle); 
 
-  const minAngle = 45;
-  const maxAngle = 315;
-  const centerX = 25;
-  const centerY = 25;
-  const clampAngle = (deg: number) => {
-    if (deg < minAngle && deg > 180) return minAngle;
-    if (deg > maxAngle && deg < 360) return maxAngle;
-    return Math.max(minAngle, Math.min(maxAngle, deg));
+  useEffect(() => {
+    const image = new window.Image();
+    image.src = "/assets/circuit_canvas/elements/potentiometer.svg";
+    image.onload = () => setImg(image);
+    image.alt = "Potentiometer";
+  }, []);
+
+  const centerX = 31.4;
+  const centerY = 24.5;
+
+  // Helper to check if angle is on the left side of valid range (225° to 360°)
+  const isOnLeftSide = (deg: number): boolean => {
+    const normalized = ((deg % 360) + 360) % 360;
+    return normalized >= SWEEP_START && normalized <= 360;
   };
 
-  const ratioFromAngle = (ang: number) =>
-    (ang - minAngle) / (maxAngle - minAngle);
+  // Helper to check if angle is on the right side of valid range (0° to 135°)
+  const isOnRightSide = (deg: number): boolean => {
+    const normalized = ((deg % 360) + 360) % 360;
+    return normalized >= 0 && normalized <= SWEEP_END;
+  };
 
-  const angleFromRatio = (ratio: number) =>
-    clampAngle(ratio * (maxAngle - minAngle) + minAngle);
-
-  // Update angle only if ratio changes and differs significantly
+  // Sync angle when props.ratio changes
   useEffect(() => {
     if (typeof props.ratio === "number") {
-      const newAngle = angleFromRatio(props.ratio);
-      if (Math.abs(newAngle - angle) > 0.01) {
+      const newAngle = ratioToAngle(props.ratio);
+      const currentRatio = angleToRatio(angle);
+      if (Math.abs(props.ratio - currentRatio) > 0.01) {
         setAngle(newAngle);
+        lastValidAngleRef.current = newAngle;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [props.ratio]); // intentionally ignore 'angle' here to avoid loop
+  }, [props.ratio]);
 
   // Call onRatioChange only if ratio changed meaningfully
   useEffect(() => {
-    const ratio = ratioFromAngle(angle);
+    const ratio = angleToRatio(angle);
     if (props.ratio === undefined || Math.abs(ratio - props.ratio) > 0.01) {
       props.onRatioChange?.(ratio);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [angle]); // intentionally ignoring props.ratio and onRatioChange references
+  }, [angle]);
 
-  const handlePointerMove = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+  const handlePointerMove = (e: MouseEvent | TouchEvent) => {
     if (!isDragging || !groupRef.current) return;
 
-    const stage = e.target.getStage();
-    const pointer = stage?.getPointerPosition();
-    const absPos = groupRef.current.getAbsolutePosition();
-    if (!pointer || !absPos) return;
+    const stage = groupRef.current.getStage();
+    if (!stage) return;
 
-    const dx = pointer.x - (absPos.x + centerX);
-    const dy = pointer.y - (absPos.y + centerY);
-
-    let rawAngle = (Math.atan2(dy, dx) * 180) / Math.PI + 90;
-    if (rawAngle < 0) rawAngle += 360;
-
-    if (rawAngle >= minAngle && rawAngle <= maxAngle) {
-      setAngle(clampAngle(rawAngle));
+    let pointerX: number, pointerY: number;
+    if ('touches' in e && e.touches.length > 0) {
+      const rect = stage.container().getBoundingClientRect();
+      pointerX = e.touches[0].clientX - rect.left;
+      pointerY = e.touches[0].clientY - rect.top;
+    } else if ('clientX' in e) {
+      const rect = stage.container().getBoundingClientRect();
+      pointerX = e.clientX - rect.left;
+      pointerY = e.clientY - rect.top;
+    } else {
+      return;
     }
+
+    // Get absolute position of the group
+    const absPos = groupRef.current.getAbsolutePosition();
+    const scale = stage.scaleX() || 1;
+
+    const dx = (pointerX / scale) - (absPos.x / scale + centerX);
+    const dy = (pointerY / scale) - (absPos.y / scale + centerY);
+
+    let newAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+    
+    newAngle = ((newAngle + 90) % 360 + 360) % 360;
+
+    if (isInDeadZone(newAngle)) {
+      return;
+    }
+
+    const lastAngle = lastValidAngleRef.current;
+    
+    const calculateAngularDistance = (from: number, to: number) => {
+      const diff = ((to - from + 540) % 360) - 180;
+      return Math.abs(diff);
+    };
+    
+    const angularDistance = calculateAngularDistance(lastAngle, newAngle);
+    
+    if (angularDistance > 90) {
+      const wasOnLeft = isOnLeftSide(lastAngle);
+      const wasOnRight = isOnRightSide(lastAngle);
+      const nowOnLeft = isOnLeftSide(newAngle);
+      const nowOnRight = isOnRightSide(newAngle);
+      
+      if ((wasOnLeft && nowOnRight) || (wasOnRight && nowOnLeft)) {
+        if (wasOnLeft) {
+          newAngle = SWEEP_START; // Left endpoint (225°)
+        } else {
+          newAngle = SWEEP_END;   // Right endpoint (135°)
+        }
+      }
+    }
+
+    lastValidAngleRef.current = newAngle;
+    setAngle(newAngle);
   };
+
+  const handlePointerDown = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+    e.cancelBubble = true;
+    setIsDragging(true);
+  };
+
+  const handlePointerUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent | TouchEvent) => {
+      handlePointerMove(e);
+    };
+
+    const handleUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('touchmove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchend', handleUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchend', handleUp);
+    };
+  }, [isDragging]);
 
   return (
     <BaseElement {...props}>
-      <Group
-        ref={groupRef}
-        onMouseMove={handlePointerMove}
-        onTouchMove={handlePointerMove}
-        onMouseUp={() => setIsDragging(false)}
-        onTouchEnd={() => setIsDragging(false)}
-      >
-        <Line
-          points={[0, 0, 0, -15]}
-          stroke="black"
-          strokeWidth={4}
-          hitStrokeWidth={10}
-          lineCap="round"
-          x={centerX + 15}
-          y={centerY - 10}
-        />
-        <Line
-          points={[0, 0, 0, -15]}
-          stroke="black"
-          strokeWidth={4}
-          hitStrokeWidth={10}
-          lineCap="round"
-          x={centerX - 0}
-          y={centerY - 15}
-          shadowColor={props.selected ? "#000000" : undefined}
-          shadowBlur={props.selected ? 10 : 0}
-          shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={0}
-        />
-        <Line
-          points={[0, 0, 0, -15]}
-          stroke="black"
-          strokeWidth={4}
-          hitStrokeWidth={10}
-          lineCap="round"
-          x={centerX - 15}
-          y={centerY - 10}
-          shadowColor={props.selected ? "#000000" : undefined}
-          shadowBlur={props.selected ? 10 : 0}
-          shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={0}
-        />
+      <Group ref={groupRef}>
+        {/* Base potentiometer SVG image */}
+        {img && (
+          <Image
+            image={img}
+            width={60}
+            height={75}
+            shadowColor={props.selected ? "#000000" : undefined}
+            shadowBlur={props.selected ? 10 : 0}
+            shadowOffset={{ x: 10, y: -10 }}
+            shadowOpacity={0}
+          />
+        )}
+
+        {/* Interactive dial/knob overlay - circular clickable area */}
         <Circle
           x={centerX}
           y={centerY}
-          radius={24}
-          fill="#e0e0e0"
-          stroke="black"
-          strokeWidth={2}
-          shadowColor={props.selected ? "#000000" : undefined}
-          shadowBlur={props.selected ? 10 : 0}
-          shadowOffset={{ x: 10, y: 10 }}
-          shadowOpacity={0}
+          radius={9}
+          fill={isDragging ? "rgba(255, 102, 0, 0.4)" : "transparent"}
+          stroke={isDragging ? "#FF6600" : "transparent"}
+          strokeWidth={isDragging ? 2 : 0}
+          onMouseDown={handlePointerDown}
+          onTouchStart={handlePointerDown}
+          onMouseEnter={(e) => {
+            const stage = e.target.getStage();
+            if (stage) stage.container().style.cursor = "grab";
+          }}
+          onMouseLeave={(e) => {
+            if (!isDragging) {
+              const stage = e.target.getStage();
+              if (stage) stage.container().style.cursor = "default";
+            }
+          }}
         />
 
-        <Line
-          points={[0, 0, 0, -15]}
-          stroke="black"
-          strokeWidth={4}
-          hitStrokeWidth={10}
-          lineCap="round"
+        {/* Arrow pointer that rotates with the dial */}
+        <Group
           x={centerX}
           y={centerY}
           rotation={angle}
-          onMouseDown={(e) => {
-            e.cancelBubble = true;
-            setIsDragging(true);
-          }}
-          onDragMove={(e) => {
-            e.cancelBubble = true;
-            setIsDragging(true);
-          }}
-        />
+          listening={false}
+        >
+          {/* Arrow line pointing upward (will rotate) */}
+          <Line
+            points={[0, 0, 0, -8]}
+            stroke="#FF6600"
+            strokeWidth={2}
+            lineCap="round"
+          />
+          {/* Arrow head */}
+          <Path
+            data="M -1.5 -8 L 0 -11 L 1.5 -8 Z"
+            fill="#FF6600"
+          />
+        </Group>
       </Group>
     </BaseElement>
   );

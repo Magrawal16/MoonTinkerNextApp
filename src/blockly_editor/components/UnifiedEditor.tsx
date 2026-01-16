@@ -56,6 +56,8 @@ interface UnifiedEditorProps {
   onFlashRef?: React.MutableRefObject<FlashRefHandle | null>; // Ref to expose flash functionality
   sharedFlasher?: MicrobitFlasher | null; // Shared flasher instance from parent
   onFlashingChange?: (isFlashing: boolean) => void; // Callback to notify parent of flashing state
+  externalControllerXmlMap?: Record<string, string>; // XML map from backend
+  onControllerXmlMapChange?: (xmlMap: Record<string, string>) => void; // Notify parent of XML updates
 }
 
 export default function UnifiedEditor({
@@ -72,6 +74,8 @@ export default function UnifiedEditor({
   onFlashRef,
   sharedFlasher,
   onFlashingChange,
+  externalControllerXmlMap,
+  onControllerXmlMapChange,
 }: UnifiedEditorProps) {
   const EDITOR_MODE_STORAGE_KEY = "moontinker_lastEditorMode";
   const CONTROLLER_MODE_MAP_KEY = "moontinker_controllerEditorModeMap";
@@ -93,8 +97,11 @@ export default function UnifiedEditor({
       return "block";
     }
   });
-  // Load controllerXmlMap from localStorage on mount
+  // Controller XML state: prefer external map from backend, fallback to localStorage
   const [controllerXmlMap, setControllerXmlMap] = useState<Record<string, string>>(() => {
+    if (externalControllerXmlMap && Object.keys(externalControllerXmlMap).length > 0) {
+      return externalControllerXmlMap;
+    }
     if (typeof window !== 'undefined') {
       try {
         const raw = localStorage.getItem('moontinker_controllerXmlMap');
@@ -103,6 +110,18 @@ export default function UnifiedEditor({
     }
     return {};
   });
+
+  // Sync internal XML map when external map changes (only if content differs)
+  useEffect(() => {
+    if (!externalControllerXmlMap || Object.keys(externalControllerXmlMap).length === 0) return;
+    // Only update if content actually changed (deep comparison)
+    const hasChanges = Object.keys(externalControllerXmlMap).some(
+      key => controllerXmlMapRef.current[key] !== externalControllerXmlMap[key]
+    );
+    if (!hasChanges) return;
+    setControllerXmlMap(externalControllerXmlMap);
+    controllerXmlMapRef.current = externalControllerXmlMap;
+  }, [externalControllerXmlMap ? JSON.stringify(externalControllerXmlMap) : '']);
   const [workspaceXml, setWorkspaceXml] = useState<string>("");
   const [bidirectionalConverter, setBidirectionalConverter] = useState<BidirectionalConverter | null>(null);
   const [isUpdatingFromBlocks, setIsUpdatingFromBlocks] = useState(false);
@@ -281,7 +300,7 @@ export default function UnifiedEditor({
     activeControllerIdRef,
     // The following are required by the hook interface
     saveWorkspaceState: (controllerId?: string) => {
-      // Save XML for the current controller
+      // Save XML for the current controller (initialization: no parent notify)
       if (!controllerId) controllerId = activeControllerId ?? undefined;
       if (controllerId && workspaceRef.current) {
         const xml = Blockly.Xml.workspaceToDom(workspaceRef.current);
@@ -318,12 +337,14 @@ export default function UnifiedEditor({
     isSwitchingControllerRef,
   });
 
-  // Persist controllerXmlMap to localStorage whenever it changes
+  // Notify parent of XML changes via debounce to avoid rapid re-renders
   useEffect(() => {
-    try {
-      localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(controllerXmlMap));
-    } catch {}
-  }, [controllerXmlMap]);
+    if (!controllerXmlMap || Object.keys(controllerXmlMap).length === 0) return;
+    const timer = setTimeout(() => {
+      try { onControllerXmlMapChange?.(controllerXmlMap); } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [controllerXmlMap, onControllerXmlMapChange]);
 
   // XML operation helpers
   const xmlHelpers = useRef({

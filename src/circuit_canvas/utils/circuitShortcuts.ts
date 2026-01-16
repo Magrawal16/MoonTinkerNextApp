@@ -68,7 +68,7 @@ export function getShortcutMetadata(): ShortcutMetadata[] {
     {
       name: "Rotate Left",
       description: "Rotate selected element counter-clockwise",
-      keys: ["e"],
+      keys: ["a"],
     },
     {
       name: "Clear wires",

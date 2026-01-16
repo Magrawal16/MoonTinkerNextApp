@@ -41,7 +41,9 @@ export async function SaveCircuit(
   name: string,
   elements: CircuitElement[],
   wires: Wire[],
-  snapshot?: string
+  snapshot?: string,
+  controllerCodeJson?: Record<string, string>,
+  controllerXmlJson?: Record<string, string>
 ): Promise<string> {
   // Strip out computed fields
   const sanitizedElements = elements.map(
@@ -52,7 +54,9 @@ export async function SaveCircuit(
     Name: name,
     Snapshot: snapshot || null,
     ElementsJson: JSON.stringify(sanitizedElements),
-  WiresJson: JSON.stringify(wires)
+    WiresJson: JSON.stringify(wires),
+    ControllerCodeJson: controllerCodeJson ? JSON.stringify(controllerCodeJson) : null,
+    ControllerXmlJson: controllerXmlJson ? JSON.stringify(controllerXmlJson) : null,
   };
 
   try {
@@ -124,6 +128,8 @@ export async function getCircuitById(id: string): Promise<
     snapshot?: string;
     createdAt?: string;
     updatedAt?: string;
+    controllerCodeMap?: Record<string, string>;
+    controllerXmlMap?: Record<string, string>;
   }
   | undefined
 > {
@@ -150,9 +156,13 @@ export async function getCircuitById(id: string): Promise<
     // Normalize backend DTO -> client shape
     const elementsJson = data.ElementsJson || data.elementsJson || data.elements;
     const wiresJson = data.WiresJson || data.wiresJson || data.wires;
+    const controllerCodeJson = data.ControllerCodeJson || data.controllerCodeJson;
+    const controllerXmlJson = data.ControllerXmlJson || data.controllerXmlJson;
 
     let parsedElements: CircuitElement[] = [];
     let parsedWires: Wire[] = [];
+    let parsedControllerCodeMap: Record<string, string> = {};
+    let parsedControllerXmlMap: Record<string, string> = {};
     try {
       if (typeof elementsJson === "string") parsedElements = JSON.parse(elementsJson);
       else if (Array.isArray(elementsJson)) parsedElements = elementsJson;
@@ -167,6 +177,20 @@ export async function getCircuitById(id: string): Promise<
       console.warn('[getCircuitById] Failed to parse WiresJson');
     }
 
+    try {
+      if (typeof controllerCodeJson === "string") parsedControllerCodeMap = JSON.parse(controllerCodeJson);
+      else if (typeof controllerCodeJson === "object") parsedControllerCodeMap = controllerCodeJson;
+    } catch (e) {
+      console.warn('[getCircuitById] Failed to parse ControllerCodeJson');
+    }
+
+    try {
+      if (typeof controllerXmlJson === "string") parsedControllerXmlMap = JSON.parse(controllerXmlJson);
+      else if (typeof controllerXmlJson === "object") parsedControllerXmlMap = controllerXmlJson;
+    } catch (e) {
+      console.warn('[getCircuitById] Failed to parse ControllerXmlJson');
+    }
+
     return {
       id: data.id || data.Id,
       name: data.name || data.Name,
@@ -175,6 +199,8 @@ export async function getCircuitById(id: string): Promise<
       snapshot: data.snapshot || data.Snapshot || null,
       createdAt: data.createdAt || data.CreatedAt,
       updatedAt: data.updatedAt || data.UpdatedAt,
+      controllerCodeMap: parsedControllerCodeMap,
+      controllerXmlMap: parsedControllerXmlMap,
     };
   } catch (error) {
     showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_LOAD_FAILED);
@@ -214,11 +240,15 @@ export async function updateCircuit(
     elements,
     wires,
     snapshot,
+    controllerCodeJson,
+    controllerXmlJson,
   }: {
     name?: string;
     elements?: CircuitElement[];
     wires?: Wire[];
     snapshot?: string | null;
+    controllerCodeJson?: Record<string, string>;
+    controllerXmlJson?: Record<string, string>;
   }
 ): Promise<boolean> {
   try {
@@ -229,6 +259,8 @@ export async function updateCircuit(
     let targetElements = elements;
     let targetWires = wires;
     let targetSnapshot = snapshot;
+    let targetControllerCodeJson = controllerCodeJson;
+    let targetControllerXmlJson = controllerXmlJson;
 
     if (!targetName || !targetElements || !targetWires) {
       const existingCircuit = await getCircuitById(id);
@@ -240,6 +272,8 @@ export async function updateCircuit(
       targetElements = targetElements || existingCircuit.elements;
       targetWires = targetWires || existingCircuit.wires;
       targetSnapshot = targetSnapshot ?? existingCircuit.snapshot ?? null;
+      targetControllerCodeJson = targetControllerCodeJson || existingCircuit.controllerCodeMap;
+      targetControllerXmlJson = targetControllerXmlJson || existingCircuit.controllerXmlMap;
     }
 
     // Strip out computed fields from elements before sending
@@ -253,6 +287,8 @@ export async function updateCircuit(
       ElementsJson: JSON.stringify(sanitizedElements),
       WiresJson: JSON.stringify(targetWires || []),
       Snapshot: targetSnapshot || null,
+      ControllerCodeJson: targetControllerCodeJson ? JSON.stringify(targetControllerCodeJson) : null,
+      ControllerXmlJson: targetControllerXmlJson ? JSON.stringify(targetControllerXmlJson) : null,
     };
 
     const token = getAuthToken();
@@ -306,7 +342,9 @@ export async function duplicateCircuit(id: string): Promise<string | null> {
       newName,
       circuit.elements,
       circuit.wires,
-      circuit.snapshot
+      circuit.snapshot,
+      circuit.controllerCodeMap,
+      circuit.controllerXmlMap
     );
     return newId;
   } catch (error) {

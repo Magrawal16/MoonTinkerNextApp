@@ -11,7 +11,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 13px;
+  font-size: 16px;
   margin-top: 8px;
   margin-left: 8px;
 }
@@ -26,22 +26,46 @@
   cursor: pointer;
   color: #4b5563;
   border-radius: 4px;
-  transition: all 0.2s ease;
+  transition: all 0.18s ease;
 }
 
 .profileButton:hover {
   background-color: rgba(0, 0, 0, 0.05);
+  transform: scale(1.12);
+  box-shadow: 0 8px 22px rgba(37,99,235,0.18);
 }
 
 .profileIcon {
-  width: 32px;
-  height: 32px;
-  background-color: #2563eb;
+  width: 40px;
+  height: 40px;
+  background-color: #FBBF24; /* yellow by default */
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
+  transition: background-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.profileIcon:hover {
+  background-color: #2563eb; /* dark blue on hover */
+  box-shadow: 0 8px 22px rgba(37,99,235,0.22);
+  transform: scale(1.12);
+}
+
+.profileIconActive {
+  background-color: #2563eb; /* dark blue when active/open */
+  box-shadow: 0 8px 22px rgba(37,99,235,0.22);
+  transform: scale(1.12);
+}
+
+.profileButton:active, .profileIcon:active, .profileIconActive:active {
+  transform: scale(0.96);
+}
+
+.profileIcon:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px rgba(37,99,235,0.12);
 }
 
 .dropdown {
@@ -59,7 +83,7 @@
 
 .dropdownHeader {
   padding: 8px 16px;
-  font-size: 13px;
+  font-size: 16px;
   color: #6b7280;
   border-bottom: 1px solid #f3f4f6;
 }
@@ -69,12 +93,12 @@
   padding: 8px 16px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background-color: transparent;
   border: none;
   cursor: pointer;
   color: #dc2626;
-  font-size: 13px;
+  font-size: 16px;
   text-align: left;
 }
 
@@ -103,8 +127,8 @@
 }
 
 .chevronButton {
-  width: 32px;
-  height: 32px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

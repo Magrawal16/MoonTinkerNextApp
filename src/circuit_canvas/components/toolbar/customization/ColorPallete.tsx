@@ -41,11 +41,11 @@ export function ColorPaletteDropdown({
     <div ref={dropdownRef} className="relative inline-block text-left">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="px-2 py-1 bg-gray-200 rounded border border-gray-300 shadow text-gray-800 text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:bg-gray-300 hover:shadow-blue-400 hover:scale-105 transition-all duration-200"
+        className="px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105 transition-all duration-200"
         title={`Wire color: ${selectedColor || ""}`}
       >
         <div
-          className="w-4 h-4 rounded-full border border-gray-400"
+          className="w-5 h-5 rounded-full border border-gray-400"
           style={{ backgroundColor: selectedColor || "#ccc" }}
         />
         <LuChevronDown className="w-3 h-3" />
@@ -53,26 +53,26 @@ export function ColorPaletteDropdown({
 
       {isOpen && (
         <div className="absolute mt-2 left-0 bg-white border border-gray-300 rounded-sm shadow-sm z-10 p-1 w-40 flex flex-col">
-          <div className="px-2 pb-2 text-[11px] font-semibold tracking-wide text-gray-600 uppercase">
-            Wire color
-          </div>
-          {colors.map(({ name, hex }) => (
-            <div
-              key={hex}
-              className="flex items-center space-x-2 px-2 py-1 rounded-sm cursor-pointer hover:bg-gray-100"
-              onClick={() => {
-                onColorSelect(hex);
-                setIsOpen(false);
-              }}
-            >
-              <div
-                className={`w-4 h-4 rounded-full border ${selectedColor === hex ? "border-black" : "border-gray-300"
-                  }`}
-                style={{ backgroundColor: hex }}
-              />
-              <span className="text-sm text-black">{name}</span>
+          <div className="px-3 pb-2 text-sm font-semibold tracking-wide text-gray-600 uppercase">
+              Wire color
             </div>
-          ))}
+            {colors.map(({ name, hex }) => (
+              <div
+                key={hex}
+                className="flex items-center space-x-3 px-3 py-2 rounded-md cursor-pointer hover:bg-gray-100"
+                onClick={() => {
+                  onColorSelect(hex);
+                  setIsOpen(false);
+                }}
+              >
+                <div
+                  className={`w-5 h-5 rounded-full border ${selectedColor === hex ? "border-black" : "border-gray-300"
+                    }`}
+                  style={{ backgroundColor: hex }}
+                />
+                <span className="text-sm text-black">{name}</span>
+              </div>
+            ))}
         </div>
       )}
     </div>

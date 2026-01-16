@@ -75,7 +75,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     type: "potentiometer",
     label: "Potentiometer",
     iconPath: "assets/circuit_canvas/elements/potentiometer.svg",
-    defaultProps: { resistance: 100, ratio: 0.5 },
+    defaultProps: { resistance: 10000 }, // 10kΩ total resistance (Tinkercad style)
   },
   {
     type: "led",

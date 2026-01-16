@@ -79,6 +79,13 @@ const SavedCircuitsPage = () => {
       localStorage.setItem('mt_circuit_name', circuit.name);
       localStorage.setItem('mt_circuit_elements', JSON.stringify(circuit.elements));
       localStorage.setItem('mt_circuit_wires', JSON.stringify(circuit.wires));
+      // Persist controller code and XML from backend
+      if (circuit.controllerCodeMap) {
+        localStorage.setItem('mt_controller_code_map', JSON.stringify(circuit.controllerCodeMap));
+      }
+      if (circuit.controllerXmlMap) {
+        localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(circuit.controllerXmlMap));
+      }
       localStorage.removeItem('mt:importedCircuit');
       router.push('/circuit_canvas');
     }

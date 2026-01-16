@@ -100,20 +100,20 @@ const ElementRotationButtons: React.FC<Props> = ({
   return (
     <div className="flex flex-row items-center gap-2">
       <button
-        className="px-2 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        className="p-2 bg-[#F4F5F6] rounded border border-gray-300 shadow-sm text-black text-sm cursor-pointer flex items-center justify-center hover:shadow-blue-400 hover:scale-105 w-9 h-9"
         onClick={() => rotateElement("left")}
         title="Rotate Left"
         aria-label="Rotate Left"
       >
-        <FaRotateLeft />
+        <FaRotateLeft size={18} />
       </button>
       <button
-        className="px-2 py-1 bg-[#F4F5F6] rounded-sm border-2 border-gray-300 shadow-lg text-black text-sm cursor-pointer flex items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        className="p-2 bg-[#F4F5F6] rounded border border-gray-300 shadow-sm text-black text-sm cursor-pointer flex items-center justify-center hover:shadow-blue-400 hover:scale-105 w-9 h-9"
         onClick={() => rotateElement("right")}
         title="Rotate Right"
         aria-label="Rotate Right"
       >
-        <FaRotateRight />
+        <FaRotateRight size={18} />
       </button>
     </div>
   );

@@ -23,6 +23,10 @@ type CircuitManagerProps = {
   onCircuitNameChange?: (name: string) => void; // Called when circuit is renamed
   currentCircuitId?: string; // ID of the currently loaded circuit
   currentCircuitName?: string; // Current circuit name to use as default for saving
+  controllerCodeMap?: Record<string, string>; // Map of controller ID to code
+  onControllerCodeMapLoad?: (codeMap: Record<string, string>) => void; // Called when circuit with code is loaded
+  controllerXmlMap?: Record<string, string>; // Map of controller ID to XML
+  onControllerXmlMapLoad?: (xmlMap: Record<string, string>) => void; // Called when circuit with XML is loaded
 };
 
 type ToastMessage = {
@@ -120,6 +124,14 @@ export default function CircuitStorage(props: CircuitManagerProps) {
       props.onCircuitSelect(circuitId);
       const selected = await getCircuitById(circuitId);
       setSelectedCircuitName(selected?.name ?? "");
+      // Load controller code if available
+      if (selected?.controllerCodeMap) {
+        props.onControllerCodeMapLoad?.(selected.controllerCodeMap);
+      }
+      // Load controller XML if available
+      if (selected?.controllerXmlMap) {
+        props.onControllerXmlMapLoad?.(selected.controllerXmlMap);
+      }
       showToast(`Circuit "${selected?.name}" loaded successfully!`, 'success');
     } finally {
       setLoadingCircuitId(null);
@@ -149,7 +161,9 @@ export default function CircuitStorage(props: CircuitManagerProps) {
         circuitName.trim(),
         props.currentElements ?? [],
         props.currentWires ?? [],
-        props.getSnapshot?.() ?? ""
+        props.getSnapshot?.() ?? "",
+        props.controllerCodeMap ?? {},
+        props.controllerXmlMap ?? {}
       );
       const updatedList = await getSavedCircuitsList();
       setSavedCircuits(updatedList);
@@ -226,6 +240,8 @@ export default function CircuitStorage(props: CircuitManagerProps) {
         elements: props.currentElements ?? [],
         wires: props.currentWires ?? [],
         snapshot: props.getSnapshot?.() ?? "",
+        controllerCodeJson: props.controllerCodeMap ?? {},
+        controllerXmlJson: props.controllerXmlMap ?? {},
       });
       if (overridden) {
         const updatedList = await getSavedCircuitsList();
@@ -268,15 +284,15 @@ export default function CircuitStorage(props: CircuitManagerProps) {
   return (
     <>
       <button
-        className="px-2 py-1 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-xs font-medium cursor-pointer flex flex-row gap-1.5 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+        className="px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
         onClick={() => {
           props.onOpenModal?.();
           setIsOpen(true);
         }}
         title="Open saved circuits"
       >
-        <FaFolder size={11} />
-        <span>Saved</span>
+        <FaFolder size={16} />
+        <span className="text-sm font-medium">Saved</span>
       </button>
 
       {/* Toast Notifications */}

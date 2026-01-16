@@ -228,3 +228,15 @@
   display: inline-block;
   padding: 4px;
 }
+
+/* Logo hover/active fallback to ensure grow/shrink works even if Tailwind utilities are missing */
+.logo {
+  transition: transform 150ms ease;
+  will-change: transform;
+}
+.logo:hover {
+  transform: scale(1.05);
+}
+.logo:active {
+  transform: scale(0.95);
+}

@@ -369,24 +369,24 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-A", // Terminal A
-        x: 11.3,
-        y: 20,
+        x: 20.5,
+        y: 90,
         parentId: id,
         placeholder: "Terminal 1",
         fillColor: "red",
       },
       {
         id: id + "-node-W", // Wiper
-        x: 26,
-        y: 16, // position it visually on top if needed
+        x: 31.5,
+        y: 92, // position it visually on top if needed
         parentId: id,
         placeholder: "Wiper",
         fillColor: "red",
       },
       {
         id: id + "-node-B", // Terminal B
-        x: 41.3,
-        y: 20,
+        x: 43.5,
+        y: 90,
         parentId: id,
         placeholder: "Terminal 2",
         fillColor: "red",
@@ -395,12 +395,12 @@ export default function createElement(
     properties: {
       ...{
         voltage: props.properties?.voltage,
-        resistance: props.properties?.resistance ?? 2,
-        ratio: props.properties?.ratio ?? 0.5, // Default ratio for potentiometer
+        resistance: props.properties?.resistance ?? 10000, // Default 10kΩ like Tinkercad
+        ratio: props.properties?.ratio ?? 0.5, // Internal only - not displayed to user
       },
       ...props.properties,
     },
-    displayProperties: ["resistance", "ratio"],
+    displayProperties: ["resistance"], // Only show total resistance like Tinkercad
   };
   const ledElement = {
     // Dynamic LED element: explicit per-color node map for easier manual tuning.

@@ -59,7 +59,7 @@ export default function CircuitSelector() {
                 
                 // Clean up the temporary element after drag starts
                 setTimeout(() => {
-                  document.body.removeChild(img);
+                  if (img.parentElement) img.parentElement.removeChild(img);
                 }, 0);
               }
             }}

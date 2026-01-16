@@ -276,6 +276,22 @@ export default function RgbLed(props: RgbLedProps) {
           />
         )}
 
+        {/* Extended Cathode (Common) Leg */}
+        {baseReady && (
+          <Rect
+            x={43.4}
+            y={80}
+            width={4.1}
+            height={15}
+            fill="#8c8c8c"
+            cornerRadius={2}
+            shadowColor="#000000"
+            shadowBlur={25}
+            shadowOpacity={0.3}
+            listening={false}
+          />
+        )}
+
         {/* RGB Glow Effect */}
         {baseReady && glowVisible && (
           <Group listening={false}>

@@ -63,13 +63,13 @@ export function CollapsibleToolbar({
       <div ref={containerRef} className={`relative ${className}`}>
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-1.5 px-2 py-1 bg-gray-200 rounded border border-gray-300 text-gray-800 text-xs font-medium shadow hover:bg-gray-300 hover:shadow-blue-400 hover:scale-105 transition-all duration-200"
+          className={`flex items-center gap-2 px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer hover:shadow-blue-400 hover:scale-105 transition-all duration-200`}
           title={label}
         >
           {icon}
-          <span>{label}</span>
+          <span className="text-sm font-medium">{label}</span>
           <FaChevronDown 
-            size={10} 
+            size={12} 
             className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
@@ -97,7 +97,7 @@ export function CollapsibleToolbar({
 
   // Horizontal expanding toolbar
   return (
-    <div ref={containerRef} className={`relative flex items-center ${className}`}>
+  <div ref={containerRef} className={`relative flex items-center ${className}`}>
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`
@@ -161,8 +161,8 @@ export function DropdownItem({
       onClick={onClick}
       disabled={disabled}
       className={`
-        w-full flex items-center gap-1.5 px-2 py-1 
-        text-left text-xs text-gray-700
+        w-full flex items-center gap-2 px-3 py-2 
+        text-left text-sm text-gray-700
         rounded-md transition-colors duration-150
         ${disabled 
           ? "opacity-50 cursor-not-allowed" 
@@ -171,8 +171,8 @@ export function DropdownItem({
         ${className}
       `}
     >
-      {icon && <span className="text-gray-500">{icon}</span>}
-      <span>{label}</span>
+      {icon && <span className="text-gray-600">{icon}</span>}
+      <span className="text-sm font-medium">{label}</span>
     </button>
   );
 }
@@ -200,7 +200,8 @@ export function ToolButton({
       onClick={onClick}
       disabled={disabled}
       className={`
-        p-1.5 rounded transition-all duration-150
+        p-2 rounded transition-all duration-150
+        w-9 h-9 flex items-center justify-center
         ${disabled 
           ? "opacity-50 cursor-not-allowed bg-gray-100" 
           : "bg-white hover:bg-gray-200 active:scale-95 shadow-sm border border-gray-200"

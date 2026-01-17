@@ -299,6 +299,9 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const dragStartWireCountRef = useRef(0);
   const [copiedElement, setCopiedElement] = useState<CircuitElement | null>(null);
   const [notesToolActive, setNotesToolActive] = useState(false);
+  // Transient visual feedback for rotate tool buttons
+  const [rotateLeftFlash, setRotateLeftFlash] = useState(false);
+  const [rotateRightFlash, setRotateRightFlash] = useState(false);
 
 
 
@@ -612,23 +615,21 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     }
   }, [currentCircuitId]);
 
-  // Load circuit name from localStorage on mount (or set random name for new circuits)
+  // Load circuit name from localStorage on mount; if creating new and no saved name, set random
   useEffect(() => {
     try {
-      // Check if this is a new circuit creation
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
         const isCreatingNew = params.get("new") === "1";
-        
-        if (isCreatingNew) {
-          // Generate random name for new circuit
-          setCurrentCircuitName(getRandomCircuitName());
-        } else {
-          // Load existing name from localStorage
-          const savedName = localStorage.getItem('mt_circuit_name');
-          if (savedName) {
-            setCurrentCircuitName(savedName);
-          }
+
+        const savedName = localStorage.getItem('mt_circuit_name');
+        if (savedName && savedName.trim()) {
+          setCurrentCircuitName(savedName);
+        } else if (isCreatingNew) {
+          // First-time new circuit: generate and persist a random name
+          const name = getRandomCircuitName();
+          setCurrentCircuitName(name);
+          try { localStorage.setItem('mt_circuit_name', name); } catch {}
         }
       }
     } catch (e) {
@@ -855,7 +856,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     return () => container.removeEventListener("pointerenter", handleEnter);
   }, []);
 
-  // Keyboard shortcuts for rotation
+  // Keyboard shortcuts visual feedback (flash rotate buttons); actual rotation handled via useCircuitShortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -866,38 +867,15 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       ) {
         return;
       }
-
+      // Visual flash only; do not rotate here to avoid double-handling
       if (!selectedElement) return;
-
-      if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        setElements((prev) => {
-          const next = prev.map((el) =>
-            el.id === selectedElement.id
-              ? { ...el, rotation: ((el.rotation || 0) + 30) % 360 }
-              : el
-          );
-          elementsRef.current = next;
-          updateWiresDirect();
-          pushToHistory(next, wiresRef.current);
-          return next;
-        });
-        stopSimulation();
-      }
-      else if (e.key === 'a' || e.key === 'A') {
-        e.preventDefault();
-        setElements((prev) => {
-          const next = prev.map((el) =>
-            el.id === selectedElement.id
-              ? { ...el, rotation: ((el.rotation || 0) - 30 + 360) % 360 }
-              : el
-          );
-          elementsRef.current = next;
-          updateWiresDirect();
-          pushToHistory(next, wiresRef.current);
-          return next;
-        });
-        stopSimulation();
+      const hasModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.altKey;
+      if ((e.key === 'r' || e.key === 'R') && !hasModifier) {
+        setRotateRightFlash(true);
+        window.setTimeout(() => setRotateRightFlash(false), 160);
+      } else if ((e.key === 'a' || e.key === 'A') && !hasModifier) {
+        setRotateLeftFlash(true);
+        window.setTimeout(() => setRotateLeftFlash(false), 160);
       }
     };
 
@@ -2188,7 +2166,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
                 <ToolButton
                   icon={<FaRotateLeft size={18} />}
-                  title="Rotate Left (E)"
+                  title="Rotate Left (A)"
                   disabled={!selectedElement}
                   onClick={() => {
                     if (!selectedElement) return;
@@ -2205,6 +2183,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                     });
                     stopSimulation();
                   }}
+                  className={rotateLeftFlash ? "!bg-gray-200 !scale-95" : ""}
                 />
 
                 <ToolButton
@@ -2226,6 +2205,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                     });
                     stopSimulation();
                   }}
+                  className={rotateRightFlash ? "!bg-gray-200 !scale-95" : ""}
                 />
 
                 <div className="w-px h-5 bg-gray-300 mx-1" />

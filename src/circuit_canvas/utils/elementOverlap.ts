@@ -28,6 +28,7 @@ function getElementSize(type: string): { width: number; height: number } {
     ultrasonicsensor4p: { width: 210, height: 90 },
     pushbutton: { width: 61, height: 81 },
     slideswitch: { width: 220, height: 100 },
+    buzzer: { width: 110, height: 90 },
   };
   return sizeMap[type] || { width: 100, height: 100 };
 }
@@ -279,6 +280,18 @@ export function getElementRegions(
         y: element.y - center.y,
         width: 220,
         height: 100,
+      },
+    ];
+  }
+
+  if (element.type === "buzzer") {
+    return [
+      {
+        type: 'rect',
+        x: element.x - center.x,
+        y: element.y - center.y,
+        width: 110,
+        height: 90,
       },
     ];
   }

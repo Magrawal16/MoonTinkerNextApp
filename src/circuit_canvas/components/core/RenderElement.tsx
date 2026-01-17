@@ -24,6 +24,7 @@ import PowerSupply from "@/circuit_canvas/components/elements/PowerSupply";
 import Note from "@/circuit_canvas/components/elements/Note";
 import PushButton from "@/circuit_canvas/components/elements/PushButton";
 import SlideSwitch from "@/circuit_canvas/components/elements/SlideSwitch";
+import Buzzer from "@/circuit_canvas/components/elements/Buzzer";
 
 interface RenderElementProps {
   element: CircuitElement;
@@ -382,6 +383,22 @@ export default function RenderElement(props: RenderElementProps) {
             });
           }}
           isSimulationOn={props.isSimulationOn}
+        />
+      )}
+      {props.showBody !== false && element.type === "buzzer" && (
+        <Buzzer
+          id={element.id}
+          x={0}
+          y={0}
+          draggable={false}
+          selected={props.selectedElementId === element.id}
+          isSimulationOn={props.isSimulationOn}
+          // Provide electrical snapshot for buzzer decisions
+          electrical={{
+            voltage: element.computed?.voltage ?? 0,
+            current: element.computed?.current,
+            power: element.computed?.power,
+          }}
         />
       )}
       {props.showBody !== false && element.type === "note" && (

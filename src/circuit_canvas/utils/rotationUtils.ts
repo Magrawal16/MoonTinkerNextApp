@@ -113,6 +113,8 @@ export function getElementCenter(element: CircuitElement): {
       return { x: 30.5, y: 40.5 };
     case "slideswitch":
       return { x: 75, y: 45 };
+    case "buzzer":
+      return { x: 55, y: 45 };
     case "note":
       const noteWidth = element.properties?.width ?? 200;
       const noteHeight = element.properties?.height ?? 150;
@@ -169,6 +171,8 @@ export function getElementDimensions(element: CircuitElement): {
         width: element.properties?.width ?? 200, 
         height: element.properties?.height ?? 150 
       };
+    case "buzzer":
+      return { width: 110, height: 90 };
     default:
       return { width: 50, height: 50 };
   }

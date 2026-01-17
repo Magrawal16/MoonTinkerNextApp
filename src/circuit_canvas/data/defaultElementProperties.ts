@@ -123,4 +123,10 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     iconPath: "assets/circuit_canvas/elements/SlideSwitch.svg",
     defaultProps: { resistance: 0.01 }, // Low resistance when connected
   },
+  {
+    type: "buzzer",
+    label: "Buzzer",
+    iconPath: "assets/circuit_canvas/elements/buzzer.svg",
+    defaultProps: { voltage: 5 },
+  },
 ];

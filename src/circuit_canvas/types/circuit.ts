@@ -195,7 +195,8 @@ export type PaletteElementType =
   | "microbitWithBreakout"
   | "pushbutton"
   | "slideswitch"
-  | "note";
+  | "note"
+  | "buzzer";
 
 export type PropertiesPanelProps = {
   selectedElement: CircuitElement | null;

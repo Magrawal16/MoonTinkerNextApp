@@ -211,7 +211,7 @@ export function getCircuitShortcuts(args: ShortcutArgs): ShortcutDefinition[] {
             stopSimulation();
           },
         };
-      case "e":
+      case "a":
         return {
           ...meta,
           handler: () => {

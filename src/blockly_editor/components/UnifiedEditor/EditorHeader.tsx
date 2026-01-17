@@ -154,11 +154,7 @@ export function EditorHeader({
               ))}
             </select>
           </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg">
-            <span className="text-xs text-gray-600 font-medium">None</span>
-          </div>
-        )}
+        ) : null}
       </div>
       {onClose && (
         <button

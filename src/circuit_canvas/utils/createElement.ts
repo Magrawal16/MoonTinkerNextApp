@@ -927,6 +927,39 @@ export default function createElement(
     displayProperties: ["text"],
   };
 
+  const buzzerElement: CircuitElement = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    // Two-terminal buzzer: left = negative, right = positive
+    nodes: [
+      {
+        id: id + "-node-1",
+        x: 50,
+        y: 86,
+        parentId: id,
+        polarity: "negative" as const,
+        placeholder: "Negative",
+        fillColor: "black",
+      },
+      {
+        id: id + "-node-2",
+        x: 61,
+        y: 86,
+        parentId: id,
+        polarity: "positive" as const,
+        placeholder: "Positive",
+        fillColor: "red",
+      },
+    ],
+    properties: {
+      voltage: props.properties?.voltage ?? 5,
+    },
+    displayProperties: [],
+  };
+
   // switch based on type
   let element;
   switch (props.type) {
@@ -980,6 +1013,9 @@ export default function createElement(
       break;
     case "slideswitch":
       element = slideSwitchElement;
+      break;
+    case "buzzer":
+      element = buzzerElement;
       break;
     case "note":
       element = noteElement;

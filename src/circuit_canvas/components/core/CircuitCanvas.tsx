@@ -2511,8 +2511,13 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                     }
                     setOpenCodeEditor(true);
                   }}
-                  title="Open block/text editor"
-                  className="px-3 py-2 bg-[#F4F5F6] rounded border border-gray-300 shadow text-black text-sm font-medium cursor-pointer flex flex-row gap-2 items-center justify-center hover:shadow-blue-400 hover:scale-105"
+                  disabled={!elements.some(el => el.type === "microbit" || el.type === "microbitWithBreakout")}
+                  title={!elements.some(el => el.type === "microbit" || el.type === "microbitWithBreakout") ? "Add a micro:bit or micro:bit with breakout to enable code editor" : "Open block/text editor"}
+                  className={`px-3 py-2 rounded border shadow text-sm font-medium flex flex-row gap-2 items-center justify-center transition-all duration-200 ${
+                    !elements.some(el => el.type === "microbit" || el.type === "microbitWithBreakout")
+                      ? "bg-gray-200 border-gray-300 text-gray-400 cursor-not-allowed opacity-50"
+                      : "bg-[#F4F5F6] border-gray-300 text-black cursor-pointer hover:shadow-blue-400 hover:scale-105"
+                  }`}
                 >
                     <FaCode size={16} />
                     <span className="text-sm font-medium">Code</span>

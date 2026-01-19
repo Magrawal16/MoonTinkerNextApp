@@ -4,7 +4,7 @@ import {
   BaseElement,
   BaseElementProps,
 } from "@/circuit_canvas/components/core/BaseElement";
-import { Circle, Group, Line, Image, Path } from "react-konva";
+import { Circle, Group, Line, Image, Path, Arc, Rect } from "react-konva";
 import Konva from "konva";
 import { KonvaEventObject } from "konva/lib/Node";
 
@@ -228,14 +228,86 @@ function Potentiometer(props: PotentiometerProps) {
           />
         )}
 
-        {/* Interactive dial/knob overlay - circular clickable area */}
+        {/* New Dial UI - Blue outer ring with counter-rotation */}
+        <Group
+          x={centerX}
+          y={centerY}
+          rotation={-angle * 0.3} // Counter-rotation for realistic feel
+        >
+          {/* Blue outer ring */}
+          <Circle
+            x={0}
+            y={0}
+            radius={13}
+            fill="#2E86DE"
+            stroke="#1B5FAA"
+            strokeWidth={1}
+          />
+          
+          {/* Tick marks on the blue ring */}
+          {[0, 45, 90, 135, 180, 225, 270, 315].map((tickAngle) => (
+            <Line
+              key={tickAngle}
+              points={[0, -7.5, 0, -12]}
+              stroke="#1A3A5C"
+              strokeWidth={2}
+              rotation={tickAngle}
+              lineCap="round"
+            />
+          ))}
+        </Group>
+
+        {/* Inner gray/light blue circle (static) */}
         <Circle
           x={centerX}
           y={centerY}
-          radius={9}
-          fill={isDragging ? "rgba(255, 102, 0, 0.4)" : "transparent"}
-          stroke={isDragging ? "#FF6600" : "transparent"}
-          strokeWidth={isDragging ? 2 : 0}
+          radius={10}
+          fill="#D6E6F5"
+          stroke="#B8D4ED"
+          strokeWidth={1}
+        />
+
+        {/* Yellow rotating arrow/strip */}
+        <Group
+          x={centerX}
+          y={centerY}
+          rotation={angle}
+        >
+          {/* Yellow strip/arrow body */}
+          <Rect
+            x={2.5}
+            y={0}
+            width={5}
+            height={15}
+            fill="#F9A825"
+            cornerRadius={3}
+            rotation={180}
+          />
+          {/* Rounded end of the yellow strip (outer end) */}
+          {/* <Circle
+            x={0}
+            y={15}
+            radius={3}
+            fill="#F9A825"
+          /> */}
+        </Group>
+
+        {/* Pink/Red center dot */}
+        <Circle
+          x={centerX}
+          y={centerY}
+          radius={3.5}
+          fill="#E91E63"
+          stroke="#C2185B"
+          strokeWidth={0.5}
+        />
+
+        {/* Interactive dial overlay - invisible circular clickable area */}
+        <Circle
+          x={centerX}
+          y={centerY}
+          radius={18}
+          fill="transparent"
           onMouseDown={handlePointerDown}
           onTouchStart={handlePointerDown}
           onMouseEnter={(e) => {
@@ -249,27 +321,6 @@ function Potentiometer(props: PotentiometerProps) {
             }
           }}
         />
-
-        {/* Arrow pointer that rotates with the dial */}
-        <Group
-          x={centerX}
-          y={centerY}
-          rotation={angle}
-          listening={false}
-        >
-          {/* Arrow line pointing upward (will rotate) */}
-          <Line
-            points={[0, 0, 0, -8]}
-            stroke="#FF6600"
-            strokeWidth={2}
-            lineCap="round"
-          />
-          {/* Arrow head */}
-          <Path
-            data="M -1.5 -8 L 0 -11 L 1.5 -8 Z"
-            fill="#FF6600"
-          />
-        </Group>
       </Group>
     </BaseElement>
   );

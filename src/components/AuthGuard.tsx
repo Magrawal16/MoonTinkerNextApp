@@ -3,18 +3,27 @@
 import React, { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 
 const AuthGuard: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
   const { isAuthenticated, initialized } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const { showMessage } = useMessage();
+  const redirectTimerRef = React.useRef<number | null>(null);
 
   useEffect(() => {
     if (!initialized) return;
 
-    // If not authenticated and not on /login, redirect to login
+    // If not authenticated and not on /login, show notice then redirect to login
     if (!isAuthenticated && pathname !== "/login") {
-      router.push("/login");
+      if (!redirectTimerRef.current) {
+        showMessage("Session expired. Redirecting to login...", "info", 2000);
+        redirectTimerRef.current = window.setTimeout(() => {
+          redirectTimerRef.current = null;
+          router.push("/login");
+        }, 2000);
+      }
       return;
     }
 
@@ -23,7 +32,23 @@ const AuthGuard: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
       router.push("/");
       return;
     }
+
+    // Clear any pending redirect timer if auth state changes
+    if (redirectTimerRef.current) {
+      window.clearTimeout(redirectTimerRef.current);
+      redirectTimerRef.current = null;
+    }
   }, [initialized, isAuthenticated, pathname, router]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        window.clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // While we are checking sessionStorage, don't render children to avoid a flash.
   if (!initialized) return null;

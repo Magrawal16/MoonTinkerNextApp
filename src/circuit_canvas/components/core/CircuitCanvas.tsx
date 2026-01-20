@@ -2032,13 +2032,15 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         >
           {/* Logo on the extreme left */}
           <div className="flex items-center gap-3 w-full">
-            <img
-              src="/assets/common/mp_logo.svg"
-              alt="MoonTinker Logo"
-              className={`h-9 w-auto mr-2 select-none transform transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer ${styles.logo}`}
-              style={{ display: 'block' }}
-            />
-            
+            {/* Logo links to saved_circuits */}
+            <a href="/saved_circuits" aria-label="Go to Saved Circuits">
+              <img
+                src="/assets/common/mp_logo.svg"
+                alt="MoonTinker Logo"
+                className={`h-9 w-auto mr-2 select-none transform transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer ${styles.logo}`}
+                style={{ display: 'block' }}
+              />
+            </a>
             {/* Display current circuit name - editable */}
             {currentCircuitName && (
               <input

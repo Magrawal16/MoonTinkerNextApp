@@ -70,7 +70,9 @@ import {
   usePersistCircuitSessionToLocalStorage,
 } from "@/circuit_canvas/hooks/useCircuitLocalStorageSession";
 import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulators";
-
+import { captureFullCircuitSnapshot } from "@/circuit_canvas/utils/canvasTransform";
+import { useAutosave } from "@/circuit_canvas/hooks/useAutosave";
+import { AutosaveIndicator } from "@/circuit_canvas/components/ui/AutosaveIndicator";
 
 export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: string | null }) {
   // Import modal state
@@ -473,7 +475,20 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   });
 
   
-
+  const [autosaveEnabled, setAutosaveEnabled] = useState(true);
+  const { status: autosaveStatus, triggerManualSave } = useAutosave({
+    circuitId: currentCircuitId,
+    circuitName: currentCircuitName,
+    elements,
+    wires,
+    controllerCodeMap,
+    controllerXmlMap,
+    isSimulationRunning: simulationRunning,
+    stageRef,
+    enabled: autosaveEnabled,
+    debounceMs: 4000,
+    isCreatingWire: !!creatingWireStartNode,
+  });
   const PROPERTIES_PANEL_WIDTH = 240;
   const propertiesPanelRight = useMemo(() => {
     const padding = 12;
@@ -2042,36 +2057,39 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               />
             </a>
             {/* Display current circuit name - editable */}
-            {currentCircuitName && (
-              <input
-                type="text"
-                value={currentCircuitName}
-                onChange={(e) => setCurrentCircuitName(e.target.value)}
-                onBlur={async () => {
-                  if (currentCircuitId && currentCircuitName.trim()) {
-                    try {
-                      const success = await updateCircuit(currentCircuitId, { name: currentCircuitName.trim() });
-                      if (success) {
-                        showMessage('Circuit renamed successfully', 'success');
-                      } else {
+            <div className="flex items-center gap-3">
+              {currentCircuitName && (
+                <input
+                  type="text"
+                  value={currentCircuitName}
+                  onChange={(e) => setCurrentCircuitName(e.target.value)}
+                  onBlur={async () => {
+                    if (currentCircuitId && currentCircuitName.trim()) {
+                      try {
+                        const success = await updateCircuit(currentCircuitId, { name: currentCircuitName.trim() });
+                        if (success) {
+                          showMessage('Circuit renamed successfully', 'success');
+                        } else {
+                          showMessage('Failed to rename circuit', 'error');
+                        }
+                      } catch (error) {
                         showMessage('Failed to rename circuit', 'error');
                       }
-                    } catch (error) {
-                      showMessage('Failed to rename circuit', 'error');
                     }
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="px-2 py-1 bg-transparent text-lg text-gray-800 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors hover:underline"
-                style={{ minWidth: '200px', width: 'auto' }}
-                size={currentCircuitName.length || 20}
-                placeholder="Circuit Name"
-              />
-            )}
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.currentTarget.blur();
+                    }
+                  }}
+                  className="px-2 py-1 bg-transparent text-lg text-gray-800 font-normal focus:outline-none focus:ring-2 focus:ring-blue-500 rounded transition-colors hover:underline"
+                  style={{ minWidth: '200px', width: 'auto' }}
+                  size={currentCircuitName.length || 20}
+                  placeholder="Circuit Name"
+                />
+              )}
+            </div>
+
             
             {/* ...existing code for the rest of the header controls... */}
             {/* File Menu - Contains Export & Import (moved to right group) */}
@@ -2079,6 +2097,29 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
             {/* Color Palette and shortcuts moved to tools row (after Fit to View) */}
             <div className="ml-auto flex items-center gap-2">
               {/* File Menu - Contains Export & Import */}
+              {/* Autosave Indicator and Button - next to Circuit dropdown */}
+              {currentCircuitId && (
+                <>
+                  <AutosaveIndicator 
+                    status={autosaveStatus.status}
+                    lastSaved={autosaveStatus.lastSaved}
+                    error={autosaveStatus.error}
+                  />
+                  <button
+                    onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
+                      autosaveEnabled
+                        ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
+                    }`}
+                    title={autosaveEnabled ? 'Autosave enabled - Click to disable' : 'Autosave disabled - Click to enable'}
+                  >
+                    {autosaveEnabled ? '✓ Autosave On' : 'Autosave Off'}
+                  </button>
+                </>
+              )}
+
+
               <CollapsibleToolbar
                 label="Circuit"
                 icon={<FaFolder size={16} />}
@@ -2133,7 +2174,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                 }}
                 currentElements={elements}
                 currentWires={wires}
-                getSnapshot={() => stageRef.current?.toDataURL() || ""}
+                getSnapshot={() => stageRef.current ? captureFullCircuitSnapshot(stageRef.current, 50) : ""}
                 onOpenModal={() => {
                   stopSimulation();
                   setSelectedElement(null);

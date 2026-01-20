@@ -8,6 +8,7 @@ type AuthContextType = {
   userEmail?: string | null;
   role?: string | null;
   initialized: boolean;
+  isLoggingOut: boolean;
   login: (email: string, password: string) => Promise<boolean>;
   logout: () => void;
 };
@@ -21,6 +22,7 @@ export const AuthContext = createContext<AuthContextType>({
   isAuthenticated: false,
   userEmail: null,
   initialized: false,
+  isLoggingOut: false,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   login: async () => false,
   logout: () => {},
@@ -40,6 +42,7 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [role, setRole] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     try {
@@ -163,6 +166,7 @@ debugger;
   }, []);
 
   const logout = useCallback(() => {
+    setIsLoggingOut(true);
     try {
       // Clear auth data from sessionStorage
       sessionStorage.removeItem(STORAGE_KEY);
@@ -184,6 +188,8 @@ debugger;
     setIsAuthenticated(false);
     setUserEmail(null);
     setRole(null);
+    // Reset isLoggingOut after navigation completes
+    setTimeout(() => setIsLoggingOut(false), 100);
   }, []);
 
   const ctx: AuthContextType = {
@@ -191,6 +197,7 @@ debugger;
     userEmail,
     role,
     initialized,
+    isLoggingOut,
     login,
     logout,
   };

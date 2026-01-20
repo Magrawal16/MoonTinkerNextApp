@@ -262,19 +262,21 @@ export async function updateCircuit(
     let targetControllerCodeJson = controllerCodeJson;
     let targetControllerXmlJson = controllerXmlJson;
 
-    if (!targetName || !targetElements || !targetWires) {
-      const existingCircuit = await getCircuitById(id);
-      if (!existingCircuit) {
-        showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_NOT_FOUND);
-        return false;
-      }
-      targetName = targetName || existingCircuit.name;
-      targetElements = targetElements || existingCircuit.elements;
-      targetWires = targetWires || existingCircuit.wires;
-      targetSnapshot = targetSnapshot ?? existingCircuit.snapshot ?? null;
-      targetControllerCodeJson = targetControllerCodeJson || existingCircuit.controllerCodeMap;
-      targetControllerXmlJson = targetControllerXmlJson || existingCircuit.controllerXmlMap;
+    // Always fetch existing circuit to ensure we have complete data (especially snapshot)
+    // This prevents 400 errors from missing required fields
+    const existingCircuit = await getCircuitById(id);
+    if (!existingCircuit) {
+      showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_NOT_FOUND);
+      return false;
     }
+    
+    // Use provided values, fallback to existing
+    targetName = targetName || existingCircuit.name;
+    targetElements = targetElements || existingCircuit.elements;
+    targetWires = targetWires || existingCircuit.wires;
+    targetSnapshot = targetSnapshot !== undefined ? targetSnapshot : (existingCircuit.snapshot ?? null);
+    targetControllerCodeJson = targetControllerCodeJson || existingCircuit.controllerCodeMap;
+    targetControllerXmlJson = targetControllerXmlJson || existingCircuit.controllerXmlMap;
 
     // Strip out computed fields from elements before sending
     const sanitizedElements = (targetElements || []).map(
@@ -303,11 +305,31 @@ export async function updateCircuit(
     });
 
     if (!response.ok) {
-      throw new Error(`Failed to update circuit: ${response.statusText}`);
+      // Try to get error details from response
+      let errorDetail = response.statusText;
+      try {
+        const errorData = await response.json();
+        errorDetail = errorData.message || errorData.error || JSON.stringify(errorData);
+      } catch {
+        // If can't parse JSON, use statusText
+      }
+      console.error('[updateCircuit] API error:', {
+        status: response.status,
+        statusText: response.statusText,
+        detail: errorDetail,
+        updateData: {
+          id,
+          nameLength: updateData.Name?.length,
+          elementsCount: sanitizedElements.length,
+          wiresCount: (targetWires || []).length,
+        }
+      });
+      throw new Error(`Failed to update circuit (${response.status}): ${errorDetail}`);
     }
 
     return true;
   } catch (error) {
+    console.error('[updateCircuit] Caught error:', error);
     showErrorToast(APP_MESSAGES.ERRORS.CIRCUIT_UPDATE_FAILED);
     return false;
   }

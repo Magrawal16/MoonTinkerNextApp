@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMessage } from "@/common/components/ui/GenericMessagePopup";
 
 const AuthGuard: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
-  const { isAuthenticated, initialized } = useAuth();
+  const { isAuthenticated, initialized, isLoggingOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { showMessage } = useMessage();
@@ -16,13 +16,17 @@ const AuthGuard: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
     if (!initialized) return;
 
     // If not authenticated and not on /login, show notice then redirect to login
+    // Skip the message if user is manually logging out
     if (!isAuthenticated && pathname !== "/login") {
       if (!redirectTimerRef.current) {
-        showMessage("Session expired. Redirecting to login...", "info", 2000);
+        // Only show session expired message if NOT manually logging out
+        if (!isLoggingOut) {
+          showMessage("Session expired. Redirecting to login...", "info", 2000);
+        }
         redirectTimerRef.current = window.setTimeout(() => {
           redirectTimerRef.current = null;
           router.push("/login");
-        }, 2000);
+        }, isLoggingOut ? 0 : 2000); // Immediate redirect for manual logout
       }
       return;
     }

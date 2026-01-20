@@ -25,37 +25,18 @@ function Potentiometer(props: PotentiometerProps) {
   
   // Convert angle (degrees) to ratio (0-1) - EXACT Tinkercad mapping
   const angleToRatio = (angleDeg: number): number => {
-    // Normalize angle to 0–360
-    angleDeg = ((angleDeg % 360) + 360) % 360;
-    
-    // Calculate distance from sweep start (225°) going clockwise through the top
-    let dist = (angleDeg - SWEEP_START + 360) % 360;
-    
-    // Clamp to sweep length
-    if (dist > SWEEP_LENGTH) dist = SWEEP_LENGTH;
-    
-    return Math.min(1, Math.max(0, dist / SWEEP_LENGTH));
+    const normalize = ((angleDeg % 360) + 360) % 360;
+    let dist = ((normalize - 225 + 360) % 360);
+    if (dist > 270) dist = 270;
+    const ratio = dist / 270;
+    return ratio;
   };
   
   // Convert ratio (0-1) to angle (degrees)
   const ratioToAngle = (ratio: number): number => {
-    // Clamp ratio to 0-1
     ratio = Math.min(1, Math.max(0, ratio));
-    
-    // Calculate angle from ratio
-    const offset = ratio * SWEEP_LENGTH;
-    let angle = SWEEP_START + offset;
-    
-    // Normalize to 0-360
-    if (angle >= 360) angle -= 360;
-    
+    const angle = ((225 + ratio * 270) % 360);
     return angle;
-  };
-  
-  // Check if angle is in the dead zone (135° to 225°)
-  const isInDeadZone = (deg: number): boolean => {
-    const normalized = ((deg % 360) + 360) % 360;
-    return normalized > SWEEP_END && normalized < SWEEP_START;
   };
   
   // Get initial angle from props.ratio
@@ -70,8 +51,7 @@ function Potentiometer(props: PotentiometerProps) {
   const [angle, setAngle] = useState(initialAngle);
   const [isDragging, setIsDragging] = useState(false);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const groupRef = useRef<Konva.Group>(null);
-  const lastValidAngleRef = useRef(initialAngle); 
+  const groupRef = useRef<Konva.Group>(null); 
 
   useEffect(() => {
     const image = new window.Image();
@@ -83,18 +63,6 @@ function Potentiometer(props: PotentiometerProps) {
   const centerX = 31.4;
   const centerY = 24.5;
 
-  // Helper to check if angle is on the left side of valid range (225° to 360°)
-  const isOnLeftSide = (deg: number): boolean => {
-    const normalized = ((deg % 360) + 360) % 360;
-    return normalized >= SWEEP_START && normalized <= 360;
-  };
-
-  // Helper to check if angle is on the right side of valid range (0° to 135°)
-  const isOnRightSide = (deg: number): boolean => {
-    const normalized = ((deg % 360) + 360) % 360;
-    return normalized >= 0 && normalized <= SWEEP_END;
-  };
-
   // Sync angle when props.ratio changes
   useEffect(() => {
     if (typeof props.ratio === "number") {
@@ -102,7 +70,6 @@ function Potentiometer(props: PotentiometerProps) {
       const currentRatio = angleToRatio(angle);
       if (Math.abs(props.ratio - currentRatio) > 0.01) {
         setAngle(newAngle);
-        lastValidAngleRef.current = newAngle;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,38 +111,16 @@ function Potentiometer(props: PotentiometerProps) {
     const dy = (pointerY / scale) - (absPos.y / scale + centerY);
 
     let newAngle = Math.atan2(dy, dx) * (180 / Math.PI);
-    
     newAngle = ((newAngle + 90) % 360 + 360) % 360;
 
-    if (isInDeadZone(newAngle)) {
-      return;
+    const normalized = ((newAngle % 360) + 360) % 360;
+    if (normalized > SWEEP_END && normalized < SWEEP_START) {
+      return; 
     }
 
-    const lastAngle = lastValidAngleRef.current;
-    
-    const calculateAngularDistance = (from: number, to: number) => {
-      const diff = ((to - from + 540) % 360) - 180;
-      return Math.abs(diff);
-    };
-    
-    const angularDistance = calculateAngularDistance(lastAngle, newAngle);
-    
-    if (angularDistance > 90) {
-      const wasOnLeft = isOnLeftSide(lastAngle);
-      const wasOnRight = isOnRightSide(lastAngle);
-      const nowOnLeft = isOnLeftSide(newAngle);
-      const nowOnRight = isOnRightSide(newAngle);
-      
-      if ((wasOnLeft && nowOnRight) || (wasOnRight && nowOnLeft)) {
-        if (wasOnLeft) {
-          newAngle = SWEEP_START; // Left endpoint (225°)
-        } else {
-          newAngle = SWEEP_END;   // Right endpoint (135°)
-        }
-      }
-    }
+    const newRatio = angleToRatio(newAngle);
+    newAngle = ratioToAngle(newRatio);
 
-    lastValidAngleRef.current = newAngle;
     setAngle(newAngle);
   };
 

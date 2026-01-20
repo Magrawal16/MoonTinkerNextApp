@@ -948,12 +948,9 @@ function buildMNAMatrices(
 
       const R = el.properties?.resistance ?? 10000; // Default 10kΩ
       const t = el.properties?.ratio ?? 0.5;
-      // CORRECTED for proper Tinkercad behavior:
-      // When dial is LEFT (ratio=0): Rb should be minimum (wiper near Terminal 2)
-      // When dial is RIGHT (ratio=1): Rb should be maximum (wiper far from Terminal 2)
       const MIN_R = 1; // Minimum resistance to prevent division by zero (1Ω)
-      const Rb = Math.max(MIN_R, R * t);        // Wiper to Terminal 2 - increases with ratio
-      const Ra = Math.max(MIN_R, R * (1 - t));  // Terminal 1 to Wiper - decreases with ratio
+      const Ra = Math.max(MIN_R, R * t);        
+      const Rb = Math.max(MIN_R, R * (1 - t));  
       const ga = 1 / Ra;
       const gb = 1 / Rb;
 
@@ -1313,8 +1310,8 @@ function computeElementResults(
       const R = el.properties?.resistance ?? 10000;
       const t = el.properties?.ratio ?? 0.5;
       const MIN_R = 1;
-      const Rb = Math.max(MIN_R, R * t);        // Wiper to Terminal 2 - increases with ratio
-      const Ra = Math.max(MIN_R, R * (1 - t));  // Terminal 1 to Wiper - decreases with ratio
+      const Ra = Math.max(MIN_R, R * t);        
+      const Rb = Math.max(MIN_R, R * (1 - t));  
 
       // Current through A-W segment
       const Ia = (Va2 - Vw) / Ra;

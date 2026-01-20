@@ -267,29 +267,31 @@ function Potentiometer(props: PotentiometerProps) {
           strokeWidth={1}
         />
 
-        {/* Yellow rotating arrow/strip */}
+        {/* Yellow rotating arrow */}
         <Group
           x={centerX}
           y={centerY}
           rotation={angle}
         >
-          {/* Yellow strip/arrow body */}
+          {/* Arrow shaft */}
           <Rect
-            x={2.5}
-            y={0}
-            width={5}
-            height={15}
-            fill="#F9A825"
-            cornerRadius={3}
-            rotation={180}
+            x={-2}
+            y={-8}
+            width={4}
+            height={10}
+            fill="#E91E63"
+            stroke="#C2185B"
+            strokeWidth={0.5}
+            cornerRadius={10}
           />
-          {/* Rounded end of the yellow strip (outer end) */}
-          {/* <Circle
-            x={0}
-            y={15}
-            radius={3}
-            fill="#F9A825"
-          /> */}
+          {/* Arrow head (triangle) */}
+          <Line
+            points={[0, -12, -3.5, -5, 3.5, -5]}
+            fill="#E91E63"
+            stroke="#C2185B"
+            strokeWidth={0.5}
+            closed={true}
+          />
         </Group>
 
         {/* Pink/Red center dot */}

@@ -486,7 +486,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     isSimulationRunning: simulationRunning,
     stageRef,
     enabled: autosaveEnabled,
-    debounceMs: 4000,
+    debounceMs: 2500,
     isCreatingWire: !!creatingWireStartNode,
   });
   const PROPERTIES_PANEL_WIDTH = 240;

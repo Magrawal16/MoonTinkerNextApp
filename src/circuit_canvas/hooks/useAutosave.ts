@@ -44,7 +44,7 @@ export function useAutosave({
   isSimulationRunning,
   stageRef,
   enabled = true,
-  debounceMs = 4000, // Default 4 seconds after last change
+  debounceMs = 2500, // Default 2.5 seconds after last change
   isCreatingWire = false,
 }: UseAutosaveOptions) {
   const [status, setStatus] = useState<AutosaveStatus>({

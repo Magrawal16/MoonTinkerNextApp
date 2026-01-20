@@ -60,8 +60,6 @@ export async function SaveCircuit(
   };
 
   try {
-  debugger;
-
     const token = getAuthToken();
     const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/createCircuit`, {
       method: "POST",
@@ -87,7 +85,6 @@ export async function SaveCircuit(
 }
 
 export async function getSavedCircuitsList(): Promise<{ id: string; name: string; createdAt?: string; updatedAt?: string }[]> {
-  debugger;
   try {
     const token = getAuthToken();
     const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/getCircuits`, {
@@ -134,8 +131,6 @@ export async function getCircuitById(id: string): Promise<
   | undefined
 > {
   try {
-  debugger;
-
     const token = getAuthToken();
     const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/getCircuitById/${id}`, {
       method: "GET",
@@ -210,8 +205,6 @@ export async function getCircuitById(id: string): Promise<
 
 export async function deleteCircuitById(id: string): Promise<boolean> {
   try {
-  debugger;
-
     const token = getAuthToken();
     const response = await apiFetch(`${EXTERNAL_API_BASE}/Circuit/deleteCircuit/${id}`, {
       method: "DELETE",
@@ -252,8 +245,6 @@ export async function updateCircuit(
   }
 ): Promise<boolean> {
   try {
-    debugger;
-
     // Ensure we have full circuit data. If any field is missing, fetch existing circuit.
     let targetName = name;
     let targetElements = elements;
@@ -336,7 +327,6 @@ export async function updateCircuit(
 }
 
 export async function duplicateCircuit(id: string): Promise<string | null> {
-  debugger;
   const circuit = await getCircuitById(id);
   if (!circuit) return null;
   

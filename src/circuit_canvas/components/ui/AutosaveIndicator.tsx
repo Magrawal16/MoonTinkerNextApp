@@ -33,13 +33,6 @@ export const AutosaveIndicator: React.FC<AutosaveIndicatorProps> = ({
 
   const getStatusConfig = () => {
     switch (status) {
-      case 'pending':
-        return {
-          icon: <FaClock className="text-gray-400" size={12} />,
-          text: 'Pending...',
-          bgColor: 'bg-gray-100',
-          textColor: 'text-gray-600',
-        };
       case 'saving':
         return {
           icon: <FaSpinner className="text-blue-500 animate-spin" size={12} />,

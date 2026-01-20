@@ -19,7 +19,7 @@ import styles from "@/circuit_canvas/styles/CircuitCanvas.module.css";
 import AuthHeader from "@/components/AuthHeader";
 import CircuitStorage from "@/circuit_canvas/components/core/CircuitStorage";
 import useCircuitShortcuts from "@/circuit_canvas/hooks/useCircuitShortcuts";
-import { FaLink, FaDownload, FaUpload, FaFolder, FaWrench, FaPlus } from "react-icons/fa6";
+import { FaLink, FaDownload, FaUpload, FaFolder, FaWrench, FaPlus, FaCheck, FaClock } from "react-icons/fa6";
 import { 
   CollapsibleToolbar, 
   DropdownItem, 
@@ -78,6 +78,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [importInput, setImportInput] = useState("");
+  type AuthContextType = { role?: string } | null;
+  const authContext = React.useContext(require("@/providers/AuthProvider").AuthContext) as AuthContextType;
   const [importError, setImportError] = useState<string | null>(null);
 
   // LocalStorage keys for session persistence
@@ -2097,26 +2099,14 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
             {/* Color Palette and shortcuts moved to tools row (after Fit to View) */}
             <div className="ml-auto flex items-center gap-2">
               {/* File Menu - Contains Export & Import */}
-              {/* Autosave Indicator and Button - next to Circuit dropdown */}
+
+              {/* Autosave Indicator always visible if circuit loaded */}
               {currentCircuitId && (
-                <>
-                  <AutosaveIndicator 
-                    status={autosaveStatus.status}
-                    lastSaved={autosaveStatus.lastSaved}
-                    error={autosaveStatus.error}
-                  />
-                  <button
-                    onClick={() => setAutosaveEnabled(!autosaveEnabled)}
-                    className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 ${
-                      autosaveEnabled
-                        ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-300'
-                    }`}
-                    title={autosaveEnabled ? 'Autosave enabled - Click to disable' : 'Autosave disabled - Click to enable'}
-                  >
-                    {autosaveEnabled ? '✓ Autosave On' : 'Autosave Off'}
-                  </button>
-                </>
+                <AutosaveIndicator 
+                  status={autosaveStatus.status}
+                  lastSaved={autosaveStatus.lastSaved}
+                  error={autosaveStatus.error}
+                />
               )}
 
 
@@ -2143,6 +2133,20 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                   onClick={handleImportCircuit}
                   className="bg-green-100 hover:!bg-green-200 text-green-800"
                 />
+                {/* Autosave toggle button inside Circuit dropdown, will be hidden for students in next step */}
+                {currentCircuitId && authContext?.role !== 'Student' && (
+                  <DropdownItem
+                    icon={autosaveEnabled ? <FaCheck /> : <FaClock />}
+                    label={autosaveEnabled ? 'Autosave On' : 'Autosave Off'}
+                    onClick={() => setAutosaveEnabled(!autosaveEnabled)}
+                    className={
+                      (autosaveEnabled
+                        ? 'bg-purple-100 hover:!bg-purple-200 text-purple-800'
+                        : 'bg-purple-50 hover:!bg-purple-100 text-purple-400') +
+                      ' font-semibold border-0 w-full flex items-center gap-2 rounded-md transition-colors duration-150 py-2 px-3'
+                    }
+                  />
+                )}
               </CollapsibleToolbar>
               
 

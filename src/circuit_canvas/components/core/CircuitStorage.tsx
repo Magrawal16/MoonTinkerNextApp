@@ -12,6 +12,7 @@ import {
 } from "@/circuit_canvas/utils/circuitStorage";
 import React from "react";
 import { FaFolder, FaSearch, FaTimes, FaSave, FaCheck, FaCopy, FaTrash, FaDownload } from "react-icons/fa";
+import { useRouter } from "next/navigation";
 import { APP_MESSAGES } from "@/common/constants/messages";
 
 type CircuitManagerProps = {
@@ -36,6 +37,7 @@ type ToastMessage = {
 };
 
 export default function CircuitStorage(props: CircuitManagerProps) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedCircuitID, setSelectedCircuitID] = useState<string | null>(null);
   const [selectedCircuitData, setSelectedCircuitData] = useState<any>(null);
@@ -157,7 +159,7 @@ export default function CircuitStorage(props: CircuitManagerProps) {
 
     setIsSaving(true);
     try {
-      await SaveCircuit(
+      const newId = await SaveCircuit(
         circuitName.trim(),
         props.currentElements ?? [],
         props.currentWires ?? [],
@@ -167,6 +169,10 @@ export default function CircuitStorage(props: CircuitManagerProps) {
       );
       const updatedList = await getSavedCircuitsList();
       setSavedCircuits(updatedList);
+      // Update parent with new circuit ID
+      if (typeof props.onCircuitSelect === 'function' && newId) {
+        props.onCircuitSelect(newId);
+      }
       showToast(APP_MESSAGES.SUCCESS.CIRCUIT_SAVED, 'success');
       setCircuitName("");
     } catch (error) {
@@ -185,8 +191,16 @@ export default function CircuitStorage(props: CircuitManagerProps) {
         const updatedList = await getSavedCircuitsList();
         setSavedCircuits(updatedList);
         setSelectedCircuitID(null);
-        showToast(APP_MESSAGES.SUCCESS.CIRCUIT_DELETED, 'info');
         setDeleteConfirmId(null);
+        // Show toast and redirect if deleted circuit is the current circuit
+        if (props.currentCircuitId === id) {
+          showToast(APP_MESSAGES.SUCCESS.CIRCUIT_DELETED, 'info');
+          setTimeout(() => {
+            router.push('/saved_circuits');
+          }, 1200); // Give time for toast to show
+        } else {
+          showToast(APP_MESSAGES.SUCCESS.CIRCUIT_DELETED, 'info');
+        }
       }
     } finally {
       setIsLoading(false);

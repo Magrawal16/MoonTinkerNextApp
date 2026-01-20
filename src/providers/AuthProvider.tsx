@@ -66,7 +66,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     // Construct URL from centralized client API base so environments can override.
     // Call the same-origin proxy which injects the required security-key
     // and forwards to the external login API. Payload matches Postman screenshot.
-    debugger;
     
     // Clear all circuit-related localStorage data before logging in
     // This prevents data from previous user sessions being accessible
@@ -108,7 +107,6 @@ export const AuthProvider: React.FC<React.PropsWithChildren<{}>> = ({
     //   setRole("dev");
     //   return true;
     // }
-debugger;
     try {
       const res = await fetch(`${EXTERNAL_API_BASE}/account/login`, {
         method: "POST",

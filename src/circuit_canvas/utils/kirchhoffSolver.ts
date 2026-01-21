@@ -10,8 +10,10 @@ const DEBUG = false;
 const VOLTMETER_R = 10_000_000; // ohms
 // Low shunt resistance for ammeter (~50 mΩ)
 const AMMETER_R = 0.05; // ohms
-// Ohmmeter applies a small known test voltage and measures current
-const OHMMETER_VTEST = 1; // volt
+// Ohmmeter injects a small constant current and measures resulting voltage
+const OHMMETER_ITEST = 0.001; // amps (1 mA)
+// Treat anything above this as open-loop (OL) like Tinkercad's DMM
+const OHMMETER_OPEN_THRESHOLD = 1e9; // ohms
 
 /**
  * Main function to solve the entire circuit by dividing it into connected subcircuits.
@@ -75,19 +77,9 @@ function solveSingleSubcircuitAfterMerge(
   const n = nonGroundIds.length;
 
   // Determine which elements act as independent sources for this subcircuit
-  // Base set includes batteries, microbits, and multimeters in resistance mode
-  const baseSources = getElementsWithCurrent(elements, nodeEquivalenceMap);
-  
-  const hasExternalSources = baseSources.some(
-    (e) => e.type !== "multimeter" || e.properties?.mode !== "resistance"
-  );
-
-  // If any external source exists, exclude ohmmeters from acting as sources
-  const elementsWithCurrent = hasExternalSources
-    ? baseSources.filter(
-        (e) => !(e.type === "multimeter" && e.properties?.mode === "resistance")
-      )
-    : baseSources;
+  // Base set includes batteries, microbits, and supplies. Ohmmeters no longer
+  // inject a voltage source; they are modeled via a fixed test current stamp.
+  const elementsWithCurrent = getElementsWithCurrent(elements, nodeEquivalenceMap);
 
   const currentSourceIndexMap = mapCurrentSourceIndices(elementsWithCurrent);
 
@@ -704,14 +696,13 @@ function getElementsWithCurrent(
 ) {
   const result: CircuitElement[] = [];
 
-    for (const e of elements) {
-      if (!e || !e.type) continue;
-      if (
-        (((e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply")) &&
-          Array.isArray(e.nodes) &&
-          e.nodes.length === 2) ||
-        (e.type === "multimeter" && e.properties?.mode === "resistance")
-      ) {
+  for (const e of elements) {
+    if (!e || !e.type) continue;
+    if (
+      (((e.type === "battery" || e.type === "cell3v" || e.type === "AA_battery" || e.type === "AAA_battery" || e.type === "powersupply")) &&
+        Array.isArray(e.nodes) &&
+        e.nodes.length === 2)
+    ) {
       // If it's a power supply explicitly switched OFF, do not treat as source.
       if (e.type === "powersupply" && (e.properties as any)?.isOn === false) {
         continue;
@@ -721,10 +712,10 @@ function getElementsWithCurrent(
       // Only add the main microbit source if both 3.3V and GND are connected
       const posIds = e.nodes?.filter((n) => n.placeholder === "3.3V").map((n) => n.id) ?? [];
       const negIds = e.nodes?.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND")).map((n) => n.id) ?? [];
-      
-      const hasConnectedPos = posIds.some(id => nodeMap.has(id));
-      const hasConnectedNeg = negIds.some(id => nodeMap.has(id));
-      
+
+      const hasConnectedPos = posIds.some((id) => nodeMap.has(id));
+      const hasConnectedNeg = negIds.some((id) => nodeMap.has(id));
+
       if (hasConnectedPos && hasConnectedNeg) {
         result.push(e);
       }
@@ -735,7 +726,7 @@ function getElementsWithCurrent(
     if (e.type === "microbit" || e.type === "microbitWithBreakout") {
       const pins =
         (e.controller?.pins as Record<string, { digital?: number }>) ?? {};
-      
+
       for (const node of e.nodes ?? []) {
         const pinName = node.placeholder;
         if (pinName && pinName.startsWith("P")) {
@@ -775,6 +766,17 @@ function buildMNAMatrices(
 ) {
   const n = nodeIndex.size; // number of non-ground nodes
   const m = currentMap.size; // number of current sources / voltage sources
+  const externallyPowered = elements.some(
+    (el) =>
+      el.type === "battery" ||
+      el.type === "cell3v" ||
+      el.type === "AA_battery" ||
+      el.type === "AAA_battery" ||
+      el.type === "powersupply" ||
+      el.type === "microbit" ||
+      el.type === "microbitWithBreakout"
+  );
+  const allowOhmmeterDrive = !externallyPowered;
 
   const zeroRow = (len: number) => Array.from({ length: len }, () => 0);
   const G = Array.from({ length: n }, () => zeroRow(n));
@@ -935,37 +937,59 @@ function buildMNAMatrices(
       }
     } else if (el.type === "potentiometer") {
       // Potentiometer: 3 terminals - A (Terminal 1), W (Wiper), B (Terminal 2)
-      // Physical behavior:
-      // ratio = 0 (dial left/CCW): Wiper far from Terminal 2, so Rb ≈ R, Ra ≈ 0
-      // ratio = 1 (dial right/CW): Wiper close to Terminal 2, so Rb ≈ 0, Ra ≈ R
+      // Tinkercad convention: ratio expresses the fraction of the total resistance
+      // between Wiper and Terminal 2 (B).
+      // - ratio = 0 (dial left): Wiper on Terminal 2 -> Ra = R, Rb = 0
+      // - ratio = 1 (dial right): Wiper on Terminal 1 -> Ra = 0, Rb = R
       const [nodeA, nodeW, nodeB] = el.nodes;
       const aMapped = nodeMap.get(nodeA?.id ?? "");
       const wMapped = nodeMap.get(nodeW?.id ?? "");
       const bMapped = nodeMap.get(nodeB?.id ?? "");
+      
+      // Get matrix indices (undefined for ground node or unconnected terminals)
       const ai2 = aMapped ? nodeIndex.get(aMapped) : undefined;
       const wi = wMapped ? nodeIndex.get(wMapped) : undefined;
       const bi2 = bMapped ? nodeIndex.get(bMapped) : undefined;
+      
+      // Check which terminals are in the circuit (have a mapped equivalence class)
+      const inCircuitA = !!aMapped;
+      const inCircuitW = !!wMapped;
+      const inCircuitB = !!bMapped;
 
       const R = el.properties?.resistance ?? 10000; // Default 10kΩ
-      const t = el.properties?.ratio ?? 0.5;
-      const MIN_R = 1; // Minimum resistance to prevent division by zero (1Ω)
-      const Ra = Math.max(MIN_R, R * t);        
-      const Rb = Math.max(MIN_R, R * (1 - t));  
+      // Clamp ratio to [0, 1] and snap the endpoints so the user can hit true 0Ω/10kΩ
+      const tRaw = Math.max(0, Math.min(1, el.properties?.ratio ?? 0.5));
+      const t = tRaw <= 1e-4 ? 0 : tRaw >= 1 - 1e-4 ? 1 : tRaw;
+      const R_SHORT = 1e-4; // 0.1 mΩ pseudo-short for numerical stability
+      // Tinkercad: ratio is the portion from Wiper to Terminal 2 (B)
+      const Ra = Math.max(R_SHORT, R * (1 - t));    // T1 to Wiper: decreases as ratio -> 1
+      const Rb = Math.max(R_SHORT, R * t);          // Wiper to T2: increases as ratio -> 1
       const ga = 1 / Ra;
       const gb = 1 / Rb;
 
-      if (ai2 !== undefined) G[ai2][ai2] += ga;
-      if (wi !== undefined) G[wi][wi] += ga;
-      if (ai2 !== undefined && wi !== undefined) {
-        G[ai2][wi] -= ga;
-        G[wi][ai2] -= ga;
-      }
+      // Helper to stamp conductance between two nodes (handles ground correctly)
+      // When one node is ground (undefined index), only stamp diagonal for the non-ground node
+      const stampConductance = (idx1: number | undefined, idx2: number | undefined, g: number) => {
+        if (idx1 !== undefined) G[idx1][idx1] += g;
+        if (idx2 !== undefined) G[idx2][idx2] += g;
+        if (idx1 !== undefined && idx2 !== undefined) {
+          G[idx1][idx2] -= g;
+          G[idx2][idx1] -= g;
+        }
+      };
 
-      if (bi2 !== undefined) G[bi2][bi2] += gb;
-      if (wi !== undefined) G[wi][wi] += gb;
-      if (bi2 !== undefined && wi !== undefined) {
-        G[bi2][wi] -= gb;
-        G[wi][bi2] -= gb;
+      // Always stamp all three resistor segments if the terminals are in the circuit
+      // This ensures the full resistor network is present regardless of wiper position
+      if (inCircuitA && inCircuitW) {
+        stampConductance(ai2, wi, ga);  // Resistance from A to W
+      }
+      if (inCircuitW && inCircuitB) {
+        stampConductance(wi, bi2, gb);  // Resistance from W to B
+      }
+      if (inCircuitA && inCircuitB && !inCircuitW) {
+        // Special case: A and B connected but W floating - act as full resistance
+        const g = R > 0 ? 1 / R : 1e12;
+        stampConductance(ai2, bi2, g);
       }
     } else if (el.type === "microbit" || el.type === "microbitWithBreakout" || el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply") {
       // Skip battery/supply/microbit stamping in the main elements loop
@@ -994,15 +1018,12 @@ function buildMNAMatrices(
           G[bi][ai] -= g;
         }
       } else if (mode === "resistance") {
-        // Stamp a known test voltage source across the probes
-        const idx = safeCurrentIndex(el.id);
-        if (idx === undefined) continue;
-        if (ai !== undefined) B[ai][idx] -= 1;
-        if (bi !== undefined) B[bi][idx] += 1;
-        if (ai !== undefined) C[idx][ai] += 1;
-        if (bi !== undefined) C[idx][bi] -= 1;
-        D[idx][idx] += 0; // ideal source
-        E[idx] = OHMMETER_VTEST;
+        if (!allowOhmmeterDrive) {
+          continue; // Do not drive a powered circuit in resistance mode
+        }
+        // Inject a small test current (DMM ohms mode) from probe 0 to probe 1
+        if (ai !== undefined) I[ai] -= OHMMETER_ITEST;
+        if (bi !== undefined) I[bi] += OHMMETER_ITEST;
       }
     }
   }
@@ -1113,20 +1134,6 @@ function buildMNAMatrices(
         D[idx][idx] += el.properties?.resistance ?? 0;
         E[idx] = el.properties?.voltage ?? 3.3;
       }
-    } else if (el.type === "multimeter" && el.properties?.mode === "resistance") {
-      // Ohmmeter mode
-      const node0 = el.nodes[0]?.id;
-      const node1 = el.nodes[1]?.id;
-      const ai = safeNodeIndex(node0);
-      const bi = safeNodeIndex(node1);
-      const idx = safeCurrentIndex(el.id);
-      if (idx === undefined) continue;
-      if (ai !== undefined) B[ai][idx] -= 1;
-      if (bi !== undefined) B[bi][idx] += 1;
-      if (ai !== undefined) C[idx][ai] += 1;
-      if (bi !== undefined) C[idx][bi] -= 1;
-      D[idx][idx] += 0;
-      E[idx] = OHMMETER_VTEST;
     }
   }
 
@@ -1301,33 +1308,35 @@ function computeElementResults(
       power = redResult.power + greenResult.power + blueResult.power;
     } else if (el.type === "potentiometer") {
       // Potentiometer result computation
-      // Same formula as stamping: Ra = R * t, Rb = R * (1 - t)
+      // Tinkercad convention: ratio is fraction from Wiper to Terminal 2 (B)
       const [nodeA, nodeW, nodeB] = el.nodes;
-      const Va2 = nodeVoltages[nodeMap.get(nodeA.id) ?? ""] ?? 0;
-      const Vw = nodeVoltages[nodeMap.get(nodeW.id) ?? ""] ?? 0;
-      const Vb2 = nodeVoltages[nodeMap.get(nodeB.id) ?? ""] ?? 0;
+      const aMapped = nodeMap.get(nodeA?.id ?? "");
+      const wMapped = nodeMap.get(nodeW?.id ?? "");
+      const bMapped = nodeMap.get(nodeB?.id ?? "");
+
+      // Get voltages from solved node voltages (0 for unconnected/ground nodes)
+      const Va2 = aMapped ? nodeVoltages[aMapped] ?? 0 : 0;
+      const Vw = wMapped ? nodeVoltages[wMapped] ?? 0 : 0;
+      const Vb2 = bMapped ? nodeVoltages[bMapped] ?? 0 : 0;
 
       const R = el.properties?.resistance ?? 10000;
-      const t = el.properties?.ratio ?? 0.5;
-      const MIN_R = 1;
-      const Ra = Math.max(MIN_R, R * t);        
-      const Rb = Math.max(MIN_R, R * (1 - t));  
+      const tRaw = Math.max(0, Math.min(1, el.properties?.ratio ?? 0.5));
+      const t = tRaw <= 1e-4 ? 0 : tRaw >= 1 - 1e-4 ? 1 : tRaw;
+      const R_SHORT = 1e-4;
+      const Ra = Math.max(R_SHORT, R * (1 - t));    // T1 to Wiper
+      const Rb = Math.max(R_SHORT, R * t);          // Wiper to T2
 
-      // Current through A-W segment
-      const Ia = (Va2 - Vw) / Ra;
-      // Current through W-B segment  
-      const Ib = (Vw - Vb2) / Rb;
-
-      // Total voltage across the potentiometer (A to B)
+      // Compute current through each segment based on voltage drops
+      // Avoid division by zero when resistance is 0 (short circuit)
+      const Ia = (Va2 - Vw) / Ra;  // Current from A to W
+      const Ib = (Vw - Vb2) / Rb;  // Current from W to B
+      
+      // Report the dominant current and overall voltage
       const totalVoltage = Va2 - Vb2;
-      // In a proper circuit, Ia ≈ Ib (Kirchhoff's current law at wiper)
-      // Use average for better accuracy
-      const totalCurrent = (Math.abs(Ia) + Math.abs(Ib)) / 2;
-      const totalPower = Math.abs(totalVoltage * totalCurrent);
-
+      const totalCurrent = Math.max(Math.abs(Ia), Math.abs(Ib));
       current = totalCurrent;
       voltage = totalVoltage;
-      power = totalPower;
+      power = Math.abs(totalVoltage * totalCurrent);
     } else if (el.type === "battery" || el.type === "cell3v" || el.type === "AA_battery" || el.type === "AAA_battery" || el.type === "powersupply" || el.type === "microbit" || el.type === "microbitWithBreakout") {
       const isPsOff = el.type === "powersupply" && (el.properties as any)?.isOn === false;
       if (isPsOff) {
@@ -1362,13 +1371,16 @@ function computeElementResults(
           // Powered circuit: real meters refuse measurement
           measurement = Number.NaN; // UI will render as "Error"
         } else {
-          // R = Vtest / |Isrc|
-          const idx = currentMap.get(el.id);
-          const isrc = idx !== undefined ? Math.abs(x[n + idx] ?? 0) : 0;
-          if (isrc > 1e-12) {
-            measurement = Math.abs(OHMMETER_VTEST) / isrc;
+          // Equivalent resistance: R = |V| / Itest
+          const vdrop = Math.abs(voltage);
+          const testCurrent = OHMMETER_ITEST;
+          if (testCurrent > 0) {
+            measurement = vdrop / testCurrent;
+            if (!isFinite(measurement) || measurement > OHMMETER_OPEN_THRESHOLD) {
+              measurement = Number.POSITIVE_INFINITY; // open circuit / floating
+            }
           } else {
-            measurement = Number.POSITIVE_INFINITY; // open circuit
+            measurement = Number.POSITIVE_INFINITY;
           }
         }
         power = 0;

@@ -19,6 +19,13 @@ const AuthGuard: React.FC<React.PropsWithChildren<{}>> = ({ children }) => {
     // Skip the message if user is manually logging out
     if (!isAuthenticated && pathname !== "/login") {
       if (!redirectTimerRef.current) {
+        // Clear all localStorage before redirecting
+        try {
+          localStorage.clear();
+        } catch (e) {
+          // ignore storage errors
+        }
+        
         // Only show session expired message if NOT manually logging out
         if (!isLoggingOut) {
           showMessage("Session expired. Redirecting to login...", "info", 2000);

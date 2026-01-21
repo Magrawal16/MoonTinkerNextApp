@@ -17,9 +17,16 @@ export default function LoginPage() {
   const router = useRouter();
   const auth = useAuth();
 
-  // Auto-focus email field on mount
+  // Auto-focus email field on mount and clear all localStorage
   React.useEffect(() => {
     emailRef.current?.focus();
+    
+    // Clear all localStorage when user lands on login page
+    try {
+      localStorage.clear();
+    } catch (e) {
+      // ignore storage errors
+    }
   }, []);
 
   // Auto-focus is retained without keyboard shortcuts
@@ -55,20 +62,6 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
-
-  // Load remembered email
-  React.useEffect(() => {
-    try {
-      const remembered = localStorage.getItem("mt:remember");
-      const savedEmail = localStorage.getItem("mt:email");
-      if (remembered === "1" && savedEmail) {
-        setEmail(savedEmail);
-        setRememberMe(true);
-      }
-    } catch (e) {
-      // Ignore storage errors
-    }
-  }, []);
 
   return (
     <div className="login-page" style={{

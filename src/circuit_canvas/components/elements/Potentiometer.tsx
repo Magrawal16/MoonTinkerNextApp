@@ -140,7 +140,7 @@ function Potentiometer(props: PotentiometerProps) {
   };
 
   const handlePointerDown = (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
-    if (!props.isSimulationOn) return; 
+    if (!props.isSimulationOn) return;
     e.cancelBubble = true;
     setIsDragging(true);
   };

@@ -51,7 +51,9 @@ function Potentiometer(props: PotentiometerProps) {
   const [angle, setAngle] = useState(initialAngle);
   const [isDragging, setIsDragging] = useState(false);
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const groupRef = useRef<Konva.Group>(null); 
+  const groupRef = useRef<Konva.Group>(null);
+  const lastValidAngleRef = useRef<number>(initialAngle);
+  const prevRatioRef = useRef<number>(angleToRatio(initialAngle)); 
 
   useEffect(() => {
     const image = new window.Image();
@@ -70,6 +72,7 @@ function Potentiometer(props: PotentiometerProps) {
       const currentRatio = angleToRatio(angle);
       if (Math.abs(props.ratio - currentRatio) > 0.01) {
         setAngle(newAngle);
+        prevRatioRef.current = props.ratio;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,6 +81,7 @@ function Potentiometer(props: PotentiometerProps) {
   // Call onRatioChange only if ratio changed meaningfully
   useEffect(() => {
     const ratio = angleToRatio(angle);
+    prevRatioRef.current = ratio;
     if (props.ratio === undefined || Math.abs(ratio - props.ratio) > 0.01) {
       props.onRatioChange?.(ratio);
     }
@@ -114,13 +118,24 @@ function Potentiometer(props: PotentiometerProps) {
     newAngle = ((newAngle + 90) % 360 + 360) % 360;
 
     const normalized = ((newAngle % 360) + 360) % 360;
+    
     if (normalized > SWEEP_END && normalized < SWEEP_START) {
-      return; 
+      return;
     }
 
     const newRatio = angleToRatio(newAngle);
+    const prevRatio = prevRatioRef.current;
+    
+    const deltaRatio = newRatio - prevRatio;
+
+    if (Math.abs(deltaRatio) > 0.5) {
+      return;
+    }
+
     newAngle = ratioToAngle(newRatio);
 
+    prevRatioRef.current = newRatio;
+    lastValidAngleRef.current = newAngle;
     setAngle(newAngle);
   };
 

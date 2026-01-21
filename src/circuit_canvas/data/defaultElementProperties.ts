@@ -5,6 +5,7 @@ import React from "react";
 import { PaletteElementType } from "../types/circuit";
 import { ReactNode } from "react";
 import { SlideSwitchPreview } from "../components/palette/SlideSwitchPreview";
+import { ResistorPreview } from "../components/palette/ResistorPreview";
 
 export interface PaletteElement {
   type: PaletteElementType;
@@ -56,6 +57,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
   {
     type: "resistor",
     label: "Resistor",
+    customIcon: () => React.createElement(ResistorPreview),
     iconPath: "assets/circuit_canvas/elements/resistor.svg",
     defaultProps: { resistance: 1000 },
   },

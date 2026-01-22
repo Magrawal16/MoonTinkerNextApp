@@ -1616,6 +1616,10 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
   // handle resistance change for potentiometer
   const handleRatioChange = useCallback((elementId: string, ratio: number) => {
+    // Update the ratio in elements state. The animation loop will pick up
+    // the change and re-solve the circuit automatically when simulation is running.
+    // We avoid calling computeCircuit manually to prevent race conditions
+    // between the manual call and the animation loop.
     setElements((prev) =>
       prev.map((el) =>
         el.id === elementId
@@ -1626,12 +1630,13 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
           : el
       )
     );
-    if (simulationRunning) {
-      computeCircuit(wires);
-    }
-  }, [simulationRunning, computeCircuit, wires]);
+    // When simulation is NOT running, we still update the state but don't
+    // need to solve. When it IS running, the animation loop handles solving.
+  }, []);
 
   const handleModeChange = useCallback((elementId: string, mode: "voltage" | "current" | "resistance") => {
+    // Update the mode in elements state. The animation loop will pick up
+    // the change and re-solve the circuit automatically when simulation is running.
     setElements((prev) =>
       prev.map((el) =>
         el.id === elementId
@@ -1642,8 +1647,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
           : el
       )
     );
-    if (simulationRunning) computeCircuit(wires);
-  }, [simulationRunning, computeCircuit, wires]);
+  }, []);
 
   // Compute the next available numeric suffix for a given element type (e.g., microbit-1, microbit-2)
   const getNextIdNumberForType = useCallback((type: string) => {

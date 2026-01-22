@@ -959,11 +959,24 @@ function buildMNAMatrices(
       const R = el.properties?.resistance ?? 10000; // Default 10kΩ
       // Clamp ratio to [0, 1] and snap the endpoints so the user can hit true 0Ω/10kΩ
       const tRaw = Math.max(0, Math.min(1, el.properties?.ratio ?? 0.5));
-      const t = tRaw <= 1e-4 ? 0 : tRaw >= 1 - 1e-4 ? 1 : tRaw;
-      const R_SHORT = 1e-4; // 0.1 mΩ pseudo-short for numerical stability
+      // Widen snap threshold to 0.01 (1%) to make it easier to hit exact endpoints
+      const t = tRaw <= 0.01 ? 0 : tRaw >= 0.99 ? 1 : tRaw;
+      const R_SHORT = 1e-9; // 1 nΩ pseudo-short for numerical stability (very small to allow near-zero readings)
       // Tinkercad: ratio is the portion from Wiper to Terminal 2 (B)
       const Ra = Math.max(R_SHORT, R * (1 - t));    // T1 to Wiper: decreases as ratio -> 1
       const Rb = Math.max(R_SHORT, R * t);          // Wiper to T2: increases as ratio -> 1
+      
+      // Debug logging
+      console.log('[Potentiometer Debug]', {
+        R,
+        tRaw,
+        t,
+        Ra,
+        Rb,
+        inCircuitA,
+        inCircuitW,
+        inCircuitB
+      });
       const ga = 1 / Ra;
       const gb = 1 / Rb;
 
@@ -996,7 +1009,7 @@ function buildMNAMatrices(
       // They will be stamped in the elementsWithCurrent loop below
       continue;
     } else if (el.type === "multimeter") {
-      const mode = el.properties?.mode;
+      const mode = el.properties?.mode ?? "voltage"; // Default to voltage mode
       if (mode === "voltage") {
         // Stamp a very large resistor across probes to model input impedance
         const R = VOLTMETER_R;
@@ -1321,8 +1334,9 @@ function computeElementResults(
 
       const R = el.properties?.resistance ?? 10000;
       const tRaw = Math.max(0, Math.min(1, el.properties?.ratio ?? 0.5));
-      const t = tRaw <= 1e-4 ? 0 : tRaw >= 1 - 1e-4 ? 1 : tRaw;
-      const R_SHORT = 1e-4;
+      // Widen snap threshold to 0.01 (1%) to make it easier to hit exact endpoints
+      const t = tRaw <= 0.01 ? 0 : tRaw >= 0.99 ? 1 : tRaw;
+      const R_SHORT = 1e-9; // Match the stamping constant
       const Ra = Math.max(R_SHORT, R * (1 - t));    // T1 to Wiper
       const Rb = Math.max(R_SHORT, R * t);          // Wiper to T2
 
@@ -1356,7 +1370,9 @@ function computeElementResults(
         }
       }
     } else if (el.type === "multimeter") {
-      const mode = el.properties?.mode;
+      const mode = el.properties?.mode ?? "voltage"; // Default to voltage mode
+      let measurementUnit: "ohm" | "kohm" | undefined;
+      
       if (mode === "voltage") {
         // Read differential voltage; high input impedance is stamped in G
         measurement = voltage;
@@ -1376,15 +1392,50 @@ function computeElementResults(
           const testCurrent = OHMMETER_ITEST;
           if (testCurrent > 0) {
             measurement = vdrop / testCurrent;
+            
+            // Debug logging
+            console.log('[Multimeter Debug]', {
+              vdrop,
+              testCurrent,
+              measurement,
+              Va,
+              Vb,
+              voltage
+            });
+            
             if (!isFinite(measurement) || measurement > OHMMETER_OPEN_THRESHOLD) {
               measurement = Number.POSITIVE_INFINITY; // open circuit / floating
             }
           } else {
             measurement = Number.POSITIVE_INFINITY;
           }
+          
+          // Find connected elements to determine display unit preference
+          // Look for potentiometers or resistors connected to multimeter probes
+          const probeA = el.nodes?.[0]?.id;
+          const probeB = el.nodes?.[1]?.id;
+          const probeAClass = probeA ? nodeMap.get(probeA) : undefined;
+          const probeBClass = probeB ? nodeMap.get(probeB) : undefined;
+          
+          for (const otherEl of elements) {
+            if (otherEl.type === "potentiometer" || otherEl.type === "resistor") {
+              // Check if any of this element's nodes are in the same equivalence class as probes
+              const connected = otherEl.nodes?.some(n => {
+                const nodeClass = nodeMap.get(n.id);
+                return nodeClass && (nodeClass === probeAClass || nodeClass === probeBClass);
+              });
+              if (connected && otherEl.properties?.resistanceUnit) {
+                measurementUnit = otherEl.properties.resistanceUnit;
+                break;
+              }
+            }
+          }
         }
         power = 0;
       }
+      
+      // Store measurementUnit in a temporary variable to add to computed result
+      (el as any)._measurementUnit = measurementUnit;
     }
 
     const supplyMode = el.type === "powersupply"
@@ -1393,11 +1444,15 @@ function computeElementResults(
           : currentLimitedIds?.has(el.id) ? "CC" : "VC")
       : undefined;
 
+    // Get measurementUnit for multimeter if it was computed
+    const measurementUnit = el.type === "multimeter" ? (el as any)._measurementUnit : undefined;
+
     const computedResult: any = {
       voltage,
       current,
       power,
       measurement,
+      measurementUnit,
       supplyMode,
       ...(el.type === "led" && (el.runtime as any)?.led?.exploded && intactLedCurrentById
         ? { explosionCurrentEstimate: intactLedCurrentById.get(el.id) ?? 0 }

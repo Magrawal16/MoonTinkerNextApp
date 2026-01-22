@@ -75,12 +75,15 @@ export default function PropertiesPanel({
     // chosen unit (Ω vs kΩ) when the same element is updated elsewhere.
     const isNewSelection = lastSelectedIdRef.current !== selectedElement.id;
     const r = selectedElement.properties?.resistance;
+    const savedUnit = selectedElement.properties?.resistanceUnit;
     if (isNewSelection) {
       if (r != null) {
-        setResistanceUnit(r >= 1000 ? "kohm" : "ohm");
-        setResistanceInput((r >= 1000 ? r / 1000 : r).toString());
+        // Use saved unit preference if available, otherwise infer from value
+        const unit = savedUnit ?? (r >= 1000 ? "kohm" : "ohm");
+        setResistanceUnit(unit);
+        setResistanceInput((unit === "kohm" ? r / 1000 : r).toString());
       } else {
-        setResistanceUnit("ohm");
+        setResistanceUnit(savedUnit ?? "ohm");
         setResistanceInput("");
       }
     }
@@ -134,6 +137,7 @@ export default function PropertiesPanel({
       const nextProps: NonNullable<CircuitElement["properties"]> = {
         ...selectedElement.properties,
         resistance: resistance ?? undefined,
+        resistanceUnit: resistanceUnit, // Save the user's chosen unit preference
         voltage: voltage ?? undefined,
         ratio: ratio ?? undefined,
         color: color ?? undefined,

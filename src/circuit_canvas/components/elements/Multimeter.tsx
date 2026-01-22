@@ -8,6 +8,7 @@ import { Image, Text, Group, Line, Circle } from "react-konva";
 
 interface MultimeterProps extends BaseElementProps {
   measurement?: number;
+  measurementUnit?: "ohm" | "kohm";
   initialMode?: Mode;
   onModeChange: (id: string, mode: Mode) => void;
   isSimulationOn?: boolean;
@@ -30,12 +31,26 @@ export default function Multimeter(props: MultimeterProps) {
     props.onModeChange(props.id, newMode);
   };
 
-  const formatOhms = (r: number) => {
+  const formatOhms = (r: number, unit?: "ohm" | "kohm") => {
     if (Number.isNaN(r)) return "Error"; // powered circuit or invalid measurement
     if (!isFinite(r)) return "OL"; // over-limit / open-loop
     const ar = Math.abs(r);
+    
+    // Treat very small values as effectively 0 (< 0.01 Ω)
+    if (ar < 0.01) return unit === "kohm" ? "0.00 kΩ" : "0.00 Ω";
+    
     if (ar >= 1_000_000) return `${(r / 1_000_000).toFixed(2)} MΩ`;
-    if (ar >= 1_000) return `${(r / 1_000).toFixed(2)} kΩ`;
+    
+    // If a unit preference is specified (from connected potentiometer/resistor), use it
+    if (unit === "kohm") {
+      return `${(r / 1_000).toFixed(2)} kΩ`;
+    }
+    if (unit === "ohm") {
+      return `${r.toFixed(2)} Ω`;
+    }
+    
+    // Default behavior: show kΩ for values >= 1Ω
+    if (ar >= 1) return `${(r / 1_000).toFixed(2)} kΩ`;
     return `${r.toFixed(2)} Ω`;
   };
 
@@ -55,7 +70,7 @@ export default function Multimeter(props: MultimeterProps) {
       case "current":
         return `${props.measurement.toFixed(2)} A`;
       case "resistance":
-        return formatOhms(props.measurement);
+        return formatOhms(props.measurement, props.measurementUnit);
       default:
         return "---";
     }

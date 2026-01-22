@@ -354,6 +354,7 @@ export default function createElement(
       ...{
         voltage: props.properties?.voltage ?? 1,
         resistance: props.properties?.resistance ?? 11,
+        mode: props.properties?.mode ?? "voltage", // Default mode
       },
       ...props.properties,
     },
@@ -396,6 +397,7 @@ export default function createElement(
       ...{
         voltage: props.properties?.voltage,
         resistance: props.properties?.resistance ?? 10000, // Default 10kΩ like Tinkercad
+        resistanceUnit: props.properties?.resistanceUnit ?? "kohm", // Default to kΩ for potentiometer
         ratio: props.properties?.ratio ?? 0.5, // Internal only - not displayed to user
       },
       ...props.properties,

@@ -280,6 +280,7 @@ export default function RenderElement(props: RenderElementProps) {
           x={1}
           y={22}
           measurement={element.computed?.measurement}
+          measurementUnit={element.computed?.measurementUnit}
           initialMode={(element.properties?.mode as any) ?? "voltage"}
           onModeChange={props.handleModeChange}
           draggable={false}

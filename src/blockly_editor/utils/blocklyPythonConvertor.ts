@@ -129,6 +129,7 @@ export class BlocklyPythonIntegration {
    * This is the main entry point for Python-to-Blockly conversion
    */
   importPythonCode(pythonCode: string): void {
+    this.workspace.clear();
     // Use the shared converter to create blocks from Python code
     const blocks = this.converter.convertPythonToBlocks(pythonCode);
 

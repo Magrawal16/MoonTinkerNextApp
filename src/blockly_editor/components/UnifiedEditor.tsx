@@ -325,6 +325,7 @@ export default function UnifiedEditor({
           const parser = new DOMParser();
           const dom = parser.parseFromString(controllerXmlMap[controllerId], "text/xml");
           const xml = dom.documentElement;
+          workspaceRef.current.clear();
           Blockly.Xml.domToWorkspace(xml, workspaceRef.current);
           return true;
         } catch (e) { return false; }

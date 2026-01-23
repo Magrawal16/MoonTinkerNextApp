@@ -4,7 +4,7 @@ import {
   BaseElementProps,
 } from "@/circuit_canvas/components/core/BaseElement";
 import { useEffect, useState } from "react";
-import { Image, Text, Group, Line, Circle } from "react-konva";
+import { Image, Text, Group, Line, Circle, Label, Tag } from "react-konva";
 
 interface MultimeterProps extends BaseElementProps {
   measurement?: number;
@@ -21,10 +21,11 @@ export default function Multimeter(props: MultimeterProps) {
   const [mode, setMode] = useState<Mode>(props.initialMode || "voltage");
 
   useEffect(() => {
+    // Keep internal mode state in sync with parent updates (e.g. Properties Panel)
     if (props.initialMode && props.initialMode !== mode) {
       setMode(props.initialMode);
     }
-  }, []);
+  }, [props.initialMode, mode]);
 
   const handleModeChange = (newMode: Mode) => {
     setMode(newMode);
@@ -94,6 +95,7 @@ export default function Multimeter(props: MultimeterProps) {
     { cy: 46, label: "V", mode: "voltage" as const },
     { cy: 64, label: "Ω", mode: "resistance" as const },
   ] as const;
+  const [hoveredMode, setHoveredMode] = useState<Mode | null>(null);
 
   return (
     <BaseElement {...props}>
@@ -150,6 +152,20 @@ export default function Multimeter(props: MultimeterProps) {
               key={btn.label}
               onClick={() => handleModeChange(btn.mode)}
               onTap={() => handleModeChange(btn.mode)}
+              onMouseEnter={(e) => {
+                e.cancelBubble = true;
+                setHoveredMode(btn.mode);
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'pointer';
+              }}
+              onMouseLeave={(e) => {
+                e.cancelBubble = true;
+                setHoveredMode(null);
+                const stage = e.target.getStage();
+                if (stage) stage.container().style.cursor = 'default';
+              }}
+              onTouchStart={() => setHoveredMode(btn.mode)}
+              onTouchEnd={() => setHoveredMode(null)}
             >
               <Circle
                 x={BTN_X}
@@ -177,6 +193,38 @@ export default function Multimeter(props: MultimeterProps) {
             </Group>
           );
         })}
+
+        {/* Simple Konva tooltip shown on hover */}
+        {hoveredMode && (() => {
+          const def = buttonDefs.find(b => b.mode === hoveredMode)!;
+          const tooltipText = hoveredMode === 'voltage'
+            ? 'Click to select "VOLTAGE" mode'
+            : hoveredMode === 'current'
+            ? 'Click to select "CURRENT/AMPERAGE" mode'
+            : 'Click to select "RESISTANCE" mode';
+          const tx = BTN_X + 15;
+          const ty = def.cy - 20;
+          return (
+            <Label x={tx} y={ty} listening={false}>
+              <Tag
+                fill="rgba(30,41,59,0.95)"
+                stroke="#3b82f6"
+                strokeWidth={1}
+                cornerRadius={6}
+                shadowColor="rgba(0,0,0,0.4)"
+                shadowBlur={6}
+                shadowOffset={{ x: 0, y: 2 }}
+              />
+              <Text
+                text={tooltipText}
+                fontSize={12}
+                padding={8}
+                fill="#fff"
+                fontFamily="Arial, sans-serif"
+              />
+            </Label>
+          );
+        })()}
       </Group>
     </BaseElement>
   );

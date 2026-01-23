@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Image, Rect, Circle, Text, Line } from "react-konva";
+import Konva from "konva";
 import { BaseElement, BaseElementProps } from "@/circuit_canvas/components/core/BaseElement";
 
 interface LdrProps extends BaseElementProps {
@@ -16,6 +17,9 @@ interface LdrProps extends BaseElementProps {
 const MIN_R = 506;       // Bright
 const MAX_R = 180000;    // Dark
 
+//Hide Resistance from Slider (used for debugging)
+const SHOW_RESISTANCE_LABEL = false;
+
 /* =======================
    UI CONSTANTS
 ======================= */
@@ -23,7 +27,7 @@ const WIDTH = 60;
 const SLIDER_PADDING = 8;
 const TRACK_HEIGHT = 10;
 const KNOB_RADIUS = 8;
-const SLIDER_OFFSET_Y = -18; // 🔼 slider ABOVE the LDR
+const SLIDER_OFFSET_Y = -18; // slider ABOVE the LDR
 
 /* =======================
    HELPERS
@@ -55,7 +59,9 @@ export default function Ldr(props: LdrProps) {
   );
 
   const [img, setImg] = useState<HTMLImageElement | null>(null);
-  const [pressed, setPressed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const groupRef = useRef<Konva.Group>(null);
 
   useEffect(() => {
     const image = new window.Image();
@@ -75,42 +81,48 @@ export default function Ldr(props: LdrProps) {
   );
 
   /* =======================
-     POINTER → LIGHT UPDATE
+     GLOBAL DRAG HANDLING
   ======================= */
-  const updateLightFromPointer = (evt: any) => {
-    const stage = evt.target.getStage();
+  const handlePointerMove = (e: MouseEvent) => {
+    if (!isDragging || !groupRef.current) return;
+
+    const stage = groupRef.current.getStage();
     if (!stage) return;
 
-    const pointer = stage.getPointerPosition();
-    if (!pointer) return;
+    const rect = stage.container().getBoundingClientRect();
+    const pointerX = e.clientX - rect.left;
 
-    const group = evt.target.getParent();
-    if (!group) return;
+    const absPos = groupRef.current.getAbsolutePosition();
+    const scale = stage.scaleX() || 1;
 
-    // Convert pointer → local group space (rotation-safe)
-    const local = group
-      .getAbsoluteTransform()
-      .copy()
-      .invert()
-      .point(pointer);
+    const localX =
+      (pointerX / scale) - (absPos.x / scale) - SLIDER_PADDING;
 
-    const x = clamp(local.x, 0, trackWidth);
+    const x = clamp(localX, 0, trackWidth);
     const newLight = Math.round((x / trackWidth) * 100);
 
     props.onLightChange?.(newLight);
   };
 
-  // clear pressed state on global mouse up (covers leaving the canvas)
   useEffect(() => {
-    const onUp = () => setPressed(false);
-    window.addEventListener("mouseup", onUp);
-    return () => window.removeEventListener("mouseup", onUp);
-  }, []);
+    if (!isDragging) return;
+
+    const handleMove = (e: MouseEvent) => handlePointerMove(e);
+    const handleUp = () => setIsDragging(false);
+
+    window.addEventListener("mousemove", handleMove);
+    window.addEventListener("mouseup", handleUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMove);
+      window.removeEventListener("mouseup", handleUp);
+    };
+  }, [isDragging]);
 
   return (
     <BaseElement {...props} draggable={!props.isSimulationOn}>
       {img && (
-        <Group>
+        <Group ref={groupRef}>
           {/* =======================
               SLIDER (TOP)
           ======================= */}
@@ -121,7 +133,7 @@ export default function Ldr(props: LdrProps) {
                 <Circle radius={6} fill="#333" stroke="#111" strokeWidth={1} />
               </Group>
 
-              {/* Track background */}
+              {/* Track */}
               <Rect
                 width={trackWidth}
                 height={TRACK_HEIGHT}
@@ -131,12 +143,11 @@ export default function Ldr(props: LdrProps) {
                 shadowBlur={2}
                 onMouseDown={(e) => {
                   e.cancelBubble = true;
-                  setPressed(true);
-                  updateLightFromPointer(e);
+                  setIsDragging(true);
                 }}
               />
 
-              {/* Filled progress (visualizes light level) */}
+              {/* Filled progress */}
               <Rect
                 width={Math.max(2, knobX)}
                 height={TRACK_HEIGHT}
@@ -151,27 +162,20 @@ export default function Ldr(props: LdrProps) {
               <Circle
                 x={knobX}
                 y={TRACK_HEIGHT / 2}
-                radius={pressed ? KNOB_RADIUS + 2 : KNOB_RADIUS}
-                fill={pressed ? "#f4f4f4" : "#ffffff"}
-                stroke={pressed ? "#444" : "#666"}
-                strokeWidth={pressed ? 1.8 : 1.5}
-                shadowBlur={pressed ? 10 : 6}
-                shadowColor={pressed ? "#222" : "#444"}
-                draggable={false} // ❗ IMPORTANT
+                radius={isDragging ? KNOB_RADIUS + 2 : KNOB_RADIUS}
+                fill={isDragging ? "#f4f4f4" : "#ffffff"}
+                stroke={isDragging ? "#444" : "#666"}
+                strokeWidth={isDragging ? 1.8 : 1.5}
+                shadowBlur={isDragging ? 10 : 6}
+                shadowColor={isDragging ? "#222" : "#444"}
                 onMouseDown={(e) => {
                   e.cancelBubble = true;
-                  setPressed(true);
-                  updateLightFromPointer(e);
-                }}
-                onMouseMove={(e) => {
-                  if (e.evt.buttons === 1) {
-                    e.cancelBubble = true;
-                    updateLightFromPointer(e);
-                  }
+                  setIsDragging(true);
                 }}
               />
 
-              {/* Resistance Label (moved above slider) */}
+              {/* Resistance Label */}
+              {SHOW_RESISTANCE_LABEL && (
               <Text
                 y={-TRACK_HEIGHT - 12}
                 x={trackWidth / 2 - 40}
@@ -179,6 +183,8 @@ export default function Ldr(props: LdrProps) {
                 fill="#222"
                 text={`${Math.round(resistance)} Ω`}
               />
+            )}
+
 
               {/* Sun icon (right) */}
               <Group x={trackWidth + 18} y={TRACK_HEIGHT / 2}>

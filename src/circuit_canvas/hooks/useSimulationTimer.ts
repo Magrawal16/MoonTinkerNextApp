@@ -12,7 +12,9 @@ export function useSimulationTimer(simulationRunning: boolean) {
   const simulationTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    // When simulation starts, reset the timer and create one interval.
     if (simulationRunning) {
+      setSimulationTime(0);
       simulationTimerRef.current = setInterval(() => {
         setSimulationTime((prev) => prev + 1);
       }, 1000);
@@ -29,10 +31,6 @@ export function useSimulationTimer(simulationRunning: boolean) {
         simulationTimerRef.current = null;
       }
     };
-  }, [simulationRunning]);
-
-  useEffect(() => {
-    if (simulationRunning) setSimulationTime(0);
   }, [simulationRunning]);
 
   return { simulationTime, formatTime: formatHms };

@@ -358,7 +358,8 @@ export default function createElement(
       },
       ...props.properties,
     },
-    displayProperties: [],
+    // Expose mode in the Properties Panel so the Update button appears
+    displayProperties: ["mode"],
   };
 
   const potentiometerElement = {

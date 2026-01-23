@@ -31,6 +31,7 @@ export default function PropertiesPanel({
   const [resistanceInput, setResistanceInput] = useState<string>("");
   const [voltage, setVoltage] = useState<number | null>(null);
   const [ratio, setRatio] = useState<number | null>(null);
+  const [mode, setMode] = useState<"voltage" | "current" | "resistance" | null>(null);
   const [color, setColor] = useState<string | null>(null);
   const [selectedWireColor, setSelectedWireColor] = useState<string>(
     wireColor || defaultColors[0].hex
@@ -89,6 +90,7 @@ export default function PropertiesPanel({
     }
     setVoltage(selectedElement.properties?.voltage ?? null);
     setRatio(selectedElement.properties?.ratio ?? null);
+    setMode((selectedElement.properties?.mode as any) ?? null);
     const nextColor =
       selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout"
         ? selectedElement.properties?.color ?? (selectedElement.type === "microbitWithBreakout" ? "green" : "red")
@@ -116,6 +118,13 @@ export default function PropertiesPanel({
     lastSelectedIdRef.current = selectedElement.id;
   }, [selectedElement]);
 
+  // Keep `mode` in sync if the selected element's properties.mode changes
+  useEffect(() => {
+    if (!selectedElement) return;
+    const m = (selectedElement.properties?.mode as any) ?? null;
+    setMode(m);
+  }, [selectedElement?.properties?.mode, selectedElement?.id]);
+
   // Track last selected element id so we don't reinitialize unit/input on prop updates
   const lastSelectedIdRef = useRef<string | null>(null);
 
@@ -140,6 +149,7 @@ export default function PropertiesPanel({
         resistanceUnit: resistanceUnit, // Save the user's chosen unit preference
         voltage: voltage ?? undefined,
         ratio: ratio ?? undefined,
+        mode: mode ?? undefined,
         color: color ?? undefined,
         text: noteText || undefined,
       };
@@ -382,6 +392,22 @@ export default function PropertiesPanel({
         </div>
       )}
 
+      {/* Multimeter mode selector */}
+      {selectedElement.type === "multimeter" && (
+        <div className="flex flex-col text-xs">
+          <label>Mode:</label>
+          <select
+            className="border px-1 py-1 rounded text-xs bg-white"
+            value={mode ?? (selectedElement.properties?.mode ?? "voltage")}
+            onChange={(e) => setMode(e.target.value as any)}
+          >
+            <option value="voltage">Voltage (V)</option>
+            <option value="current">Current/Amperage (A)</option>
+            <option value="resistance">Resistance(Ω)</option>
+          </select>
+        </div>
+      )}
+
       {/* AA battery type (AA/AAA) and count selector like Tinkercad */}
       {selectedElement.type === "AA_battery" && (
         <>
@@ -557,16 +583,18 @@ export default function PropertiesPanel({
 
       <div className="flex justify-between gap-2 text-xs">
         { 
+          (selectedElement.type === "multimeter") || (
           selectedElement.type !== "wire" &&
           Array.isArray(selectedElement.displayProperties) &&
-          selectedElement.displayProperties.length > 0 && (
-          <button
-            className="bg-blue-500 text-white px-3 py-1 rounded w-full"
-            onClick={handleUpdate}
-          >
-            Update
-          </button>
-        )}
+          selectedElement.displayProperties.length > 0)
+          ? (
+            <button
+              className="bg-blue-500 text-white px-3 py-1 rounded w-full"
+              onClick={handleUpdate}
+            >
+              Update
+            </button>
+          ) : null}
         <button
           className="bg-red-500 text-white px-3 py-1 rounded w-full"
           onClick={handleDelete}

@@ -1637,17 +1637,26 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const handleModeChange = useCallback((elementId: string, mode: "voltage" | "current" | "resistance") => {
     // Update the mode in elements state. The animation loop will pick up
     // the change and re-solve the circuit automatically when simulation is running.
-    setElements((prev) =>
-      prev.map((el) =>
+    setElements((prev) => {
+      const next = prev.map((el) =>
         el.id === elementId
           ? {
             ...el,
             properties: { ...el.properties, mode },
           }
           : el
-      )
-    );
-  }, []);
+      );
+
+      // If this element is currently selected in the Properties Panel,
+      // update the selectedElement reference so the panel shows the new mode immediately.
+      if (selectedElement && selectedElement.id === elementId) {
+        const updated = next.find((e) => e.id === elementId) || null;
+        setSelectedElement(updated);
+      }
+
+      return next;
+    });
+  }, [selectedElement]);
 
   // Compute the next available numeric suffix for a given element type (e.g., microbit-1, microbit-2)
   const getNextIdNumberForType = useCallback((type: string) => {

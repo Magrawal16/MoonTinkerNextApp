@@ -1437,7 +1437,19 @@ function computeElementResults(
       // Store measurementUnit in a temporary variable to add to computed result
       (el as any)._measurementUnit = measurementUnit;
     }
-
+    
+    else if (el.type === "buzzer") {
+      // Buzzer nodes: [negative, positive] per createElement
+      const posId = nodeMap.get(el.nodes?.[1]?.id ?? "");
+      const negId = nodeMap.get(el.nodes?.[0]?.id ?? "");
+      const Vpos = posId ? nodeVoltages[posId] ?? 0 : 0;
+      const Vneg = negId ? nodeVoltages[negId] ?? 0 : 0;
+      // Expose voltage as positive = V(positive) - V(negative)
+      voltage = Vpos - Vneg;
+      // Buzzer is modeled as a high-impedance sensor for now (doesn't affect node solve)
+      current = 0;
+      power = Math.abs(voltage * current);
+    }
     const supplyMode = el.type === "powersupply"
       ? ((el.type === "powersupply" && (el.properties as any)?.isOn === false)
           ? "OFF"

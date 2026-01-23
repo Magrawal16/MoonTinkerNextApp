@@ -21,7 +21,24 @@ const voltageToFrequency = (v: number) => {
   const maxF = 2000;
   return minF * Math.pow(maxF / minF, vNorm);
 };
-const voltageToVolume = (v: number) => clamp(v / 5, 0, 1) * 0.6; // cap overall loudness
+// Map voltage to perceived volume. Use 9V as full-scale so 9V is the loudest.
+// Reduce mid-range loudness so voltages just above 1.5V are noticeably quieter.
+const voltageToVolume = (v: number) => {
+  const vClamped = clamp(v, 0, 9);
+  if (vClamped <= 1.5) {
+    // Very quiet on small single-cell batteries
+    return 0.03;
+  }
+  if (vClamped <= 4.5) {
+    // Interpolate from quiet (1.5V) up to a modest medium at 4.5V
+    const t = (vClamped - 1.5) / (4.5 - 1.5);
+    // 0.03 -> 0.25 across this band
+    return 0.03 + t * (0.25 - 0.03);
+  }
+  // Upper region: 4.5V -> 9V maps from medium to near-full
+  const t = (vClamped - 4.5) / (9 - 4.5);
+  return 0.25 + t * (0.95 - 0.25);
+};
 
 export default function Buzzer(props: BuzzerProps) {
   const [img, setImg] = useState<HTMLImageElement | null>(null);

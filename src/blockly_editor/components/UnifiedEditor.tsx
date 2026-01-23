@@ -604,12 +604,10 @@ export default function UnifiedEditor({
   useEffect(() => {
     if (editorMode !== "block") {
       if (workspaceRef.current) {
-        // Close any open field editors (dropdowns, text inputs) before disposing
         try {
           (Blockly as any).WidgetDiv?.hide();
           (Blockly as any).DropDownDiv?.hideWithoutAnimation();
           (Blockly as any).Tooltip?.hide();
-          // Unfocus any selected block
           const ws = workspaceRef.current as any;
           if (ws.hideChaff) ws.hideChaff();
         } catch {}
@@ -658,7 +656,6 @@ export default function UnifiedEditor({
   useEffect(() => {
     return () => {
       if (workspaceRef.current) {
-        // Close any open field editors before unmount
         try {
           (Blockly as any).WidgetDiv?.hide();
           (Blockly as any).DropDownDiv?.hideWithoutAnimation();

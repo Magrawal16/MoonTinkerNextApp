@@ -166,6 +166,10 @@ export default function UnifiedEditor({
   const previousControllerIdRef = useRef<string | null>(null);
   const controllerXmlMapRef = useRef<Record<string, string>>(controllerXmlMap);
   const activeControllerIdRef = useRef<string | null>(activeControllerId);
+  
+  activeControllerIdRef.current = activeControllerId;
+  controllerXmlMapRef.current = controllerXmlMap;
+  
   const isUpdatingFromCodeRef = useRef<boolean>(isUpdatingFromCode);
   // Track text edits relative to the code generated from blocks when entering text mode
   const textBaselineRef = useRef<string>("");
@@ -213,9 +217,6 @@ export default function UnifiedEditor({
     } catch {}
   }, [activeControllerId]);
 
-  useEffect(() => {
-    activeControllerIdRef.current = activeControllerId;
-  }, [activeControllerId]);
 
   // Persist the selected controller kind so shared Blockly blocks (e.g., pin dropdowns)
   // can adapt options based on whether the board is a breakout variant.
@@ -286,68 +287,6 @@ export default function UnifiedEditor({
     }
   }, [onResetRef, fullEditorReset]);
 
-  // --- Workspace Initialization Hook ---
-  // This must come after all state/refs/hooks
-  // Provide all required props for useWorkspaceInitialization
-  const { initializeWorkspace } = useWorkspaceInitialization({
-    blocklyRef,
-    workspaceRef,
-    setWorkspaceReady,
-    setBidirectionalConverter,
-    setIsUpdatingFromBlocks,
-    setControllerCodeMap,
-    activeControllerId,
-    activeControllerIdRef,
-    // The following are required by the hook interface
-    saveWorkspaceState: (controllerId?: string) => {
-      // Save XML for the current controller (initialization: no parent notify)
-      if (!controllerId) controllerId = activeControllerId ?? undefined;
-      if (controllerId && workspaceRef.current) {
-        const xml = Blockly.Xml.workspaceToDom(workspaceRef.current);
-        setControllerXmlMap(prev => {
-          const updated = { ...prev, [controllerId!]: Blockly.Xml.domToText(xml) };
-          try {
-            localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(updated));
-          } catch {}
-          return updated;
-        });
-      }
-    },
-    isUpdatingFromCodeRef,
-    localCodeRef,
-    lastCodeRef,
-    loadWorkspaceState: (controllerId?: string) => {
-      // Load XML for the given controller
-      if (!controllerId) controllerId = activeControllerId ?? undefined;
-      if (controllerId && controllerXmlMap[controllerId] && workspaceRef.current) {
-        try {
-          // Parse XML string to DOM using DOMParser
-          const parser = new DOMParser();
-          const dom = parser.parseFromString(controllerXmlMap[controllerId], "text/xml");
-          const xml = dom.documentElement;
-          workspaceRef.current.clear();
-          Blockly.Xml.domToWorkspace(xml, workspaceRef.current);
-          return true;
-        } catch (e) { return false; }
-      }
-      return false;
-    },
-    stopSimulationRef,
-    setIsConverting,
-    setConversionType,
-    isSwitchingControllerRef,
-  });
-
-  // Notify parent of XML changes via debounce to avoid rapid re-renders
-  useEffect(() => {
-    if (!controllerXmlMap || Object.keys(controllerXmlMap).length === 0) return;
-    const timer = setTimeout(() => {
-      try { onControllerXmlMapChange?.(controllerXmlMap); } catch {}
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [controllerXmlMap, onControllerXmlMapChange]);
-
-  // XML operation helpers
   const xmlHelpers = useRef({
     textToDom: (xmlText: string) => {
       const anyB: any = Blockly as any;
@@ -358,7 +297,6 @@ export default function UnifiedEditor({
       for (const fn of tryFns) {
         try { return fn(xmlText); } catch (_) {}
       }
-      // Fallback: DOMParser
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(xmlText, 'text/xml');
@@ -376,7 +314,6 @@ export default function UnifiedEditor({
       for (const fn of tryFns) {
         try { return fn(el); } catch (_) {}
       }
-      // Fallback: XMLSerializer
       try {
         return new XMLSerializer().serializeToString(el);
       } catch (e) {
@@ -384,6 +321,87 @@ export default function UnifiedEditor({
       }
     },
   });
+
+  // --- Workspace Initialization Hook ---
+  // This must come after all state/refs/hooks
+  // Provide all required props for useWorkspaceInitialization
+  const { initializeWorkspace } = useWorkspaceInitialization({
+    blocklyRef,
+    workspaceRef,
+    setWorkspaceReady,
+    setBidirectionalConverter,
+    setIsUpdatingFromBlocks,
+    setControllerCodeMap,
+    activeControllerId,
+    activeControllerIdRef,
+    // The following are required by the hook interface
+    saveWorkspaceState: (controllerId?: string) => {
+      // Save XML for the current controller (initialization: no parent notify)
+      if (!controllerId) controllerId = activeControllerIdRef.current ?? undefined;
+      if (controllerId && workspaceRef.current) {
+        const xml = Blockly.Xml.workspaceToDom(workspaceRef.current);
+        const xmlText = Blockly.Xml.domToText(xml);
+        controllerXmlMapRef.current = { ...controllerXmlMapRef.current, [controllerId]: xmlText };
+        setControllerXmlMap(prev => {
+          const updated = { ...prev, [controllerId!]: xmlText };
+          try {
+            localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(updated));
+          } catch {}
+          return updated;
+        });
+      }
+    },
+    isUpdatingFromCodeRef,
+    localCodeRef,
+    lastCodeRef,
+    loadWorkspaceState: (controllerId?: string) => {
+      // Load XML for the given controller
+      if (!controllerId) controllerId = activeControllerIdRef.current ?? undefined;
+      const xmlMap = controllerXmlMapRef.current;
+      const xmlText = controllerId ? xmlMap[controllerId] : undefined;
+      
+      if (!controllerId || !xmlText || !xmlText.trim() || !workspaceRef.current) {
+        return false;
+      }
+      
+      if (!xmlText.includes('<block')) {
+        return false;
+      }
+      
+      try {
+        const xmlDom = xmlHelpers.current.textToDom(xmlText);
+        
+        if (xmlDom.querySelector && xmlDom.querySelector('parsererror')) {
+          return false;
+        }
+        
+        workspaceRef.current.clear();
+        (Blockly.Xml as any).domToWorkspace(xmlDom, workspaceRef.current);
+        
+        const loadedBlocks = workspaceRef.current.getAllBlocks(false);
+        if (loadedBlocks.length === 0) {
+          return false;
+        }
+        
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    stopSimulationRef,
+    setIsConverting,
+    setConversionType,
+    isSwitchingControllerRef,
+  });
+
+  // Notify parent of XML changes via debounce to avoid rapid re-renders
+  useEffect(() => {
+    if (!controllerXmlMap || Object.keys(controllerXmlMap).length === 0) return;
+    const timer = setTimeout(() => {
+      try { onControllerXmlMapChange?.(controllerXmlMap); } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [controllerXmlMap, onControllerXmlMapChange]);
 
   const saveWorkspaceState = useCallback((controllerId?: string) => {
     const id = controllerId ?? activeControllerId;
@@ -432,9 +450,6 @@ export default function UnifiedEditor({
     stopSimulationRef.current = stopSimulation;
   }, [stopSimulation]);
 
-  useEffect(() => {
-    controllerXmlMapRef.current = controllerXmlMap;
-  }, [controllerXmlMap]);
 
   let currentCode = controllerCodeMap[activeControllerId ?? ""] ?? "";
 
@@ -589,6 +604,32 @@ export default function UnifiedEditor({
   useEffect(() => {
     if (editorMode !== "block") {
       if (workspaceRef.current) {
+        // Close any open field editors (dropdowns, text inputs) before disposing
+        try {
+          (Blockly as any).WidgetDiv?.hide();
+          (Blockly as any).DropDownDiv?.hideWithoutAnimation();
+          (Blockly as any).Tooltip?.hide();
+          // Unfocus any selected block
+          const ws = workspaceRef.current as any;
+          if (ws.hideChaff) ws.hideChaff();
+        } catch {}
+        try {
+          const id = activeControllerIdRef.current;
+          if (id) {
+            const xml = (Blockly.Xml as any).workspaceToDom(workspaceRef.current);
+            const xmlText = xmlHelpers.current.domToText(xml);
+            controllerXmlMapRef.current = { ...controllerXmlMapRef.current, [id]: xmlText };
+            setControllerXmlMap(prev => {
+              const updated = { ...prev, [id]: xmlText };
+              try {
+                localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(updated));
+              } catch {}
+              return updated;
+            });
+          }
+        } catch (e) {
+          console.warn("⚠️ Failed to save workspace before dispose:", e);
+        }
         try { workspaceRef.current.dispose(); } catch (_) {}
         workspaceRef.current = null;
         setWorkspaceReady(false);
@@ -605,11 +646,43 @@ export default function UnifiedEditor({
       if (!isMounted) return;
       if (!blocklyRef.current) return requestAnimationFrame(attemptInit);
       if (blocklyRef.current.offsetWidth === 0) return setTimeout(attemptInit, 50);
+      if (!activeControllerIdRef.current && controllers.length > 0) {
+        return setTimeout(attemptInit, 50);
+      }
       initializeWorkspace();
     };
     attemptInit();
     return () => { isMounted = false; };
-  }, [editorMode, activeControllerId]);
+  }, [editorMode, activeControllerId, controllers.length]);
+
+  useEffect(() => {
+    return () => {
+      if (workspaceRef.current) {
+        // Close any open field editors before unmount
+        try {
+          (Blockly as any).WidgetDiv?.hide();
+          (Blockly as any).DropDownDiv?.hideWithoutAnimation();
+          (Blockly as any).Tooltip?.hide();
+          const ws = workspaceRef.current as any;
+          if (ws.hideChaff) ws.hideChaff();
+        } catch {}
+        try {
+          const id = activeControllerIdRef.current;
+          if (id) {
+            const xml = (Blockly.Xml as any).workspaceToDom(workspaceRef.current);
+            const xmlText = xmlHelpers.current.domToText(xml);
+            controllerXmlMapRef.current = { ...controllerXmlMapRef.current, [id]: xmlText };
+            try {
+              const updated = { ...controllerXmlMapRef.current, [id]: xmlText };
+              localStorage.setItem('moontinker_controllerXmlMap', JSON.stringify(updated));
+            } catch {}
+          }
+        } catch (e) {
+          console.warn("⚠️ Failed to save workspace on unmount:", e);
+        }
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!workspaceRef.current || !workspaceReady) return;

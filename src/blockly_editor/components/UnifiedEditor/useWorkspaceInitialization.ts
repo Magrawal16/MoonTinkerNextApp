@@ -355,17 +355,14 @@ export function useWorkspaceInitialization({
 
       setTimeout(() => {
         const codeAtInit = localCodeRef.current;
-        const loaded = loadWorkspaceState(activeControllerId || undefined);
+        const currentActiveId = activeControllerIdRef.current;
+        const loaded = loadWorkspaceState(currentActiveId || undefined);
         if (!loaded) {
           if (workspace && codeAtInit.trim() && converter) {
             try {
               converter.pythonToBlocks(codeAtInit);
               lastCodeRef.current = codeAtInit;
-              setTimeout(
-                () => saveWorkspaceState(activeControllerId || undefined),
-                100
-              );
-            } catch (error) {
+            } catch {
               // Silently handle errors
             }
           } else if (workspace && !codeAtInit.trim()) {
@@ -389,7 +386,7 @@ export function useWorkspaceInitialization({
                 foreverBlock.moveBy(centerX + 200, centerY); // Position 200px to the right
 
                 setTimeout(
-                  () => saveWorkspaceState(activeControllerId || undefined),
+                  () => saveWorkspaceState(currentActiveId || undefined),
                   100
                 );
               } catch (error) {

@@ -143,7 +143,9 @@ export function addWorkspaceListeners(
         xmlSaveTimeoutRef.current = setTimeout(() => {
           // Re-read active id at save time to avoid stale writes
           const idNow = options.activeControllerIdRef.current;
-          if (idNow) options.saveWorkspaceState(idNow);
+          if (idNow) {
+            options.saveWorkspaceState(idNow);
+          }
         }, 400);
       }
     }

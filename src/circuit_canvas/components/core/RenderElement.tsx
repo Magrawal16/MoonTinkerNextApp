@@ -1,7 +1,7 @@
  
 import { useCallback, useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
-import { Rect, Group, Text, Label, Tag, Path } from "react-konva";
+import { Rect, Group, Text, Label, Tag, Path, Circle, Ellipse } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter, getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
 import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
@@ -566,6 +566,37 @@ export default function RenderElement(props: RenderElementProps) {
                   stroke="#facc15"
                   strokeWidth={1}
                   cornerRadius={2}
+                  listening={false}
+                />
+              );
+            }
+
+            if (region.type === "circle") {
+              return (
+                <Circle
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  radius={region.radius}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  listening={false}
+                />
+              );
+            }
+
+            if (region.type === "ellipse") {
+              return (
+                <Ellipse
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  radiusX={region.radiusX}
+                  radiusY={region.radiusY}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
                   listening={false}
                 />
               );

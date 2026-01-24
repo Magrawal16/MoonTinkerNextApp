@@ -26,6 +26,8 @@ import PushButton from "@/circuit_canvas/components/elements/PushButton";
 import SlideSwitch from "@/circuit_canvas/components/elements/SlideSwitch";
 import Buzzer from "@/circuit_canvas/components/elements/Buzzer";
 
+const SHOW_COLLISION_OVERLAY = (process.env.NEXT_PUBLIC_SHOW_COLLISION_OVERLAY ?? "true") !== "false";
+
 interface RenderElementProps {
   element: CircuitElement;
   simulator?: any;
@@ -548,6 +550,44 @@ export default function RenderElement(props: RenderElementProps) {
           );
         })}
       </Group>
+
+      {SHOW_COLLISION_OVERLAY && (
+        <Group listening={false}>
+          {collisionRegions.map((region, idx) => {
+            if (region.type === "rect") {
+              return (
+                <Rect
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  width={region.width}
+                  height={region.height}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  cornerRadius={2}
+                  listening={false}
+                />
+              );
+            }
+
+            return (
+              <Path
+                key={`collision-${element.id}-${idx}`}
+                data={region.data}
+                x={region.x - element.x}
+                y={region.y - element.y}
+                scaleX={region.scaleX}
+                scaleY={region.scaleY}
+                fill="rgba(250, 204, 21, 0.2)"
+                stroke="#facc15"
+                strokeWidth={1}
+                listening={false}
+              />
+            );
+          })}
+        </Group>
+      )}
 
       {props.showNodes !== false &&
         element.nodes.map((node) => {

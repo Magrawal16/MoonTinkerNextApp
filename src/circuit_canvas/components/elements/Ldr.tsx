@@ -3,9 +3,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Group, Image, Rect, Circle, Text, Line } from "react-konva";
 import Konva from "konva";
-import { BaseElement, BaseElementProps } from "@/circuit_canvas/components/core/BaseElement";
 
-interface LdrProps extends BaseElementProps {
+interface LdrProps {
+  id: string;
+  x?: number;
+  y?: number;
+  selected?: boolean;
+  draggable?: boolean;
   isSimulationOn?: boolean;
   lightLevel?: number;
   onLightChange?: (light: number) => void;
@@ -120,9 +124,9 @@ export default function Ldr(props: LdrProps) {
   }, [isDragging]);
 
   return (
-    <BaseElement {...props} draggable={!props.isSimulationOn}>
+    <>
       {img && (
-        <Group ref={groupRef}>
+        <Group ref={groupRef} x={props.x} y={props.y}>
           {/* =======================
               SLIDER (TOP)
           ======================= */}
@@ -221,6 +225,6 @@ export default function Ldr(props: LdrProps) {
           />
         </Group>
       )}
-    </BaseElement>
+    </>
   );
 }

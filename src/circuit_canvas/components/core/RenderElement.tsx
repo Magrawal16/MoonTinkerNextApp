@@ -469,6 +469,76 @@ export default function RenderElement(props: RenderElementProps) {
         />
       )}
 
+      {/* Collision overlay - must be inside rotation group to rotate with element */}
+      {SHOW_COLLISION_OVERLAY && (
+        <Group listening={false}>
+          {collisionRegions.map((region, idx) => {
+            if (region.type === "rect") {
+              return (
+                <Rect
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  width={region.width}
+                  height={region.height}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  cornerRadius={2}
+                  listening={false}
+                />
+              );
+            }
+
+            if (region.type === "circle") {
+              return (
+                <Circle
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  radius={region.radius}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  listening={false}
+                />
+              );
+            }
+
+            if (region.type === "ellipse") {
+              return (
+                <Ellipse
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  radiusX={region.radiusX}
+                  radiusY={region.radiusY}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  listening={false}
+                />
+              );
+            }
+
+            return (
+              <Path
+                key={`collision-${element.id}-${idx}`}
+                data={region.data}
+                x={region.x - element.x}
+                y={region.y - element.y}
+                scaleX={region.scaleX}
+                scaleY={region.scaleY}
+                fill="rgba(250, 204, 21, 0.2)"
+                stroke="#facc15"
+                strokeWidth={1}
+                listening={false}
+              />
+            );
+          })}
+        </Group>
+      )}
+
       {/* Render nodes and tooltip (can be disabled) */}
       {props.showNodes !== false &&
         element.nodes.map((node) => {
@@ -550,75 +620,6 @@ export default function RenderElement(props: RenderElementProps) {
           );
         })}
       </Group>
-
-      {SHOW_COLLISION_OVERLAY && (
-        <Group listening={false}>
-          {collisionRegions.map((region, idx) => {
-            if (region.type === "rect") {
-              return (
-                <Rect
-                  key={`collision-${element.id}-${idx}`}
-                  x={region.x - element.x}
-                  y={region.y - element.y}
-                  width={region.width}
-                  height={region.height}
-                  fill="rgba(250, 204, 21, 0.25)"
-                  stroke="#facc15"
-                  strokeWidth={1}
-                  cornerRadius={2}
-                  listening={false}
-                />
-              );
-            }
-
-            if (region.type === "circle") {
-              return (
-                <Circle
-                  key={`collision-${element.id}-${idx}`}
-                  x={region.x - element.x}
-                  y={region.y - element.y}
-                  radius={region.radius}
-                  fill="rgba(250, 204, 21, 0.25)"
-                  stroke="#facc15"
-                  strokeWidth={1}
-                  listening={false}
-                />
-              );
-            }
-
-            if (region.type === "ellipse") {
-              return (
-                <Ellipse
-                  key={`collision-${element.id}-${idx}`}
-                  x={region.x - element.x}
-                  y={region.y - element.y}
-                  radiusX={region.radiusX}
-                  radiusY={region.radiusY}
-                  fill="rgba(250, 204, 21, 0.25)"
-                  stroke="#facc15"
-                  strokeWidth={1}
-                  listening={false}
-                />
-              );
-            }
-
-            return (
-              <Path
-                key={`collision-${element.id}-${idx}`}
-                data={region.data}
-                x={region.x - element.x}
-                y={region.y - element.y}
-                scaleX={region.scaleX}
-                scaleY={region.scaleY}
-                fill="rgba(250, 204, 21, 0.2)"
-                stroke="#facc15"
-                strokeWidth={1}
-                listening={false}
-              />
-            );
-          })}
-        </Group>
-      )}
 
       {props.showNodes !== false &&
         element.nodes.map((node) => {

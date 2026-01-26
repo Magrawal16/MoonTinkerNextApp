@@ -348,6 +348,41 @@ function boxesOverlap(
   );
 }
 
+/**
+ * Transform a point from world coordinates to an element's local (rotated) coordinate space.
+ * This is needed to check collision against rotated elements.
+ */
+function transformPointToElementLocal(
+  point: { x: number; y: number },
+  element: CircuitElement
+): { x: number; y: number } {
+  const rotation = element.rotation || 0;
+  if (rotation === 0) {
+    return point; // No transformation needed
+  }
+  
+  const center = getElementCenter(element);
+  // Element's rotation center in world coordinates
+  const pivotX = element.x + center.x;
+  const pivotY = element.y + center.y;
+  
+  // Translate point relative to rotation center
+  const dx = point.x - pivotX;
+  const dy = point.y - pivotY;
+  
+  // Apply inverse rotation (negative angle) to get local coordinates
+  const angleRad = (-rotation * Math.PI) / 180;
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  
+  // Rotate and translate back
+  return {
+    x: dx * cos - dy * sin + pivotX,
+    y: dx * sin + dy * cos + pivotY,
+  };
+}
+
+
 function isPointInPath(
   point: { x: number; y: number },
   pathData: string,
@@ -457,11 +492,15 @@ export function shouldHideNode(
   for (let i = parentIndex + 1; i < allElements.length; i++) {
     const other = allElements[i];
 
+    // Transform node position to the covering element's local coordinate space
+    // This accounts for the covering element's rotation
+    const localPos = transformPointToElementLocal(absolutePos, other);
+
     // Get all collision regions for the covering element (handles multi-part elements)
     const regions = getElementRegions(other);
     // Check if node falls within ANY region of the covering element
     for (const region of regions) {
-      if (isPointInRegion(absolutePos, region)) {
+      if (isPointInRegion(localPos, region)) {
         return true;
       }
     }

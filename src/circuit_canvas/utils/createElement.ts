@@ -941,7 +941,7 @@ export default function createElement(
       {
         id: id + "-node-1",
         x: 50,
-        y: 86,
+        y: 92,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -950,7 +950,7 @@ export default function createElement(
       {
         id: id + "-node-2",
         x: 61,
-        y: 86,
+        y: 92,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",

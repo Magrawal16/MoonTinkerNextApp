@@ -28,7 +28,7 @@ function getElementSize(type: string): { width: number; height: number } {
     ultrasonicsensor4p: { width: 210, height: 90 },
     pushbutton: { width: 61, height: 81 },
     slideswitch: { width: 220, height: 100 },
-    buzzer: { width: 110, height: 90 },
+    buzzer: { width: 110, height: 96 },
   };
   return sizeMap[type] || { width: 100, height: 100 };
 }
@@ -300,9 +300,9 @@ export function getElementRegions(
       {
         type: 'ellipse',
         x: element.x - center.x + 111,
-        y: element.y - center.y + 87.5,
+        y: element.y - center.y + 93,
         radiusX: 35.5,
-        radiusY: 33,
+        radiusY: 35.5,
       },
     ];
   }

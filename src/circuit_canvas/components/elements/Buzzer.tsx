@@ -115,7 +115,7 @@ export default function Buzzer(props: BuzzerProps) {
             x={0}
             y={0}
             width={110}
-            height={90}
+            height={96}
             shadowColor={props.selected ? "#000000" : undefined}
             shadowBlur={props.selected ? 8 : 0}
             shadowOffset={{ x: 12, y: -12 }}

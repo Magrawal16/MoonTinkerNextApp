@@ -19,8 +19,8 @@ export default function createElement(
     nodes: [
       {
         id: id + "-node-1",
-        x: 28.7,
-        y: 31,
+        x: 28,
+        y: 30,
         parentId: id,
         polarity: "positive" as const,
         placeholder: "Positive",
@@ -28,8 +28,8 @@ export default function createElement(
       },
       {
         id: id + "-node-2",
-        x: 43,
-        y: 31,
+        x: 42.3,
+        y: 30,
         parentId: id,
         polarity: "negative" as const,
         placeholder: "Negative",
@@ -321,6 +321,48 @@ export default function createElement(
       maxResistance: 180000,    // darkness
     },
 
+    displayProperties: [],
+  };
+
+  const lm35Element = {
+    id,
+    type: props.type,
+    x: props.pos.x,
+    y: props.pos.y,
+    rotation: props.rotation ?? 0,
+    // LM35 pin order: VCC (left), ANALOG OUT (middle), GND (right)
+    nodes: [
+      {
+        id: id + "-node-vcc",
+        x: 16.5,
+        y: 80,
+        parentId: id,
+        placeholder: "VCC",
+        fillColor: "red",
+      },
+      {
+        id: id + "-node-out",
+        x: 31.5,
+        y: 80,
+        parentId: id,
+        placeholder: "ANALOG OUT",
+        fillColor: "orange",
+      },
+      {
+        id: id + "-node-gnd",
+        x: 47,
+        y: 80,
+        parentId: id,
+        placeholder: "GND",
+        fillColor: "black",
+      },
+    ],
+    properties: {
+      // Environment input controlled by slider
+      temperature: props.properties?.temperature ?? 25,
+      // keep voltage/resistance keys if needed elsewhere
+      ...props.properties,
+    },
     displayProperties: [],
   };
 
@@ -989,6 +1031,9 @@ export default function createElement(
       break;
     case "ldr":
       element = ldrElement;
+      break;
+    case "lm35":
+      element = lm35Element;
       break;
     case "multimeter":
       element = multimeterElement;

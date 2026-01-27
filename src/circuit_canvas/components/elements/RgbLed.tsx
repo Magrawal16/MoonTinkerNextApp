@@ -325,20 +325,7 @@ export default function RgbLed(props: RgbLedProps) {
               listening={false}
               globalCompositeOperation="lighten"
             />
-            {/* Bottom reflection */}
-            {/* <Ellipse
-              x={glowPosition.rect.x + glowPosition.rect.width / 2}
-              y={glowPosition.rect.y + glowPosition.rect.height + 15}
-              radiusX={glowPosition.rect.width * 0.4}
-              radiusY={6}
-              fill={combinedColor}
-              opacity={0.2 + 0.35 * overallBrightness}
-              shadowColor={combinedColor}
-              shadowBlur={15 + 35 * overallBrightness}
-              shadowOpacity={0.25 + 0.45 * overallBrightness}
-              listening={false}
-              globalCompositeOperation="lighten"
-            /> */}
+            
             <Arc
               x={glowPosition.arcBottom.x}
               y={glowPosition.arcBottom.y}

@@ -28,7 +28,7 @@ const SHOW_RESISTANCE_LABEL = false;
    UI CONSTANTS
 ======================= */
 const WIDTH = 60;
-const SLIDER_PADDING = 8;
+const SLIDER_PADDING = 2;
 const TRACK_HEIGHT = 10;
 const KNOB_RADIUS = 8;
 const SLIDER_OFFSET_Y = -18; // slider ABOVE the LDR
@@ -191,7 +191,7 @@ export default function Ldr(props: LdrProps) {
 
 
               {/* Sun icon (right) */}
-              <Group x={trackWidth + 18} y={TRACK_HEIGHT / 2}>
+              <Group x={trackWidth + 26} y={TRACK_HEIGHT / 2}>
                 <Circle radius={6} fill="#FFD54F" stroke="#FB8C00" strokeWidth={1} />
                 {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => {
                   const rad = (a * Math.PI) / 180;

@@ -17,6 +17,7 @@ export interface PaletteElement {
     resistance?: number;
     voltage?: number;
     ratio?: number;
+    temperature?: number;
     color?: string;
     mode?: "voltage" | "current" | "resistance"; // For multimeters
   };
@@ -66,6 +67,12 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     label: "LDR (Light-dependent resistor)",
     iconPath: "assets/circuit_canvas/elements/LDR.svg",
     defaultProps: { resistance: 10000 },
+  },
+  {
+    type: "lm35",
+    label: "LM35 Temperature Sensor",
+    iconPath: "assets/circuit_canvas/elements/LM35.svg",
+    defaultProps: { temperature: 25 },
   },
   {
     type: "multimeter",

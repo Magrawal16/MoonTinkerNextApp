@@ -26,6 +26,7 @@ function getRenderOffset(
   switch (element.type) {
     case "resistor":
     case "ldr":
+    case "lm35":
     case "multimeter":
     case "potentiometer":
     case "microbit":
@@ -94,6 +95,7 @@ export function getElementCenter(element: CircuitElement): {
     case "resistor":
       return { x: 1 + 25, y: 22 + 30 };
     case "ldr":
+    case "lm35":
       return { x: 1 + 30, y: 22 + 30 };
     case "multimeter":
       return { x: 1 + 90, y: 22 + 37.5 }; 
@@ -147,6 +149,7 @@ export function getElementDimensions(element: CircuitElement): {
     case "resistor":
       return { width: 50, height: 60 };
     case "ldr":
+    case "lm35":
       return { width: 60, height: 60 };
     case "multimeter":
       return { width: 180, height: 75 }; 

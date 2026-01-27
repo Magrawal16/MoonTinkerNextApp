@@ -193,6 +193,7 @@ export type PaletteElementType =
   | "potentiometer"
   | "led"
   | "ldr"
+  | "lm35"
   | "rgbled"
   | "microbit"
   | "ultrasonicsensor4p"

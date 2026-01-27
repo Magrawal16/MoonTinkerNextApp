@@ -1,7 +1,7 @@
  
 import { useCallback, useState } from "react";
 import { CircuitElement, Wire } from "@/circuit_canvas/types/circuit";
-import { Rect, Group, Text, Label, Tag, Path, Circle, Ellipse } from "react-konva";
+import { Rect, Group, Text, Label, Tag, Path, Circle, Ellipse, Arc } from "react-konva";
 import { KonvaEventObject } from "konva/lib/Node";
 import { getElementCenter, getAbsoluteNodePosition } from "@/circuit_canvas/utils/rotationUtils";
 import { findConnectedMicrobit } from "@/circuit_canvas/utils/renderElementsUtils/microbitConnectivityUtils";
@@ -17,6 +17,7 @@ import Resistor from "@/circuit_canvas/components/elements/Resistor";
 import Multimeter from "@/circuit_canvas/components/elements/Multimeter";
 import Potentiometer from "@/circuit_canvas/components/elements/Potentiometer";
 import Ldr from "@/circuit_canvas/components/elements/Ldr";
+import Lm35 from "@/circuit_canvas/components/elements/Lm35";
 import Microbit from "@/circuit_canvas/components/elements/Microbit";
 import UltraSonicSensor4P from "../elements/UltraSonicSensor4P";
 import MicrobitWithBreakout from "../elements/MicrobitWithBreakout";
@@ -276,6 +277,22 @@ export default function RenderElement(props: RenderElementProps) {
           }}
         />
       )}
+      {props.showBody !== false && element.type === "lm35" && (
+        <Lm35
+          id={element.id}
+          x={1}
+          y={22}
+          selected={props.selectedElementId === element.id}
+          draggable={false}
+          isSimulationOn={props.isSimulationOn}
+          temperature={element.properties?.temperature}
+          onTemperatureChange={(temp: number) => {
+            props.onUpdateElementProperties?.(element.id, {
+              temperature: temp,
+            });
+          }}
+        />
+      )}
       {props.showBody !== false && element.type === "multimeter" && (
         <Multimeter
           id={element.id}
@@ -469,7 +486,7 @@ export default function RenderElement(props: RenderElementProps) {
         />
       )}
 
-      {/* Collision overlay - must be inside rotation group to rotate with element */}
+{/*       
       {SHOW_COLLISION_OVERLAY && (
         <Group listening={false}>
           {collisionRegions.map((region, idx) => {
@@ -497,6 +514,23 @@ export default function RenderElement(props: RenderElementProps) {
                   x={region.x - element.x}
                   y={region.y - element.y}
                   radius={region.radius}
+                  fill="rgba(250, 204, 21, 0.25)"
+                  stroke="#facc15"
+                  strokeWidth={1}
+                  listening={false}
+                />
+              );
+            }
+             if (region.type === "arc") {
+              return (
+                <Arc
+                  key={`collision-${element.id}-${idx}`}
+                  x={region.x - element.x}
+                  y={region.y - element.y}
+                  innerRadius={region.innerRadius}
+                  outerRadius={region.outerRadius}
+                  angle={region.angle}
+                  rotation={region.rotation}
                   fill="rgba(250, 204, 21, 0.25)"
                   stroke="#facc15"
                   strokeWidth={1}
@@ -537,7 +571,7 @@ export default function RenderElement(props: RenderElementProps) {
             );
           })}
         </Group>
-      )}
+      )} */}
 
       {/* Render nodes and tooltip (can be disabled) */}
       {props.showNodes !== false &&

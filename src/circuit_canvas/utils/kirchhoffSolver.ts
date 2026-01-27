@@ -719,6 +719,17 @@ function getElementsWithCurrent(
       if (hasConnectedPos && hasConnectedNeg) {
         result.push(e);
       }
+    } else if (e.type === "lm35" && nodeMap) {
+      // LM35: only act as a voltage source if VCC and GND are connected
+      const vccIds = e.nodes?.filter((n) => n.placeholder === "VCC").map((n) => n.id) ?? [];
+      const gndIds = e.nodes?.filter((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND")).map((n) => n.id) ?? [];
+
+      const hasVcc = vccIds.some((id) => nodeMap.has(id));
+      const hasGnd = gndIds.some((id) => nodeMap.has(id));
+
+      if (hasVcc && hasGnd) {
+        result.push(e);
+      }
     }
   }
 
@@ -1147,6 +1158,26 @@ function buildMNAMatrices(
         D[idx][idx] += el.properties?.resistance ?? 0;
         E[idx] = el.properties?.voltage ?? 3.3;
       }
+      } else if (el.type === "lm35") {
+        // Stamp LM35 as a voltage source between ANALOG OUT (middle) and GND
+        const outNode = el.nodes.find((n) => n.placeholder === "ANALOG OUT")?.id ?? el.nodes[1]?.id;
+        const gndNode = el.nodes.find((n) => n.placeholder && n.placeholder.toUpperCase().startsWith("GND"))?.id ?? el.nodes[2]?.id;
+        const outIdx = safeNodeIndex(outNode);
+        const gndIdx = safeNodeIndex(gndNode);
+        const idx = safeCurrentIndex(el.id);
+        if (idx === undefined) continue;
+
+        if (outIdx !== undefined) B[outIdx][idx] -= 1;
+        if (gndIdx !== undefined) B[gndIdx][idx] += 1;
+        if (outIdx !== undefined) C[idx][outIdx] += 1;
+        if (gndIdx !== undefined) C[idx][gndIdx] -= 1;
+
+        const temp = el.properties?.temperature ?? 0;
+        D[idx][idx] += 0; // ideal source
+        // LM35 outputs 10 mV/°C. With single-supply (no negative rail) the
+        // output cannot go below 0V, so clamp to 0V.
+        const rawVout = temp * 0.01;
+        E[idx] = Math.max(0, rawVout);
     }
   }
 

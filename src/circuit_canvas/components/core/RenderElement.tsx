@@ -286,6 +286,7 @@ export default function RenderElement(props: RenderElementProps) {
           draggable={false}
           isSimulationOn={props.isSimulationOn}
           temperature={element.properties?.temperature}
+          scale={(element.properties as any)?.tempScale}
           onTemperatureChange={(temp: number) => {
             props.onUpdateElementProperties?.(element.id, {
               temperature: temp,
@@ -485,9 +486,9 @@ export default function RenderElement(props: RenderElementProps) {
           isSimulation={props.isSimulationOn}
         />
       )}
-
-{/*       
-      {SHOW_COLLISION_OVERLAY && (
+      
+      {/* Collision overlay for debugging */}
+      {/* {SHOW_COLLISION_OVERLAY && (
         <Group listening={false}>
           {collisionRegions.map((region, idx) => {
             if (region.type === "rect") {

@@ -135,6 +135,13 @@ const SavedCircuitsPage = () => {
     }
   };
 
+  const handleCardKeyDown = (e: React.KeyboardEvent, id: string) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleLoad(id);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Header */}
@@ -199,7 +206,11 @@ const SavedCircuitsPage = () => {
               {savedCircuits.map(circuit => (
                 <div
                   key={circuit.id}
-                  className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden group flex flex-col"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleLoad(circuit.id)}
+                  onKeyDown={(e) => handleCardKeyDown(e, circuit.id)}
+                  className="bg-white rounded-xl shadow-sm hover:shadow-lg transition-all duration-200 border border-gray-200 overflow-hidden group flex flex-col cursor-pointer"
                 >
                   {/* Snapshot Preview */}
                   <div className="relative bg-gray-100 aspect-video overflow-hidden flex items-center justify-center group-hover:bg-gray-200 transition-colors">
@@ -232,14 +243,15 @@ const SavedCircuitsPage = () => {
                     {/* Actions */}
                     <div className="flex gap-3 mt-auto">
                       <button
-                        onClick={() => handleLoad(circuit.id)}
+                        onClick={(e) => { e.stopPropagation(); handleLoad(circuit.id); }}
                         className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors shadow-sm hover:shadow-md"
                       >
                         <FaPlay className="text-sm" />
-                        Tinker this
+                        Edit Circuit
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setDeleteConfirmId(circuit.id);
                           setDeleteConfirmName(circuit.name);
                         }}

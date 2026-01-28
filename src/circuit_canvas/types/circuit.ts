@@ -20,6 +20,8 @@ export type CircuitElement = {
     // -------- Sensors / environment --------
     distance?: number;
     temperature?: number;
+    // Temperature display scale preference for sensors like LM35
+    tempScale?: "celsius" | "fahrenheit";
     brightness?: number;
 
     // 🌞 LDR (Light Dependent Resistor)

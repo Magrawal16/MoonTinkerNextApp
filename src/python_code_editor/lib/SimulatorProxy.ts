@@ -31,8 +31,12 @@ export class SimulatorProxy {
   private simulatorRemoteInstance: Comlink.Remote<any> | null = null;
   private options: SimulatorOptions;
   private audio: AudioPlayer;
+  // Keep a local reference to the onEvent callback so we can fire UI updates immediately
+  private onEventLocal?: (event: MicrobitEvent) => void;
 
   constructor(opts: SimulatorOptions) {
+    // Preserve local callback for immediate UI notifications (e.g., reset on stop)
+    this.onEventLocal = opts.onEvent;
     this.options = {
       ...opts,
       onOutput: opts.onOutput ? Comlink.proxy(opts.onOutput) : undefined,
@@ -120,7 +124,16 @@ export class SimulatorProxy {
   async stop() {
     this.audio.stopTone();
     if (!this.simulatorRemoteInstance) throw new Error("Not initialized at stop.");
-    return this.simulatorRemoteInstance.stop();
+    // Ensure the worker cancels any running tasks and resets hardware state
+    const result = await this.simulatorRemoteInstance.stop();
+    // Proactively notify UI to clear controller state immediately.
+    // This avoids any race where reset events arrive slightly later.
+    try {
+      this.onEventLocal?.({ type: "reset" } as MicrobitEvent);
+    } catch (_) {
+      // ignore
+    }
+    return result;
   }
 
   async disposeAndReload() {

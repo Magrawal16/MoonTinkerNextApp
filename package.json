@@ -3,16 +3,21 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
+    "dev": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" tsx server.ts",
+    "dev:next": "cross-env NODE_OPTIONS=\"--max-old-space-size=4096\" next dev --webpack",
     "build": "next build --webpack",
     "start": "tsx server.ts",
     "start:prod": "powershell -Command \"$env:NODE_ENV='production'; pnpm start\"",
     "lint": "next lint"
   },
   "dependencies": {
+    "@aspnet/signalr": "^1.0.27",
     "@microbit/microbit-connection": "^0.1.0",
     "@microbit/microbit-fs": "^0.10.0",
+    "@microsoft/signalr": "^10.0.0",
     "@monaco-editor/react": "4.7.0-rc.0",
+    "@types/socket.io-client": "^3.0.0",
+    "@types/ws": "^8.18.1",
     "blockly": "^12.2.0",
     "canvas": "^3.1.2",
     "comlink": "^4.4.2",
@@ -27,6 +32,8 @@
     "react-icons": "^5.5.0",
     "react-konva": "^19.0.7",
     "serialport": "^13.0.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "ws": "^8.18.3"
   },
   "devDependencies": {
@@ -36,6 +43,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@types/worker-plugin": "^5.0.4",
+    "cross-env": "^10.1.0",
     "eslint": "^9.30.1",
     "eslint-config-next": "16.0.7",
     "eslint-plugin-react-hooks": "^5.2.0",

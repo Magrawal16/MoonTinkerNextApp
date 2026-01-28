@@ -360,10 +360,11 @@ export default function createElement(
     properties: {
       // Environment input controlled by slider
       temperature: props.properties?.temperature ?? 25,
+      tempScale: (props.properties as any)?.tempScale ?? "celsius",
       // keep voltage/resistance keys if needed elsewhere
       ...props.properties,
     },
-    displayProperties: [],
+    displayProperties: ["temperature", "tempScale"],
   };
 
   const multimeterElement = {

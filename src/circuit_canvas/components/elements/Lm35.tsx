@@ -13,6 +13,8 @@ interface Lm35Props{
   isSimulationOn?: boolean;
   temperature?: number;
   onTemperatureChange?: (temp: number) => void;
+  // display scale: 'celsius' (default) or 'fahrenheit'
+  scale?: "celsius" | "fahrenheit";
 }
 
 /* =======================
@@ -39,6 +41,8 @@ const MAX_TEMP = 150; // °C
 
 export default function Lm35(props: Lm35Props) {
   const temperature = props.temperature ?? 25;
+
+  const scale = props.scale ?? "celsius";
 
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -150,7 +154,11 @@ export default function Lm35(props: Lm35Props) {
                   x={-18}
                   fontSize={12}
                   fill="#222"
-                  text={`${temperature}°C`}
+                  text={
+                    scale === "fahrenheit"
+                      ? `${Math.round((temperature * 9) / 5 + 32)}°F`
+                      : `${temperature}°C`
+                  }
                 />
               </Group>
 

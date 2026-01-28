@@ -44,6 +44,8 @@ export default function PropertiesPanel({
   const [noteText, setNoteText] = useState<string>("");
   // RGB LED type state
   const [rgbLedType, setRgbLedType] = useState<"common-cathode" | "common-anode">("common-cathode");
+  // LM35 temperature display scale
+  const [tempScale, setTempScale] = useState<"celsius" | "fahrenheit">("celsius");
 
 
   // Parse numeric input safely: empty string => null, invalid => null
@@ -115,6 +117,12 @@ export default function PropertiesPanel({
         | undefined;
       setRgbLedType(rlt ?? "common-cathode");
     }
+    // Initialize tempScale from element properties if present
+    const ts = (selectedElement.properties as any)?.tempScale as
+      | "celsius"
+      | "fahrenheit"
+      | undefined;
+    setTempScale(ts ?? "celsius");
     lastSelectedIdRef.current = selectedElement.id;
   }, [selectedElement]);
 
@@ -124,6 +132,17 @@ export default function PropertiesPanel({
     const m = (selectedElement.properties?.mode as any) ?? null;
     setMode(m);
   }, [selectedElement?.properties?.mode, selectedElement?.id]);
+
+  // Keep `color` in sync if the selected element's properties.color changes
+  useEffect(() => {
+    if (!selectedElement) return;
+    const nextColor =
+      selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout"
+        ? selectedElement.properties?.color ?? (selectedElement.type === "microbitWithBreakout" ? "green" : "red")
+        : selectedElement.properties?.color ?? null;
+    setColor(nextColor);
+  }, [selectedElement?.properties?.color, selectedElement?.id, selectedElement?.type]);
+
 
   // Track last selected element id so we don't reinitialize unit/input on prop updates
   const lastSelectedIdRef = useRef<string | null>(null);
@@ -279,6 +298,15 @@ export default function PropertiesPanel({
           }),
         };
       }
+
+      // Persist tempScale preference for sensors (handled generically)
+      updatedElement = {
+        ...updatedElement,
+        properties: {
+          ...updatedElement.properties,
+          tempScale: tempScale,
+        },
+      };
 
       // For microbit/microbitWithBreakout, update node positions when color changes
       if ((selectedElement.type === "microbit" || selectedElement.type === "microbitWithBreakout") && color) {
@@ -527,6 +555,31 @@ export default function PropertiesPanel({
               ? "Ground shared (2nd pin = GND)" 
               : "Positive shared (2nd pin = VCC)"}
           </span>
+        </div>
+      )}
+
+      {/* LM35 temperature scale selector */}
+      {selectedElement.type === "lm35" && (
+        <div className="flex flex-col text-xs">
+          <label>Temperature Scale:</label>
+          <select
+            value={tempScale}
+            onChange={(e) => setTempScale(e.target.value as any)}
+            className="border px-1 py-1 rounded text-xs bg-white"
+          >
+            <option value="celsius">Celsius (°C)</option>
+            <option value="fahrenheit">Fahrenheit (°F)</option>
+          </select>
+          {tempScale === "celsius" ? (
+            <span className="text-gray-500 mt-1">
+              Celsius: display and edit values in °C.
+            </span>
+          ) : (
+            <span className="text-gray-500 mt-1">
+              Fahrenheit: display values in °F (the underlying stored
+              temperature remains in °C).
+            </span>
+          )}
         </div>
       )}
 

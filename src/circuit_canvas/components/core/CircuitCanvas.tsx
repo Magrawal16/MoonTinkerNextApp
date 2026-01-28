@@ -1,3 +1,18 @@
+
+
+
+
+
+
+
+
+  
+
+
+
+
+
+
 import { SaveCircuit } from "@/circuit_canvas/utils/circuitStorage";
   // (autosave feature removed)
 "use client";
@@ -73,12 +88,15 @@ import { useMicrobitSimulators } from "@/circuit_canvas/hooks/useMicrobitSimulat
 import { captureFullCircuitSnapshot } from "@/circuit_canvas/utils/canvasTransform";
 import { useAutosave } from "@/circuit_canvas/hooks/useAutosave";
 import { AutosaveIndicator } from "@/circuit_canvas/components/ui/AutosaveIndicator";
+import { useSignalR } from "@/hooks/useSignalR";
+import { CircuitUpdate } from "@/lib/signalr/signalRTypes";
+import { getSignalRConnection, UserPresence } from "@/lib/signalr/signalRConnection";
 
 export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: string | null }) {
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [importInput, setImportInput] = useState("");
-  type AuthContextType = { role?: string } | null;
+  type AuthContextType = { role?: string; user?: { id?: string; username?: string; name?: string } } | null;
   const authContext = React.useContext(require("@/providers/AuthProvider").AuthContext) as AuthContextType;
   const [importError, setImportError] = useState<string | null>(null);
 
@@ -297,6 +315,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const simulationRunningRef = useRef(simulationRunning);
   const simulationFrameRef = useRef<number | null>(null);
   const lastTickRef = useRef<number | null>(null);
+    const startSimulationRef = useRef<(() => void) | null>(null);
+    const stopSimulationRef = useRef<(() => void) | null>(null);
   const { simulationTime, formatTime } = useSimulationTimer(simulationRunning);
   const [hoveredWireId, setHoveredWireId] = useState<string | null>(null);
   const [snapTarget, setSnapTarget] = useState<{ dragNodeId: string; targetNodeId: string; offset: { x: number; y: number } } | null>(null);
@@ -377,6 +397,188 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   const progressRafRef = useRef<number | null>(null);
   // Cache of last controller state snapshot per micro:bit to avoid redundant setElements loops
   const controllerStateCacheRef = useRef<Record<string, string>>({});
+
+  // SignalR integration for real-time collaboration
+  const currentUserId = authContext?.user?.id || 'anonymous';
+  const currentUserName = authContext?.user?.name || authContext?.user?.username || 'Anonymous User';
+  
+  // Toast notifications for user join/leave
+  
+  const {
+    isConnected: signalRConnected,
+    updateCircuit: broadcastCircuitUpdate,
+    usersInCircuit,
+  } = useSignalR({
+    autoConnect: true,
+    circuitId: currentCircuitId || undefined,
+    userId: currentUserId,
+    userName: currentUserName,
+    // ...existing code...
+  });
+
+  // Get current session ID for identifying own updates
+  const currentSessionId = useRef<string | null>(null);
+  
+  // Listen for remote circuit updates from other users
+  useEffect(() => {
+    if (!signalRConnected || !currentCircuitId) return;
+
+    const connection = getSignalRConnection();
+    
+    // Store the current socket ID if not already stored
+    if (!currentSessionId.current && connection.getSocketId()) {
+      currentSessionId.current = connection.getSocketId()!;
+      console.log('[SignalR] Current session ID:', currentSessionId.current);
+    }
+    
+    const handleRemoteUpdate = (update: CircuitUpdate) => {
+      // Ignore our own updates - compare sessionId instead of userId
+      if (update.sessionId && currentSessionId.current && update.sessionId === currentSessionId.current) {
+        console.log('[SignalR] Ignoring own update from session:', update.sessionId);
+        return;
+      }
+      
+      console.log('[SignalR] Received remote update:', update.changes.type, 'from session:', update.sessionId, 'user:', update.userId);
+      
+      // Apply changes based on type - cast to any to handle all dynamic event types
+      const changes = update.changes as any;
+      
+      // Stop simulation before applying non-simulation changes (use ref for current value)
+      if (changes.type !== 'SIMULATION_STARTED' && changes.type !== 'SIMULATION_STOPPED') {
+        if (simulationRunningRef.current) {
+          console.log('[SignalR] Stopping simulation for remote update');
+          stopSimulation();
+        }
+      }
+      
+      if (changes.type === 'ELEMENT_ADDED') {
+        setElements(prev => {
+          // Check if element already exists
+          if (prev.some(el => el.id === changes.element.id)) {
+            return prev;
+          }
+          return [...prev, changes.element];
+        });
+      } else if (changes.type === 'ELEMENT_REMOVED') {
+        setElements(prev => prev.filter(el => el.id !== changes.elementId));
+        setWires(prev => prev.filter(w => {
+          // Need to use inline logic since getNodeParent not available yet
+          const fromNode = elementsRef.current.flatMap(e => e.nodes).find(n => n.id === w.fromNodeId);
+          const toNode = elementsRef.current.flatMap(e => e.nodes).find(n => n.id === w.toNodeId);
+          return fromNode?.parentId !== changes.elementId && toNode?.parentId !== changes.elementId;
+        }));
+      } else if (changes.type === 'ELEMENT_MOVED') {
+        setElements(prev => prev.map(el => 
+          el.id === changes.elementId
+            ? { ...el, x: changes.position.x, y: changes.position.y }
+            : el
+        ));
+      } else if (changes.type === 'ELEMENT_ROTATED') {
+        setElements(prev => prev.map(el => 
+          el.id === changes.elementId
+            ? { ...el, rotation: changes.rotation }
+            : el
+        ));
+      } else if (changes.type === 'ELEMENT_UPDATED') {
+        setElements(prev => prev.map(el => 
+          el.id === changes.elementId
+            ? { ...el, ...changes.properties }
+            : el
+        ));
+        // Also update selectedElement if it's the one being updated
+        if (selectedElement && selectedElement.id === changes.elementId) {
+          setSelectedElement(prev => prev ? { ...prev, ...changes.properties } : null);
+        }
+      } else if (changes.type === 'WIRE_ADDED') {
+        setWires(prev => {
+          // Check if wire already exists
+          if (prev.some(w => w.id === changes.wire.id)) {
+            return prev;
+          }
+          return [...prev, changes.wire];
+        });
+      } else if (changes.type === 'WIRE_REMOVED') {
+        setWires(prev => prev.filter(w => w.id !== changes.wireId));
+      } else if (changes.type === 'CIRCUIT_CLEARED') {
+        setElements([]);
+        setWires([]);
+      } else if (changes.type === 'XML_UPDATED') {
+        console.log('[SignalR] Received XML_UPDATED for controller:', changes.controllerId);
+        setControllerXmlMap(prev => ({
+          ...prev,
+          [changes.controllerId]: changes.xml
+        }));
+        // Also regenerate code from the updated XML to keep code map in sync
+        (async () => {
+          try {
+            const blocklyMod = await import('blockly');
+            const Blockly = (blocklyMod as any).default || blocklyMod;
+            const { pythonGenerator } = await import('blockly/python');
+            // Register shared custom blocks & generators
+            try {
+              const { BlocklyPythonIntegration } = await import('@/blockly_editor/utils/blocklyPythonConvertor');
+              BlocklyPythonIntegration.initialize();
+              BlocklyPythonIntegration.setupPythonGenerators(pythonGenerator as any);
+            } catch (regErr) {
+              console.warn('⚠️ Failed to init shared blocks in XML_UPDATED handler:', regErr);
+            }
+            const xmlText = changes.xml;
+            if (!xmlText || !xmlText.includes('<block')) return;
+            const tempWs = new Blockly.Workspace();
+            try {
+              const parser = new DOMParser();
+              const dom = parser.parseFromString(xmlText, 'text/xml');
+              (Blockly.Xml as any).domToWorkspace(dom.documentElement, tempWs);
+              const code = (pythonGenerator as any).workspaceToCode(tempWs) as string;
+              if (code && code.trim()) {
+                setControllerCodeMap(prev => ({
+                  ...prev,
+                  [changes.controllerId]: code
+                }));
+              }
+            } finally {
+              tempWs.dispose();
+            }
+          } catch (e) {
+            console.warn('⚠️ Failed to regenerate code from remote XML:', e);
+          }
+        })();
+      } else if (changes.type === 'CODE_UPDATED') {
+        console.log('[SignalR] Received CODE_UPDATED for controller:', changes.controllerId);
+        setControllerCodeMap(prev => ({
+          ...prev,
+          [changes.controllerId]: changes.code
+        }));
+      } else if (changes.type === 'SIMULATION_STARTED') {
+        if (!simulationRunningRef.current && startSimulationRef.current) {
+          console.log('[SignalR] Starting simulation from remote user');
+          startSimulationRef.current();
+        }
+      } else if (changes.type === 'SIMULATION_STOPPED') {
+        if (simulationRunningRef.current && stopSimulationRef.current) {
+          console.log('[SignalR] Stopping simulation from remote user');
+          stopSimulationRef.current();
+        }
+      } else if (changes.type === 'VIEWPORT_CHANGED') {
+        // Sync viewport (pan and zoom) from remote user
+        const stage = stageRef.current;
+        if (stage) {
+          console.log('[SignalR] Syncing viewport from remote user');
+          stage.scale({ x: changes.scale, y: changes.scale });
+          stage.position({ x: changes.position.x, y: changes.position.y });
+          setCanvasOffset({ x: changes.position.x, y: changes.position.y });
+          stage.batchDraw();
+          updateViewport();
+        }
+      }
+    };
+    
+    connection.onCircuitUpdated(handleRemoteUpdate);
+    
+    return () => {
+      connection.offCircuitUpdated(handleRemoteUpdate);
+    };
+    }, [signalRConnected, currentCircuitId, currentUserId]);
 
   useEffect(() => {
     elementsRef.current = elements;
@@ -516,6 +718,198 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       return () => clearTimeout(t);
     }
   }, [elements, wires, selectedElement, showPropertiesPannel]);
+
+  // Track wire changes and broadcast to other users
+  const previousWiresRef = useRef<Wire[]>([]);
+  useEffect(() => {
+    if (!signalRConnected || !currentCircuitId) {
+      previousWiresRef.current = wires;
+      return;
+    }
+
+    const previous = previousWiresRef.current;
+    previousWiresRef.current = wires;
+
+    // Skip initial load
+    if (previous.length === 0 && wires.length > 0) return;
+
+    // Detect newly added wires
+    const newWires = wires.filter(w => 
+      !w.deleted && !previous.some(pw => pw.id === w.id)
+    );
+    
+    const connection = getSignalRConnection();
+    const sessionId = connection.getSocketId();
+    
+    newWires.forEach(wire => {
+      console.log('[SignalR] Broadcasting wire added:', wire.id, 'from session:', sessionId);
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: {
+          type: 'WIRE_ADDED',
+          wire
+        }
+      });
+    });
+
+    // Detect deleted wires
+    const deletedWires = wires.filter(w => 
+      w.deleted && previous.some(pw => pw.id === w.id && !pw.deleted)
+    );
+    
+    deletedWires.forEach(wire => {
+      console.log('[SignalR] Broadcasting wire removed:', wire.id, 'from session:', sessionId);
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: {
+          type: 'WIRE_REMOVED',
+          wireId: wire.id
+        }
+      });
+    });
+  }, [wires, signalRConnected, currentCircuitId, currentUserId, broadcastCircuitUpdate]);
+
+  // Track element property changes and broadcast to other users
+  const previousElementsRef = useRef<CircuitElement[]>([]);
+  useEffect(() => {
+    if (!signalRConnected || !currentCircuitId) {
+      previousElementsRef.current = elements;
+      return;
+    }
+
+    const previous = previousElementsRef.current;
+    previousElementsRef.current = elements;
+
+    // Skip initial load
+    if (previous.length === 0 && elements.length > 0) return;
+
+    const connection = getSignalRConnection();
+    const sessionId = connection.getSocketId();
+
+    // Detect property changes (excluding position and rotation which are broadcast separately)
+    elements.forEach(element => {
+      const prevElement = previous.find(el => el.id === element.id);
+      if (!prevElement) return; // This is a new element, already broadcast
+
+      // Create objects with same shape for comparison (excluding position/rotation)
+      const currentProps = { ...element, x: 0, y: 0, rotation: 0 };
+      const previousProps = { ...prevElement, x: 0, y: 0, rotation: 0 };
+
+      if (JSON.stringify(currentProps) !== JSON.stringify(previousProps)) {
+        console.log('[SignalR] Broadcasting element updated:', element.id, 'from session:', sessionId);
+        broadcastCircuitUpdate({
+          circuitId: currentCircuitId,
+          userId: currentUserId,
+          sessionId: sessionId,
+          timestamp: Date.now(),
+          changes: {
+            type: 'ELEMENT_UPDATED',
+            elementId: element.id,
+            properties: element
+          }
+        });
+      }
+    });
+  }, [elements, signalRConnected, currentCircuitId, currentUserId, broadcastCircuitUpdate]);
+
+  // Track code map changes and broadcast to other users
+  const previousCodeMapRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!signalRConnected || !currentCircuitId) {
+      previousCodeMapRef.current = controllerCodeMap;
+      return;
+    }
+
+    const previous = previousCodeMapRef.current;
+    previousCodeMapRef.current = controllerCodeMap;
+
+    // Skip initial load
+    if (Object.keys(previous).length === 0 && Object.keys(controllerCodeMap).length > 0) return;
+
+    const connection = getSignalRConnection();
+    const sessionId = connection.getSocketId();
+
+    // Detect code changes
+    Object.keys(controllerCodeMap).forEach(controllerId => {
+      const newCode = controllerCodeMap[controllerId];
+      const oldCode = previous[controllerId];
+      
+      if (newCode !== oldCode) {
+        console.log('[SignalR] Broadcasting CODE_UPDATED for controller:', controllerId);
+        broadcastCircuitUpdate({
+          circuitId: currentCircuitId,
+          userId: currentUserId,
+          sessionId: sessionId,
+          timestamp: Date.now(),
+          changes: {
+            type: 'CODE_UPDATED',
+            controllerId,
+            code: newCode
+          }
+        });
+      }
+    });
+  }, [controllerCodeMap, signalRConnected, currentCircuitId, currentUserId, broadcastCircuitUpdate]);
+
+  // Track XML map changes (Blockly blocks) and broadcast to other users
+  const previousXmlMapRef = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (!signalRConnected || !currentCircuitId) {
+      previousXmlMapRef.current = controllerXmlMap;
+      return;
+    }
+
+    const previous = previousXmlMapRef.current;
+    previousXmlMapRef.current = controllerXmlMap;
+
+    const connection = getSignalRConnection();
+    const sessionId = connection.getSocketId();
+
+    // Detect XML changes
+    Object.keys(controllerXmlMap).forEach(controllerId => {
+      const newXml = controllerXmlMap[controllerId];
+      const oldXml = previous[controllerId];
+      
+      if (newXml !== oldXml) {
+        console.log('[SignalR] Broadcasting XML_UPDATED for controller:', controllerId);
+        broadcastCircuitUpdate({
+          circuitId: currentCircuitId,
+          userId: currentUserId,
+          sessionId: sessionId,
+          timestamp: Date.now(),
+          changes: {
+            type: 'XML_UPDATED',
+            controllerId,
+            xml: newXml
+          }
+        });
+      }
+    });
+
+    // Detect deleted controllers
+    Object.keys(previous).forEach(controllerId => {
+      if (!controllerXmlMap[controllerId] && previous[controllerId]) {
+        console.log('[SignalR] Controller XML removed:', controllerId);
+        broadcastCircuitUpdate({
+          circuitId: currentCircuitId,
+          userId: currentUserId,
+          sessionId: sessionId,
+          timestamp: Date.now(),
+          changes: {
+            type: 'XML_UPDATED',
+            controllerId,
+            xml: ''
+          }
+        });
+      }
+    });
+  }, [controllerXmlMap, signalRConnected, currentCircuitId, currentUserId, broadcastCircuitUpdate]);
 
   // Position properties panel vertically aligned with the selected element (keep right-aligned)
   // Compute initial vertical position when panel is opened and keep it fixed (do not follow drags)
@@ -779,6 +1173,23 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       getNodeParent(w.fromNodeId)?.id !== id && getNodeParent(w.toNodeId)?.id !== id
     )));
 
+    // Broadcast element deletion to other users
+    if (signalRConnected && currentCircuitId) {
+      const connection = getSignalRConnection();
+      const sessionId = connection.getSocketId();
+      console.log('[SignalR] Broadcasting ELEMENT_REMOVED from session:', sessionId);
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: {
+          type: 'ELEMENT_REMOVED',
+          elementId: id
+        }
+      });
+    }
+
     // Purge controller code & editor/workspace persistence (fresh when re-added)
     setControllerCodeMap(prev => {
       const { [id]: _code, ...rest } = prev;
@@ -932,6 +1343,19 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
   function stopSimulation() {
     if (!simulationRunning) return;
 
+    // Broadcast simulation stop to other users
+    if (signalRConnected && currentCircuitId) {
+      const connection = getSignalRConnection();
+      const sessionId = connection.getSocketId();
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: { type: 'SIMULATION_STOPPED' }
+      });
+    }
+
     // Synchronously update ref to avoid a brief window where events still think simulation is running
     simulationRunningRef.current = false;
     if (simulationFrameRef.current) {
@@ -992,6 +1416,12 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       progressRef.current.style.width = "0%";
     }
   }
+
+  // Update simulation function refs
+  useEffect(() => {
+    startSimulationRef.current = startSimulation;
+    stopSimulationRef.current = stopSimulation;
+  }, [startSimulation, stopSimulation]);
 
   // Attempt to reconstruct Python source for any controller whose code entry is missing
   const ensureAllControllerCode = useCallback(async (): Promise<Record<string,string>> => {
@@ -1067,6 +1497,19 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     // Update ref synchronously so early simulator LED/pin events right after initialization are not dropped.
     simulationRunningRef.current = true;
     setSimulationRunning(true);
+
+    // Broadcast simulation start to other users
+    if (signalRConnected && currentCircuitId) {
+      const connection = getSignalRConnection();
+      const sessionId = connection.getSocketId();
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: { type: 'SIMULATION_STARTED' }
+      });
+    }
     lastTickRef.current = null;
 
     setElements(prev => prev.map(el => {
@@ -1725,6 +2168,23 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
       return next;
     });
 
+    // Broadcast element addition to other users
+    if (signalRConnected && currentCircuitId) {
+      const connection = getSignalRConnection();
+      const sessionId = connection.getSocketId();
+      console.log('[SignalR] Broadcasting ELEMENT_ADDED from session:', sessionId);
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: sessionId,
+        timestamp: Date.now(),
+        changes: {
+          type: 'ELEMENT_ADDED',
+          element: newElement
+        }
+      });
+    }
+
     // Select the newly dropped element (Tinkercad-like behavior)
     setSelectedElement(newElement);
     setShowPropertiesPannel(true);
@@ -1783,6 +2243,22 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
 
     // Update viewport for grid optimization
     updateViewport();
+
+    // Broadcast zoom change to other users
+    if (signalRConnected && currentCircuitId) {
+      const connection = getSignalRConnection();
+      broadcastCircuitUpdate({
+        circuitId: currentCircuitId,
+        userId: currentUserId,
+        sessionId: connection.getSocketId(),
+        timestamp: Date.now(),
+        changes: {
+          type: 'VIEWPORT_CHANGED',
+          position: newPos,
+          scale: newScale
+        }
+      });
+    }
   };
 
   // Fit all elements to view
@@ -2053,6 +2529,8 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
         />
       )}
 
+      {/* Collaboration Toast Notifications */}
+
       {/* Left Side: Main Canvas */}
       <div className="flex-grow h-full flex flex-col">
         {/* Toolbar */}
@@ -2063,8 +2541,7 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
           {/* Logo on the extreme left */}
           <div className="flex items-center gap-3 w-full">
             {/* Logo links to saved_circuits */}
-            <a href="/saved_circuits" aria-label="Go to Saved Circuits">
-              <img
+            <a href="/saved_circuits" aria-label="Go to Saved Circuits" title="Moontinker Circuit Library">              <img
                 src="/assets/common/mp_logo.svg"
                 alt="MoonTinker Logo"
                 className={`h-9 w-auto mr-2 select-none transform transition-transform duration-150 hover:scale-105 active:scale-95 cursor-pointer ${styles.logo}`}
@@ -2206,6 +2683,44 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
               />
 
               <AuthHeader inline />
+              
+              {/* SignalR Connection Status */}
+              {currentCircuitId && (
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm">
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-2 h-2 rounded-full ${
+                      signalRConnected ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
+                    }`} />
+                    <span className="text-xs font-medium text-gray-600">
+                      {signalRConnected ? 'Live' : 'Offline'}
+                    </span>
+                  </div>
+                  {usersInCircuit.length > 1 && (
+                    <div className="flex items-center gap-1 pl-2 border-l border-gray-200">
+                      <span className="text-xs text-gray-500">
+                        +{usersInCircuit.length - 1} other{usersInCircuit.length - 1 !== 1 ? 's' : ''}
+                      </span>
+                      <div className="flex -space-x-1">
+                        {usersInCircuit.filter(u => u.sessionId !== currentSessionId.current).slice(0, 3).map(user => (
+                          <div
+                            key={user.sessionId}
+                            className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-semibold text-white"
+                            style={{ backgroundColor: user.color }}
+                            title={user.userName}
+                          >
+                            {user.userName.charAt(0).toUpperCase()}
+                          </div>
+                        ))}
+                        {usersInCircuit.length - 1 > 3 && (
+                          <div className="w-5 h-5 rounded-full border-2 border-white bg-gray-400 flex items-center justify-center text-[8px] font-semibold text-white">
+                            +{usersInCircuit.length - 1 - 3}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -2736,6 +3251,25 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                 setCanvasOffset({ x: stage.x(), y: stage.y() });
                 updateViewport();
               }}
+              onDragEnd={(e) => {
+                // Broadcast canvas pan to other users
+                if (draggingElement !== null) return;
+                if (signalRConnected && currentCircuitId) {
+                  const stage = e.target;
+                  const connection = getSignalRConnection();
+                  broadcastCircuitUpdate({
+                    circuitId: currentCircuitId,
+                    userId: currentUserId,
+                    sessionId: connection.getSocketId(),
+                    timestamp: Date.now(),
+                    changes: {
+                      type: 'VIEWPORT_CHANGED',
+                      position: { x: stage.x(), y: stage.y() },
+                      scale: stage.scaleX()
+                    }
+                  });
+                }
+              }}
               draggable={draggingElement == null}
               onWheel={handleWheel}
             >
@@ -2881,6 +3415,24 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
                         }
                         return next;
                       });
+                      
+                      // Broadcast element move to other users
+                      if (signalRConnected && currentCircuitId) {
+                        const connection = getSignalRConnection();
+                        const sessionId = connection.getSocketId();
+                        console.log('[SignalR] Broadcasting ELEMENT_MOVED from session:', sessionId);
+                        broadcastCircuitUpdate({
+                          circuitId: currentCircuitId,
+                          userId: currentUserId,
+                          sessionId: sessionId,
+                          timestamp: Date.now(),
+                          changes: {
+                            type: 'ELEMENT_MOVED',
+                            elementId: draggedId,
+                            position: { x, y }
+                          }
+                        });
+                      }
                       
                       // When not snapped after drag, remove any hidden node-to-node
                       // wires attached to this element whose endpoints are no longer
@@ -3717,3 +4269,16 @@ export default function CircuitCanvas({ importedCircuit }: { importedCircuit?: s
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+

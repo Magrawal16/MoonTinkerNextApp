@@ -221,7 +221,6 @@ export default function Ldr(props: LdrProps) {
             width={WIDTH}
             height={height}
             y={0}
-            shadowBlur={props.selected ? 6 : 0}
           />
         </Group>
       )}

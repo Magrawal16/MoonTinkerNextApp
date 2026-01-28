@@ -5,21 +5,25 @@
 type EnvName = "development" | "uat" | "production";
 
 // Available base URLs. Comment or adjust entries as needed.
-const BASES: Record<EnvName, { client: string; external: string }> = {
+const BASES: Record<EnvName, { client: string; external: string; signalR: string }> = {
   development: {
     // Client hits Next.js proxy to inject security key/CORS
     client: "/api",
     // Local upstream API (used by server proxy)
     external: "https://localhost:7230/api",
+    // SignalR hub URL (backend server)
+    signalR: "https://localhost:7230/circuithub",
   },
   uat: {
     client: "/api",
     external: "https://dev.moonr.com/MoonTinkerService/api",
+    signalR: "https://dev.moonr.com/MoonTinkerService/circuithub",
   },
   production: {
     client: "/api",
     // TODO: set production upstream when available
     external: "https://prod.example.com/MoonTinkerService/api",
+    signalR: "https://prod.example.com/MoonTinkerService/circuithub",
   },
 };
 
@@ -31,3 +35,4 @@ const ACTIVE_ENV: EnvName = "uat";
 
 export const CLIENT_API_BASE = BASES[ACTIVE_ENV].client.replace(/\/+$/g, "");
 export const EXTERNAL_API_BASE = BASES[ACTIVE_ENV].external.replace(/\/+$/g, "");
+export const SIGNALR_HUB_URL = BASES[ACTIVE_ENV].signalR.replace(/\/+$/g, "");

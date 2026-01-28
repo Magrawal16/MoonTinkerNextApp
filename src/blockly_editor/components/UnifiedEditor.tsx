@@ -111,17 +111,9 @@ export default function UnifiedEditor({
     return {};
   });
 
-  // Sync internal XML map when external map changes (only if content differs)
-  useEffect(() => {
-    if (!externalControllerXmlMap || Object.keys(externalControllerXmlMap).length === 0) return;
-    // Only update if content actually changed (deep comparison)
-    const hasChanges = Object.keys(externalControllerXmlMap).some(
-      key => controllerXmlMapRef.current[key] !== externalControllerXmlMap[key]
-    );
-    if (!hasChanges) return;
-    setControllerXmlMap(externalControllerXmlMap);
-    controllerXmlMapRef.current = externalControllerXmlMap;
-  }, [externalControllerXmlMap ? JSON.stringify(externalControllerXmlMap) : '']);
+  // Track if we're receiving external updates (to avoid feedback loops)
+  const isApplyingExternalXmlRef = useRef(false);
+
   const [workspaceXml, setWorkspaceXml] = useState<string>("");
   const [bidirectionalConverter, setBidirectionalConverter] = useState<BidirectionalConverter | null>(null);
   const [isUpdatingFromBlocks, setIsUpdatingFromBlocks] = useState(false);
@@ -169,6 +161,52 @@ export default function UnifiedEditor({
   
   activeControllerIdRef.current = activeControllerId;
   controllerXmlMapRef.current = controllerXmlMap;
+
+  // Sync internal XML map when external map changes (only if content differs)
+  // Also reload the workspace blocks when the active controller's XML changes remotely
+  // NOTE: This effect must be placed after all state declarations to avoid "before initialization" errors
+  useEffect(() => {
+    if (!externalControllerXmlMap || Object.keys(externalControllerXmlMap).length === 0) return;
+    
+    // Check if the active controller's XML changed
+    const activeId = activeControllerIdRef.current;
+    const currentXml = controllerXmlMapRef.current[activeId ?? ''] ?? '';
+    const newXml = externalControllerXmlMap[activeId ?? ''] ?? '';
+    const activeControllerXmlChanged = activeId && newXml && currentXml !== newXml;
+    
+    // Only update if content actually changed (deep comparison)
+    const hasChanges = Object.keys(externalControllerXmlMap).some(
+      key => controllerXmlMapRef.current[key] !== externalControllerXmlMap[key]
+    );
+    if (!hasChanges) return;
+    
+    setControllerXmlMap(externalControllerXmlMap);
+    controllerXmlMapRef.current = externalControllerXmlMap;
+    
+    // If the active controller's XML changed and workspace is ready, reload blocks
+    if (activeControllerXmlChanged && workspaceRef.current && workspaceReady && editorMode === 'block') {
+      console.log('[UnifiedEditor] Reloading blocks from external XML update for:', activeId);
+      isApplyingExternalXmlRef.current = true;
+      setIsUpdatingFromBlocks(true);
+      
+      try {
+        const xmlDom = xmlHelpers.current.textToDom(newXml);
+        if (xmlDom && !xmlDom.querySelector?.('parsererror')) {
+          workspaceRef.current.clear();
+          (Blockly.Xml as any).domToWorkspace(xmlDom, workspaceRef.current);
+          setWorkspaceXml(newXml);
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to reload workspace from external XML:', e);
+      } finally {
+        // Use timeout to ensure all Blockly events settle before resuming
+        setTimeout(() => {
+          isApplyingExternalXmlRef.current = false;
+          setIsUpdatingFromBlocks(false);
+        }, 100);
+      }
+    }
+  }, [externalControllerXmlMap ? JSON.stringify(externalControllerXmlMap) : '', workspaceReady, editorMode]);
   
   const isUpdatingFromCodeRef = useRef<boolean>(isUpdatingFromCode);
   // Track text edits relative to the code generated from blocks when entering text mode
@@ -395,9 +433,12 @@ export default function UnifiedEditor({
   });
 
   // Notify parent of XML changes via debounce to avoid rapid re-renders
+  // Skip notification when we're applying external XML updates (to avoid feedback loops)
   useEffect(() => {
     if (!controllerXmlMap || Object.keys(controllerXmlMap).length === 0) return;
+    if (isApplyingExternalXmlRef.current) return; // Skip during external XML application
     const timer = setTimeout(() => {
+      if (isApplyingExternalXmlRef.current) return; // Double-check before notifying
       try { onControllerXmlMapChange?.(controllerXmlMap); } catch {}
     }, 300);
     return () => clearTimeout(timer);
@@ -453,10 +494,23 @@ export default function UnifiedEditor({
 
   let currentCode = controllerCodeMap[activeControllerId ?? ""] ?? "";
 
+  // Track if code was updated externally (from SignalR)
+  const previousCodeRef = useRef<string>("");
+  
   useEffect(() => {
-    // Only sync localCode from controllerCodeMap when in block mode
+    // Detect if code changed externally (not from local typing)
+    const wasExternalUpdate = previousCodeRef.current !== currentCode && 
+                               localCodeRef.current !== currentCode;
+    previousCodeRef.current = currentCode;
+    
+    // Sync localCode from controllerCodeMap in block mode, or when external update in text mode
     if (editorMode === "block" && !isUpdatingFromBlocks) {
       setLocalCode(currentCode);
+    } else if (editorMode === "text" && wasExternalUpdate && currentCode) {
+      // In text mode, update local code if it came from remote (SignalR)
+      console.log('[UnifiedEditor] Syncing external code update in text mode');
+      setLocalCode(currentCode);
+      textBaselineRef.current = currentCode;
     }
     localCodeRef.current = currentCode;
   }, [currentCode, activeControllerId, isUpdatingFromBlocks, editorMode]);

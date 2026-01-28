@@ -18,6 +18,7 @@ export interface PaletteElement {
     voltage?: number;
     ratio?: number;
     temperature?: number;
+    tempScale?: "celsius" | "fahrenheit";
     color?: string;
     mode?: "voltage" | "current" | "resistance"; // For multimeters
   };
@@ -72,7 +73,7 @@ export const ELEMENT_PALETTE: PaletteElement[] = [
     type: "lm35",
     label: "LM35 Temperature Sensor",
     iconPath: "assets/circuit_canvas/elements/LM35.svg",
-    defaultProps: { temperature: 25 },
+    defaultProps: { temperature: 25, tempScale: "celsius" },
   },
   {
     type: "multimeter",
